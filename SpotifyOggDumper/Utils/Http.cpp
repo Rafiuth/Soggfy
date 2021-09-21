@@ -82,7 +82,7 @@ namespace Http
                 if (!bResults || bytesAvail == 0) break;
 
                 auto& content = respData.Content;
-                int prevSize = content.size();
+                auto prevSize = content.size();
 
                 //try to alloc 2x the current buffer size to avoid reallocating every chunk
                 if (content.capacity() < prevSize + bytesAvail) {
