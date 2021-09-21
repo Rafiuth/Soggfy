@@ -88,7 +88,7 @@ DETOUR_FUNC(__cdecl, void, WriteLog, (LogParams pars))
 
 //(To find this function)
 //in ghidra, search for the function ref'ing "accessToken" (it loads the first 16 chars into xmm0)
-//then use x64dbg to find the caller (this function)
+//then find a caller refing it, (a function with 3 calls), or use x64dbg to find it. This hooks the caller.
 DETOUR_FUNC(__cdecl, int, CreateJsonAccessToken, (void* param_1, char** param_2))
 {
     if (param_2) {
@@ -111,6 +111,14 @@ struct HookTable
 };
 static const HookTable HookTables[] =
 {
+    {
+        {1, 1, 68, 632}, {1, 1, 68, 632},   //min and max Version
+        {
+            { 0x00D2D5D0, &OggSyncPageOut_Detour,           (LPVOID*)&OggSyncPageOut_Org        },
+            { 0x011B22E0, &WriteLog_Detour,                 (LPVOID*)&WriteLog_Org              },
+            { 0x00B2D470, &CreateJsonAccessToken_Detour,    (LPVOID*)&CreateJsonAccessToken_Org },
+        }
+    },
     {
         {1, 1, 68, 628}, {1, 1, 68, 628},   //min and max Version
         {
