@@ -1,0 +1,30 @@
+name: Release
+
+on:
+  push:
+    tags:
+    - 'v*'
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - uses: actions/checkout@v2
+    
+    - name: Add msbuild to PATH
+      uses: microsoft/setup-msbuild@v1.0.3
+  
+    - name: Build
+      run: |
+        vcpkg install --triplet x86-windows-static-md
+        msbuild /p:Configuration=Release
+        
+        $ver = $Env:GITHUB_REF -replace "refs/.*/v", ""
+        7z a build/Soggfy-$ver.7z ./build/Release/*
+
+    - name: Upload binaries
+      uses: softprops/action-gh-release@v1
+      with:
+        draft: false
+        files: 'build/*.7z'
