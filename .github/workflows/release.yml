@@ -18,6 +18,7 @@ jobs:
     - name: Build
       run: |
         vcpkg install --triplet x86-windows-static-md
+        vcpkg integrate install
         msbuild /p:Configuration=Release
         
         $ver = $Env:GITHUB_REF -replace "refs/.*/v", ""
