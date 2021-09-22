@@ -162,25 +162,39 @@ struct StateManagerImpl : public StateManager
 
         return utfConv.to_bytes(dstW);
     }
+    std::string SanitizeFilename(const std::string& src)
+    {
+        std::string dst;
+        dst.reserve(src.length());
+        
+        for (char ch : src) {
+            if ((ch >= 0x00 && ch < 0x20) || strchr("\\/:*?\"<>|", ch)) {
+                continue;
+            }
+            dst += ch;
+        }
+        return dst;
+    }
     fs::path RenderTrackPath(const std::string& fmtKey, const json& metadata)
     {
         std::string fmt = _config[fmtKey].get<std::string>();
 
-        auto replace = [&](const std::string& needle, const std::string& replacement) {
+        auto FillArg = [&](const std::string& needle, const std::string& replacement) {
+            auto repl = SanitizeFilename(replacement);
             //https://stackoverflow.com/a/4643526
             size_t index = 0;
             while (true) {
                 index = fmt.find(needle, index);
                 if (index == std::string::npos) break;
 
-                fmt.replace(index, needle.length(), replacement);
-                index += replacement.length();
+                fmt.replace(index, needle.length(), repl);
+                index += repl.length();
             }
         };
-        replace("{artist_name}", metadata["artists"][0]["name"]);
-        replace("{album_name}", metadata["album"]["name"]);
-        replace("{track_name}", metadata["name"]);
-        replace("{track_num}", std::to_string(metadata["track_number"].get<int>()));
+        FillArg("{artist_name}", metadata["artists"][0]["name"]);
+        FillArg("{album_name}", metadata["album"]["name"]);
+        FillArg("{track_name}", metadata["name"]);
+        FillArg("{track_num}", std::to_string(metadata["track_number"].get<int>()));
 
         return ExpandEnvVars(fmt);
     }
