@@ -71,14 +71,28 @@ DETOUR_FUNC(__cdecl, void, WriteLog, (LogParams pars))
             auto playbackId = match.str(1);
             _stateMgr->OnTrackCreated(playbackId, trackId);
         } else {
-            LogWarn("Found track uri with no matching playback.");
+            LogWarn("Found track uri with no matching playback");
         }
     }
-    if (MatchesRegex(str, R"(Close track \(playback_id (.+?)\))")) {
-        _stateMgr->OnTrackClosed(match.str(1));
+    if (MatchesRegex(str, R"(\s*reason_end: (.+))")) {
+        auto reason = match.str(1);
+
+        if (MatchesRegex(_logHistory.at(2), R"(Close track \(playback_id (.+?)\))")) {
+            auto playbackId = match.str(1);
+            _stateMgr->OnTrackClosed(playbackId, reason);
+        } else {
+            LogWarn("Track closed with no matching playback");
+        }
     }
-    if (MatchesRegex(str, R"(\s*Open track player \(playback_id (.+?)\))")) {
-        _stateMgr->OnTrackOpened(match.str(1));
+    if (MatchesRegex(str, R"(\s*position: (-?\d+) ms)")) {
+        int position = std::stoi(match.str(1));
+
+        if (MatchesRegex(_logHistory.at(1), R"(\s*Open track player \(playback_id (.+?)\))")) {
+            auto playbackId = match.str(1);
+            _stateMgr->OnTrackOpened(playbackId, position);
+        } else {
+            LogWarn("Track opened with no matching playback");
+        }
     }
     if (MatchesRegex(str, R"(Seeking track to \d+ ms \(playback_id (.+?)\))")) {
         _stateMgr->OnTrackSeeked(match.str(1));
@@ -161,6 +175,8 @@ void Exit()
 
     MH_DisableHook(MH_ALL_HOOKS);
     MH_Uninitialize();
+
+    _stateMgr->Shutdown();
 
     FreeConsole();
     FreeLibraryAndExitThread(_selfModule, 0);
