@@ -256,9 +256,9 @@ struct StateManagerImpl : public StateManager
         coverArt->setData(TagLib::ByteVector(coverData.data(), (uint32_t)coverData.size()));
 
         tag->addPicture(coverArt);
-        tag->setTitle(meta["name"].get<std::string>());
-        tag->setArtist(artists);
-        tag->setAlbum(meta["album"]["name"].get<std::string>());
+        tag->setTitle(TagLib::String(meta["name"].get<std::string>(), TagLib::String::UTF8));
+        tag->setArtist(TagLib::String(artists, TagLib::String::UTF8));
+        tag->setAlbum(TagLib::String(meta["album"]["name"].get<std::string>(), TagLib::String::UTF8));
         tag->setTrack(meta["track_number"].get<int>());
         tag->setYear(year);
 
@@ -324,6 +324,8 @@ struct StateManagerImpl : public StateManager
         FillArg("{album_name}", metadata["album"]["name"]);
         FillArg("{track_name}", metadata["name"]);
         FillArg("{track_num}", std::to_string(metadata["track_number"].get<int>()));
+        
+        return fs::u8path(ExpandEnvVars(fmt));
     }
     //Call WINAPI ExpandEnvironmentStrings(), assuming str is UTF8.
     std::string ExpandEnvVars(const std::string& str)
