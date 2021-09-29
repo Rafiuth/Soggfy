@@ -185,6 +185,10 @@ int main()
         std::cout << "Injection succeeded!\n";
     } catch (std::exception& ex) {
         std::cout << "Error: " << ex.what() << "\n";
+        for (int i = 5; i > 0; i--) {
+            std::cout << "Exiting in " << i << "s...\r";
+            Sleep(1000);
+        }
     }
     CleanupTargetProcess(targetProc);
     return 0;
