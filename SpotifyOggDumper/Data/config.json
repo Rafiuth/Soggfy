@@ -1,6 +1,6 @@
 {
     //The path to save tracks in. Supports all %env_vars% and the following metadata vars:
-    // {artist_name}, {album_name}, {track_name}, {track_num}
+    // {artist_name}, {album_name}, {release_year}, {track_name}, {track_num}
     "track_path_fmt": "%userprofile%/Music/Soggfy/{artist_name}/{album_name}/{track_num}. {track_name}.ogg",
     
     //The path to save album covers in. Can be disabled by setting to ""

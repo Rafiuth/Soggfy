@@ -244,7 +244,7 @@ struct StateManagerImpl : public StateManager
             artists += artist["name"];
         }
         auto releaseDate = meta["album"]["release_date"].get<std::string>();
-        int year = std::stoi(releaseDate.substr(0, releaseDate.find('-')));
+        int releaseYear = std::stoi(releaseDate.substr(0, releaseDate.find('-')));
 
         TagLib::Ogg::Vorbis::File ogg(path.string().c_str());
         auto* tag = ogg.tag();
@@ -260,7 +260,7 @@ struct StateManagerImpl : public StateManager
         tag->setArtist(TagLib::String(artists, TagLib::String::UTF8));
         tag->setAlbum(TagLib::String(meta["album"]["name"].get<std::string>(), TagLib::String::UTF8));
         tag->setTrack(meta["track_number"].get<int>());
-        tag->setYear(year);
+        tag->setYear(releaseYear);
 
         tag->addField("DATE", releaseDate);
         tag->addField("DISCNUMBER", std::to_string(meta["disc_number"].get<int>()));
@@ -306,6 +306,9 @@ struct StateManagerImpl : public StateManager
 
     fs::path RenderTrackPath(const std::string& fmtKey, const json& metadata)
     {
+        auto releaseDate = metadata["album"]["release_date"].get<std::string>();
+        int releaseYear = std::stoi(releaseDate.substr(0, releaseDate.find('-')));
+        
         std::string fmt = _config[fmtKey].get<std::string>();
 
         auto FillArg = [&](const std::string& needle, const std::string& replacement) {
@@ -324,6 +327,7 @@ struct StateManagerImpl : public StateManager
         FillArg("{album_name}", metadata["album"]["name"]);
         FillArg("{track_name}", metadata["name"]);
         FillArg("{track_num}", std::to_string(metadata["track_number"].get<int>()));
+        FillArg("{release_year}", std::to_string(releaseYear));
         
         return fs::u8path(ExpandEnvVars(fmt));
     }
