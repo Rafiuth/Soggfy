@@ -209,7 +209,7 @@ struct StateManagerImpl : public StateManager
 
             LogInfo("Saving track {}", trackId);
             LogInfo("  title: {} - {}", meta["artists"][0]["name"].get<std::string>(), meta["name"].get<std::string>());
-            LogInfo("  stream: {}", stream->FileName.filename().string());
+            LogDebug("  stream: {}", stream->FileName.filename().string());
             LogDebug("  meta: {}", meta.dump());
 
             auto trackPath = RenderTrackPath("track_path_fmt", meta);
