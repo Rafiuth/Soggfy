@@ -99,10 +99,6 @@ DETOUR_FUNC(__cdecl, void, WriteLog, (LogParams pars))
     }
     WriteLog_Org(pars);
 }
-
-//(To find this function)
-//in ghidra, search for the function ref'ing "accessToken" (it loads the first 16 chars into xmm0)
-//then find a caller refing it, (a function with 3 calls), or use x64dbg to find it. This hooks the caller.
 DETOUR_FUNC(__cdecl, int, CreateJsonAccessToken, (void* param_1, char** param_2))
 {
     if (param_2) {
@@ -126,7 +122,15 @@ struct HookTable
 static const HookTable HookTables[] =
 {
     {
-        {1, 1, 68, 632}, {1, 1, 68, 632},   //min and max Version
+        {1, 1, 69, 612}, {1, 1, 69, 612},   //version range
+        {
+            { 0x00A08687, &OggSyncPageOut_Detour,           (LPVOID*)&OggSyncPageOut_Org        },
+            { 0x00CBA138, &WriteLog_Detour,                 (LPVOID*)&WriteLog_Org              },
+            { 0x008AFAC3, &CreateJsonAccessToken_Detour,    (LPVOID*)&CreateJsonAccessToken_Org },
+        }
+    },
+    {
+        {1, 1, 68, 632}, {1, 1, 68, 632},   //version range
         {
             { 0x00D2D5D0, &OggSyncPageOut_Detour,           (LPVOID*)&OggSyncPageOut_Org        },
             { 0x011B22E0, &WriteLog_Detour,                 (LPVOID*)&WriteLog_Org              },
@@ -134,7 +138,7 @@ static const HookTable HookTables[] =
         }
     },
     {
-        {1, 1, 68, 628}, {1, 1, 68, 628},   //min and max Version
+        {1, 1, 68, 628}, {1, 1, 68, 628},   //version range
         {
             { 0x00D2D2D0, &OggSyncPageOut_Detour,           (LPVOID*)&OggSyncPageOut_Org        },
             { 0x011B1CB0, &WriteLog_Detour,                 (LPVOID*)&WriteLog_Org              },
@@ -214,7 +218,7 @@ DWORD WINAPI Init(LPVOID param)
         R"(     ____\_\  \ \_______\ \_______\ \_______\ \__\__/  / /    )" "\n"
         R"(    |\_________\|_______|\|_______|\|_______|\|__|\___/ /     )" "\n"
         R"(    \|_________|                                 \|___|/      )" "\n" COL_RESET
-        R"(                                                        v1.0.5)";
+        R"(                                                        v1.0.6)";
     LogInfo(label);
 
     try {
