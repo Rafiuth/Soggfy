@@ -114,11 +114,9 @@
     <ClInclude Include="OggDefs.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
-  <ImportGroup Label="ExtensionTargets">
-  </ImportGroup>
   <ItemGroup>
-    <None Include="Data/config.json">
-      <Link>config.json</Link>
+    <None Include="Data/*">
+      <Link>%(Filename)%(Extension)</Link>
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
   </ItemGroup>
