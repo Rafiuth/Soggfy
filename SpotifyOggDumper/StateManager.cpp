@@ -29,6 +29,38 @@ struct OggStream
     bool EOS;
 };
 
+enum class TrackType
+{
+    Music, PodcastEpisode
+};
+struct TrackMetadata
+{
+    TrackType Type;
+
+    std::string TrackName;
+    std::vector<std::string> Artists;
+    std::string AlbumName;
+    std::string AlbumType;
+    std::string ReleaseDate; //Format: Year-Month-Day
+    std::string CoverUrl;
+    int TrackNum;
+    int DiscNum;
+    int TotalTracks;
+
+    //Music only
+    std::string ISRC;
+
+    //Podcast only
+    std::string Description;
+
+    json RawData;
+
+    int GetReleaseYear() const
+    {
+        return std::stoi(ReleaseDate.substr(0, ReleaseDate.find('-')));
+    }
+};
+
 struct StateManagerImpl : public StateManager
 {
     fs::path _dataDir;
@@ -49,11 +81,14 @@ struct StateManagerImpl : public StateManager
         std::ifstream configFile(dataDir / "config.json");
         if (configFile.good()) {
             _config = json::parse(configFile, nullptr, true, true);
-        } else {
-            _config["track_path_fmt"] = "%userprofile%/Music/Soggfy/{artist_name}/{album_name}/{track_num}. {track_name}.ogg";
-            _config["cover_path_fmt"] = "%userprofile%/Music/Soggfy/{artist_name}/{album_name}/cover.jpg";
         }
+        //add missing values
+        _config.emplace("track_path_fmt", "%userprofile%/Music/Soggfy/{artist_name}/{album_name}/{track_num}. {track_name}.ogg");
+        _config.emplace("cover_path_fmt", "%userprofile%/Music/Soggfy/{artist_name}/{album_name}/cover.jpg");
+        _config.emplace("podcast_path_fmt", "%userprofile%/Music/SoggfyPodcasts/{artist_name}/{album_name}/{track_name}.ogg");
+        _config.emplace("podcast_cover_path_fmt", "%userprofile%/Music/SoggfyPodcasts/{artist_name}/{album_name}/cover.jpg");
 
+        //delete old temp files
         std::error_code deleteError;
         fs::remove_all(dataDir / "temp", deleteError);
     }
@@ -208,17 +243,21 @@ struct StateManagerImpl : public StateManager
             auto meta = FetchTrackMetadata(trackId);
 
             LogInfo("Saving track {}", trackId);
-            LogInfo("  title: {} - {}", meta["artists"][0]["name"].get<std::string>(), meta["name"].get<std::string>());
+            LogInfo("  title: {} - {}", meta.Artists[0], meta.TrackName);
             LogDebug("  stream: {}", stream->FileName.filename().string());
-            LogDebug("  meta: {}", meta.dump());
+            LogDebug("  meta: {}", meta.RawData.dump());
 
-            auto trackPath = RenderTrackPath("track_path_fmt", meta);
-            auto coverPath = RenderTrackPath("cover_path_fmt", meta);
+            auto pathKeys = meta.Type == TrackType::Music
+                ? std::make_tuple("track_path_fmt", "cover_path_fmt")
+                : std::make_tuple("podcast_path_fmt", "podcast_cover_path_fmt");
 
-            auto tmpCoverPath = _dataDir / "temp" / (meta["album"]["id"].get<std::string>() + "_cover.jpg");
+            auto trackPath = RenderTrackPath(std::get<0>(pathKeys), meta);
+            auto coverPath = RenderTrackPath(std::get<1>(pathKeys), meta);
+
+            auto tmpCoverPath = _dataDir / "temp" / (SanitizeFilename(meta.CoverUrl) + ".jpg");
 
             if (!fs::exists(tmpCoverPath)) {
-                DownloadFile(tmpCoverPath, meta["album"]["images"][0]["url"]);
+                DownloadFile(tmpCoverPath, meta.CoverUrl);
             }
             if (!coverPath.empty() && !fs::exists(coverPath)) {
                 fs::create_directories(coverPath.parent_path());
@@ -233,18 +272,16 @@ struct StateManagerImpl : public StateManager
         }
     }
 
-    void WriteTags(const fs::path& path, const fs::path& coverPath, const json& meta)
+    void WriteTags(const fs::path& path, const fs::path& coverPath, const TrackMetadata& meta)
     {
         std::ifstream coverFile(coverPath, std::ios::binary);
         auto coverData = std::vector<char>(std::istreambuf_iterator<char>(coverFile), std::istreambuf_iterator<char>());
 
         std::string artists;
-        for (auto& artist : meta["artists"]) {
+        for (auto& artistName : meta.Artists) {
             if (artists.size() > 0) artists += ", ";
-            artists += artist["name"];
+            artists += artistName;
         }
-        auto releaseDate = meta["album"]["release_date"].get<std::string>();
-        int releaseYear = std::stoi(releaseDate.substr(0, releaseDate.find('-')));
 
         TagLib::Ogg::Vorbis::File ogg(path.string().c_str());
         auto* tag = ogg.tag();
@@ -256,22 +293,26 @@ struct StateManagerImpl : public StateManager
         coverArt->setData(TagLib::ByteVector(coverData.data(), (uint32_t)coverData.size()));
 
         tag->addPicture(coverArt);
-        tag->setTitle(TagLib::String(meta["name"].get<std::string>(), TagLib::String::UTF8));
+        tag->setTitle(TagLib::String(meta.TrackName, TagLib::String::UTF8));
         tag->setArtist(TagLib::String(artists, TagLib::String::UTF8));
-        tag->setAlbum(TagLib::String(meta["album"]["name"].get<std::string>(), TagLib::String::UTF8));
-        tag->setTrack(meta["track_number"].get<int>());
-        tag->setYear(releaseYear);
+        tag->setAlbum(TagLib::String(meta.AlbumName, TagLib::String::UTF8));
+        tag->setTrack(meta.TrackNum);
+        tag->setYear(meta.GetReleaseYear());
 
-        tag->addField("DATE", releaseDate);
-        tag->addField("DISCNUMBER", std::to_string(meta["disc_number"].get<int>()));
-        tag->addField("ISRC", meta["external_ids"]["isrc"].get<std::string>());
-        tag->addField("RELEASETYPE", meta["album"]["album_type"].get<std::string>());
-        tag->addField("TOTALTRACKS", std::to_string(meta["album"]["total_tracks"].get<int>()));
-
+        tag->addField("DATE", meta.ReleaseDate);
+        tag->addField("TOTALTRACKS", std::to_string(meta.TotalTracks));
+        
+        if (meta.Type == TrackType::Music) {
+            tag->addField("DISCNUMBER", std::to_string(meta.DiscNum));
+            tag->addField("ISRC", meta.ISRC);
+            tag->addField("RELEASETYPE", meta.AlbumType);
+        } else if (meta.Type == TrackType::PodcastEpisode) {
+            tag->addField("DESCRIPTION", TagLib::String(meta.Description, TagLib::String::UTF8));
+        }
         ogg.save();
     }
 
-    json FetchTrackMetadata(const std::string& trackId)
+    TrackMetadata FetchTrackMetadata(const std::string& trackId)
     {
         std::string path;
 
@@ -290,7 +331,44 @@ struct StateManagerImpl : public StateManager
 
         auto resp = Http::Fetch(req);
         auto& rawJson = resp.Content;
-        return json::parse(rawJson.begin(), rawJson.end());
+        auto json = json::parse(rawJson.begin(), rawJson.end());
+
+        TrackMetadata md;
+        md.RawData = json;
+
+        if (json["type"] == "track") {
+            md.Type = TrackType::Music;
+            md.TrackName = json["name"];
+            for (auto& artist : json["artists"]) {
+                md.Artists.emplace_back(artist["name"]);
+            }
+            md.AlbumName = json["album"]["name"];
+            md.AlbumType = json["album"]["album_type"];
+            md.ReleaseDate = json["album"]["release_date"];
+            md.CoverUrl = json["album"]["images"][0]["url"];
+            md.TotalTracks = json["album"]["total_tracks"];
+            md.TrackNum = json["track_number"];
+            md.DiscNum = json["disc_number"];
+
+            if (json["external_ids"].contains("isrc")) {
+                md.ISRC = json["external_ids"]["isrc"];
+            } else {
+                md.ISRC = "unknown";
+            }
+        } else if (json["type"] == "episode") {
+            md.Type = TrackType::PodcastEpisode;
+            md.TrackName = json["name"];
+            md.Artists.emplace_back(json["show"]["publisher"]);
+            md.AlbumName = json["show"]["name"];
+            md.ReleaseDate = json["release_date"];
+            md.CoverUrl = json["images"][0]["url"];
+            md.TotalTracks = json["show"]["total_episodes"];
+            md.TrackNum = 0;
+            md.Description = json["description"];
+        } else {
+            throw std::runtime_error("Don't know how to parse track metadata (type=" + json["type"].get<std::string>() + ")");
+        }
+        return md;
     }
     void DownloadFile(const fs::path& path, const std::string& url)
     {
@@ -304,11 +382,8 @@ struct StateManagerImpl : public StateManager
         file.write((char*)resp.Content.data(), resp.Content.size());
     }
 
-    fs::path RenderTrackPath(const std::string& fmtKey, const json& metadata)
+    fs::path RenderTrackPath(const std::string& fmtKey, const TrackMetadata& metadata)
     {
-        auto releaseDate = metadata["album"]["release_date"].get<std::string>();
-        int releaseYear = std::stoi(releaseDate.substr(0, releaseDate.find('-')));
-        
         std::string fmt = _config[fmtKey].get<std::string>();
 
         auto FillArg = [&](const std::string& needle, const std::string& replacement) {
@@ -323,11 +398,11 @@ struct StateManagerImpl : public StateManager
                 index += repl.length();
             }
         };
-        FillArg("{artist_name}", metadata["artists"][0]["name"]);
-        FillArg("{album_name}", metadata["album"]["name"]);
-        FillArg("{track_name}", metadata["name"]);
-        FillArg("{track_num}", std::to_string(metadata["track_number"].get<int>()));
-        FillArg("{release_year}", std::to_string(releaseYear));
+        FillArg("{artist_name}", metadata.Artists[0]);
+        FillArg("{album_name}", metadata.AlbumName);
+        FillArg("{track_name}", metadata.TrackName);
+        FillArg("{track_num}", std::to_string(metadata.TrackNum));
+        FillArg("{release_year}", std::to_string(metadata.GetReleaseYear()));
         
         return fs::u8path(ExpandEnvVars(fmt));
     }

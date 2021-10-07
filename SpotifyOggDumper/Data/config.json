@@ -2,7 +2,11 @@
     //The path to save tracks in. Supports all %env_vars% and the following metadata vars:
     // {artist_name}, {album_name}, {release_year}, {track_name}, {track_num}
     "track_path_fmt": "%userprofile%/Music/Soggfy/{artist_name}/{album_name}/{track_num}. {track_name}.ogg",
-    
+
     //The path to save album covers in. Can be disabled by setting to ""
-    "cover_path_fmt": "%userprofile%/Music/Soggfy/{artist_name}/{album_name}/cover.jpg"
+    "cover_path_fmt": "%userprofile%/Music/Soggfy/{artist_name}/{album_name}/cover.jpg",
+
+    //Note: {track_num} is always 0
+    "podcast_path_fmt": "%userprofile%/Music/SoggfyPodcasts/{artist_name}/{album_name}/{track_name}.ogg",
+    "podcast_cover_path_fmt": "%userprofile%/Music/SoggfyPodcasts/{artist_name}/{album_name}/cover.jpg"
 }
