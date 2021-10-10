@@ -416,6 +416,7 @@ struct StateManagerImpl : public StateManager
 
         std::wstring dstW(len, '\0');
         ExpandEnvironmentStrings(srcW.c_str(), dstW.data(), len);
+        dstW.resize(len - 1); //don't count null terminator in .size()
 
         return utfConv.to_bytes(dstW);
     }
