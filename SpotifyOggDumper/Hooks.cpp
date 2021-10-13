@@ -116,13 +116,21 @@ struct HookTableEntry
 };
 struct HookTable
 {
-    AppVersion MinVersion, MaxVersion;
+    AppVersion Version;
     HookTableEntry Entries[16];
 };
 static const HookTable HookTables[] =
 {
     {
-        {1, 1, 69, 612}, {1, 1, 69, 612},   //version range
+        {1, 1, 70, 610},   //version
+        {
+            { 0x00A12421, &OggSyncPageOut_Detour,           (LPVOID*)&OggSyncPageOut_Org        },
+            { 0x00CC4953, &WriteLog_Detour,                 (LPVOID*)&WriteLog_Org              },
+            { 0x008B10EC, &CreateJsonAccessToken_Detour,    (LPVOID*)&CreateJsonAccessToken_Org },
+        }
+    },
+    {
+        {1, 1, 69, 612},   //version
         {
             { 0x00A08687, &OggSyncPageOut_Detour,           (LPVOID*)&OggSyncPageOut_Org        },
             { 0x00CBA138, &WriteLog_Detour,                 (LPVOID*)&WriteLog_Org              },
@@ -130,7 +138,7 @@ static const HookTable HookTables[] =
         }
     },
     {
-        {1, 1, 68, 632}, {1, 1, 68, 632},   //version range
+        {1, 1, 68, 632},   //version
         {
             { 0x00D2D5D0, &OggSyncPageOut_Detour,           (LPVOID*)&OggSyncPageOut_Org        },
             { 0x011B22E0, &WriteLog_Detour,                 (LPVOID*)&WriteLog_Org              },
@@ -138,7 +146,7 @@ static const HookTable HookTables[] =
         }
     },
     {
-        {1, 1, 68, 628}, {1, 1, 68, 628},   //version range
+        {1, 1, 68, 628},   //version
         {
             { 0x00D2D2D0, &OggSyncPageOut_Detour,           (LPVOID*)&OggSyncPageOut_Org        },
             { 0x011B1CB0, &WriteLog_Detour,                 (LPVOID*)&WriteLog_Org              },
@@ -165,7 +173,7 @@ void InstallHooks(const HookTable& table)
 void InstallHooks(const AppVersion& version)
 {
     for (auto& table : HookTables) {
-        if (version >= table.MinVersion && version <= table.MaxVersion) {
+        if (version == table.Version) {
             InstallHooks(table);
             return;
         }

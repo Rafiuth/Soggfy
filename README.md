@@ -20,4 +20,4 @@ This project takes a completely different approach - by hooking directly into fu
 - Default save path is `%userprofile%/Music/Soggfy`. It can be changed in `config.json`.
 - Quality depends on account type: 160Kb/s for free accounts, and 320Kb/s for premium accounts. It may also depend on the client settings.
 - There could be a non-zero chance of getting banned by using this (tracked in [#1](https://github.com/Rafiuth/Soggfy/issues/1))
-- Last supported version: [1.1.69.612.gb7409abc](https://upgrade.scdn.co/upgrade/client/win32-x86/spotify_installer-1.1.69.612.gb7409abc-16.exe)
+- Last supported version: [1.1.70.610.g4585142b](https://upgrade.scdn.co/upgrade/client/win32-x86/spotify_installer-1.1.70.610.g4585142b-8.exe)
