@@ -50,7 +50,7 @@ void WriteLog(LogLevel level, std::string_view fmt, Args&&... args)
     if (level < LogMinLevel || level > LOG_LEVEL_COUNT) return;
 
     std::string str = std::vformat(fmt, std::make_format_args(args...));
-    std::cout << levelColors[level] << str << "\n";
+    std::cout << levelColors[level] << str << COL_RESET << std::endl;
 }
 
 void InstallConsole();
