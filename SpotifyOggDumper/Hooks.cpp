@@ -9,7 +9,10 @@
 HMODULE _selfModule;
 std::deque<std::string> _logHistory;
 std::unique_ptr<StateManager> _stateMgr;
+double _playbackSpeed = -1.0;
 
+//Note: __thiscall can't be used directly; as a workaround, try __fastcall with an extra parameter for edx after 'this':
+//__thiscall FN(void* this, int x)  ->  __fastcall FN(void* ecx, void* edx, int x)
 #define DETOUR_FUNC(CALL_CONV, RET_TYPE, NAME,  SIG)            \
     typedef RET_TYPE (CALL_CONV *NAME##_FuncType)SIG;           \
     NAME##_FuncType NAME##_Org;                                 \
@@ -108,6 +111,22 @@ DETOUR_FUNC(__cdecl, int, CreateJsonAccessToken, (void* param_1, char** param_2)
     return CreateJsonAccessToken_Org(param_1, param_2);
 }
 
+/* 
+void __thiscall
+FUN_009a065b(void *this,undefined4 param_2,int **param_3,double speed, undefined4 param_5,
+            undefined4 param_6,undefined4 param_7,undefined4 param_8,undefined4 param_9)
+*/
+DETOUR_FUNC(__fastcall, void, CreateTrackPlayer, (
+    void* ecx, void* edx, int param_2, int param_3, double speed, 
+    int param_5, int param_6, int param_7, int param_8, int param_9
+))
+{
+    if (_playbackSpeed > 0.0) {
+        speed = _playbackSpeed;
+    }
+    CreateTrackPlayer_Org(ecx, edx, param_2, param_3, speed, param_5, param_6, param_7, param_8, param_9);
+}
+
 struct HookTableEntry
 {
     uintptr_t Addr;
@@ -127,6 +146,7 @@ static const HookTable HookTables[] =
             { 0x00A12421, &OggSyncPageOut_Detour,           (LPVOID*)&OggSyncPageOut_Org        },
             { 0x00CC4953, &WriteLog_Detour,                 (LPVOID*)&WriteLog_Org              },
             { 0x008B10EC, &CreateJsonAccessToken_Detour,    (LPVOID*)&CreateJsonAccessToken_Org },
+            { 0x009A065B, &CreateTrackPlayer_Detour,        (LPVOID*)&CreateTrackPlayer_Org     },
         }
     },
     {
@@ -239,10 +259,26 @@ DWORD WINAPI Init(LPVOID param)
         Exit();
     }
 
-    LogInfo("Hooks were successfully installed. Press 'u' to uninstall...");
+    LogInfo("Hooks were successfully installed.");
+    LogInfo(COL_GRAY "Commands: [u]ninstall | playback [s]peed <value> | [l]og level; [enter]");
+    
     while (true) {
         auto ch = std::tolower(std::cin.get());
-
+        
+        if (ch == 's') {
+            if (!CreateTrackPlayer_Org) {
+                LogError("This feature requires Spotify v1.1.70.610 or later.");
+                continue;
+            }
+            double newSpeed;
+            if (std::cin >> newSpeed) {
+                _playbackSpeed = newSpeed;
+                LogInfo("Following tracks will be played at {}x speed.", newSpeed);
+            } else {
+                std::cin.clear();
+                LogError("Example usage: `s 4`");
+            }
+        }
         if (ch == 'l') {
             LogMinLevel = (LogLevel)(LogMinLevel == LOG_TRACE ? LOG_INFO : LogMinLevel - 1); // cycle through [INFO, DEBUG, TRACE]
             LogInfo("Min log level set to {}", (int)LogMinLevel);
