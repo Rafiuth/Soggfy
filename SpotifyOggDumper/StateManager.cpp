@@ -12,11 +12,11 @@ struct OggStream;
 struct PlaybackInfo
 {
     std::string TrackId;
-    bool WasSeeked;
-    int StartPos;
-    bool Closed;
-    bool PlayedToEnd; //whether closeReason == "trackdone"
-    
+    bool WasSeeked = false;
+    int StartPos = 0;
+    bool Closed = false;
+    bool PlayedToEnd = false; //whether closeReason == "trackdone"
+
     //Map of <Stream, Freq> that were alive during this playback.
     //Used to determine stream source playbacks.
     std::unordered_map<std::shared_ptr<OggStream>, int> LiveStreams;
@@ -25,8 +25,8 @@ struct OggStream
 {
     fs::path FileName;
     std::ofstream FileStream;
-    int NumPages;
-    bool EOS;
+    int NumPages = 0;
+    bool EOS = false;
 };
 
 enum class TrackType
@@ -43,9 +43,9 @@ struct TrackMetadata
     std::string AlbumType;
     std::string ReleaseDate; //Format: Year-Month-Day
     std::string CoverUrl;
-    int TrackNum;
-    int DiscNum;
-    int TotalTracks;
+    int TrackNum = 0;
+    int DiscNum = 0;
+    int TotalTracks = 0;
 
     //Music only
     std::string ISRC;
@@ -70,14 +70,13 @@ struct StateManagerImpl : public StateManager
     std::shared_ptr<PlaybackInfo> _currPlayback;
 
     std::unordered_map<uintptr_t, std::shared_ptr<OggStream>> _oggs;
-    int _nextStreamId;
+    int _nextStreamId = 0;
 
     std::string _ffmpegPath;
     json _config;
 
-    StateManagerImpl(const fs::path& dataDir) : 
-        _dataDir(dataDir),
-        _nextStreamId(0)
+    StateManagerImpl(const fs::path& dataDir) :
+        _dataDir(dataDir)
     {
         std::ifstream configFile(dataDir / "config.json");
         if (configFile.good()) {

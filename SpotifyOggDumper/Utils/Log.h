@@ -47,7 +47,7 @@ void WriteLog(LogLevel level, std::string_view fmt, Args&&... args)
     constexpr const char* levelColors[] = { COL_GRAY, COL_SILVER, COL_WHITE, COL_YELLOW, COL_RED };
     //constexpr const char* levelNames[] = { "Trace", "Debug", "Info", "Warn", "Error" };
 
-    if (level < LogMinLevel || level > LOG_LEVEL_COUNT) return;
+    if (level < LogMinLevel || level >= LOG_LEVEL_COUNT) return;
 
     std::string str = std::vformat(fmt, std::make_format_args(args...));
     std::cout << levelColors[level] << str << COL_RESET << std::endl;
