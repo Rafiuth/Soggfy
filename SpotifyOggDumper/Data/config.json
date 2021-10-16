@@ -8,5 +8,24 @@
 
     //Note: {track_num} is always 0
     "podcast_path_fmt": "%userprofile%/Music/SoggfyPodcasts/{artist_name}/{album_name}/{track_name}.ogg",
-    "podcast_cover_path_fmt": "%userprofile%/Music/SoggfyPodcasts/{artist_name}/{album_name}/cover.jpg"
+    "podcast_cover_path_fmt": "%userprofile%/Music/SoggfyPodcasts/{artist_name}/{album_name}/cover.jpg",
+    
+    //Uncomment the line with the format you want to convert to.
+    // /* MP3 320K      */ "convert_args": "-c:v copy -map_metadata 0:s:0 -c:a libmp3lame -b:a 320k",  "convert_ext": "mp3",
+    // /* MP3 128K      */ "convert_args": "-c:v copy -map_metadata 0:s:0 -c:a libmp3lame -b:a 128k",  "convert_ext": "mp3",
+    // /* MP3 ~240K VBR */ "convert_args": "-c:v copy -map_metadata 0:s:0 -c:a libmp3lame -q:a 0",     "convert_ext": "mp3",
+    // /* MP3 ~160K VBR */ "convert_args": "-c:v copy -map_metadata 0:s:0 -c:a libmp3lame -q:a 4",     "convert_ext": "mp3",
+
+    // /* AAC 128K      */ "convert_args": "-c:v copy -map_metadata 0:s:0 -c:a aac -b:a 128k",         "convert_ext": "m4a",
+    // /* AAC 256K      */ "convert_args": "-c:v copy -map_metadata 0:s:0 -c:a aac -b:a 256k",         "convert_ext": "m4a",
+    
+    //"-c:v copy" is used to prevent ffmpeg from converting covers from JPEG-YUV444 to PNG.
+    //  If you encounter any issue, try removing it or changing to "-c:v mjpeg -pix_fmt yuvj420p -q:v 1"
+    //You can use any ffmpeg argument in `convert_args`. For more info, visit
+    //  Google
+    //  https://ffmpeg.org/ffmpeg-codecs.html
+    //  https://trac.ffmpeg.org/wiki/Encode/MP3
+    //  https://trac.ffmpeg.org/wiki/Encode/AAC
+    
+    "convert_keep_ogg": false //change to true if you also want to keep the oggs
 }

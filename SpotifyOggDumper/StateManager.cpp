@@ -72,6 +72,7 @@ struct StateManagerImpl : public StateManager
     std::unordered_map<uintptr_t, std::shared_ptr<OggStream>> _oggs;
     int _nextStreamId;
 
+    std::string _ffmpegPath;
     json _config;
 
     StateManagerImpl(const fs::path& dataDir) : 
@@ -87,10 +88,15 @@ struct StateManagerImpl : public StateManager
         _config.emplace("cover_path_fmt", "%userprofile%/Music/Soggfy/{artist_name}/{album_name}/cover.jpg");
         _config.emplace("podcast_path_fmt", "%userprofile%/Music/SoggfyPodcasts/{artist_name}/{album_name}/{track_name}.ogg");
         _config.emplace("podcast_cover_path_fmt", "%userprofile%/Music/SoggfyPodcasts/{artist_name}/{album_name}/cover.jpg");
+        _config.emplace("convert_keep_ogg", false);
 
         //delete old temp files
         std::error_code deleteError;
         fs::remove_all(dataDir / "temp", deleteError);
+
+        if (_config.contains("convert_args") && (_ffmpegPath = FindFFmpegPath().string()).empty()) {
+            LogWarn("config.json has 'convert_args' field but ffmpeg binaries were not found. Run DownloadFFmpeg.ps1 to fix this.");
+        }
     }
 
     void OnTrackCreated(const std::string& playbackId, const std::string& trackId)
@@ -264,11 +270,43 @@ struct StateManagerImpl : public StateManager
                 fs::copy_file(tmpCoverPath, coverPath);
             }
             WriteTags(stream->FileName, tmpCoverPath, meta);
-
-            fs::create_directories(trackPath.parent_path());
-            fs::rename(stream->FileName, trackPath);
+            CreateFinalTrack(stream->FileName, trackPath, meta);
         } catch (std::exception& ex) {
             LogError("Failed to save track {}: {}", trackId, ex.what());
+        }
+    }
+
+    void CreateFinalTrack(const fs::path& path, const fs::path& dstPath, const TrackMetadata& meta)
+    {
+        fs::create_directories(dstPath.parent_path());
+
+        auto& convArgs = _config["convert_args"];
+        auto& convExt = _config["convert_ext"];
+
+        if (convArgs.is_string() && !_ffmpegPath.empty()) {
+            fs::path outPath = dstPath;
+            outPath.replace_extension(convExt.get<std::string>());
+
+            if (fs::exists(outPath)) return;
+
+            std::string args = std::format("-i \"{}\" {} \"{}\"", path.string(), convArgs.get<std::string>(), outPath.string());
+
+            LogInfo("Converting {} - {}...", meta.Artists[0], meta.TrackName);
+            LogDebug("  args: {}", args);
+
+            DWORD exitCode = StartProcess(_ffmpegPath, args, true);
+            if (exitCode != 0) {
+                throw std::runtime_error("Conversion failed. (ffmpeg returned " + std::to_string(exitCode) + ")");
+            }
+            LogInfo("...done");
+
+            if (_config.value("convert_keep_ogg", false)) {
+                fs::rename(path, dstPath);
+            } else {
+                fs::remove(path);
+            }
+        } else {
+            fs::rename(path, dstPath);
         }
     }
 
@@ -382,6 +420,53 @@ struct StateManagerImpl : public StateManager
         file.write((char*)resp.Content.data(), resp.Content.size());
     }
 
+    fs::path FindFFmpegPath()
+    {
+        //Try Soggfy/ffmpeg/ffmpeg.exe
+        auto path = _dataDir / "ffmpeg/ffmpeg.exe";
+        if (fs::exists(path)) {
+            return path;
+        }
+        //Try %PATH%
+        std::wstring envPath;
+        DWORD envPathLen = SearchPath(NULL, L"ffmpeg.exe", NULL, 0, envPath.data(), NULL);
+        if (envPathLen != 0) {
+            envPath.resize(envPathLen - 1);
+            SearchPath(NULL, L"ffmpeg.exe", NULL, envPath.capacity(), envPath.data(), NULL);
+
+            return fs::path(envPath);
+        }
+        return {};
+    }
+    uint32_t StartProcess(const std::string& filename, const std::string& args, bool waitForExit)
+    {
+        std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> utfConv;
+        std::wstring filenameW = utfConv.from_bytes(filename);
+        std::wstring argsW = utfConv.from_bytes("\"" + filename + "\" " + args);
+
+        DWORD exitCode = 0;
+
+        PROCESS_INFORMATION processInfo = {};
+        STARTUPINFO startInfo = {};
+        startInfo.cb = sizeof(STARTUPINFO);
+        startInfo.dwFlags = STARTF_USESHOWWINDOW;
+        startInfo.wShowWindow = SW_HIDE;
+
+        DWORD flags = CREATE_NEW_CONSOLE;
+
+        if (!CreateProcess(filenameW.c_str(), argsW.data(), NULL, NULL, FALSE, flags, NULL, _dataDir.wstring(), &startInfo, &processInfo)) {
+            throw std::runtime_error("Failed to create process " + filename + " (error " + std::to_string(GetLastError()) + ")");
+        }
+        if (waitForExit) {
+            WaitForSingleObject(processInfo.hProcess, INFINITE);
+            GetExitCodeProcess(processInfo.hProcess, &exitCode);
+        }
+        CloseHandle(processInfo.hThread);
+        CloseHandle(processInfo.hProcess);
+
+        return exitCode;
+    }
+    
     fs::path RenderTrackPath(const std::string& fmtKey, const TrackMetadata& metadata)
     {
         std::string fmt = _config[fmtKey].get<std::string>();
