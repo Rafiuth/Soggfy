@@ -12,6 +12,7 @@
 #include <cstdint>
 #include <vector>
 #include <unordered_map>
+#include <unordered_set>
 
 #include <string>
 #include <format>
@@ -22,6 +23,7 @@
 #include <fstream>
 #include <iostream>
 #include <iterator>
+#include <algorithm>
 
 #include <thread>
 
@@ -30,5 +32,9 @@
 #define TAGLIB_STATIC
 #include <taglib/attachedpictureframe.h>
 #include <taglib/vorbisfile.h>
+
+//undef windows macros that conflict with stdlib
+#undef min
+#undef max
 
 #endif

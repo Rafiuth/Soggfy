@@ -1,7 +1,9 @@
 #include "pch.h"
+
 #include "StateManager.h"
 #include "Utils/Log.h"
 #include "Utils/Http.h"
+#include "Utils/Utils.h"
 
 namespace fs = std::filesystem;
 using namespace nlohmann;
@@ -16,10 +18,10 @@ struct PlaybackInfo
     int StartPos = 0;
     bool Closed = false;
     bool PlayedToEnd = false; //whether closeReason == "trackdone"
+    TimeRange LifeTime;
 
-    //Map of <Stream, Freq> that were alive during this playback.
-    //Used to determine stream source playbacks.
-    std::unordered_map<std::shared_ptr<OggStream>, int> LiveStreams;
+    //Set of streams that were alive during this playback.
+    std::unordered_set<std::shared_ptr<OggStream>> LiveStreams;
 };
 struct OggStream
 {
@@ -27,6 +29,8 @@ struct OggStream
     std::ofstream FileStream;
     int NumPages = 0;
     bool EOS = false;
+
+    TimeRange LifeTime;
 };
 
 enum class TrackType
@@ -119,6 +123,8 @@ struct StateManagerImpl : public StateManager
         }
         _currPlayback = itr->second;
         _currPlayback->StartPos = positionMs;
+        _currPlayback->LifeTime.MarkStart();
+
         LogInfo("New track detected: {}", _currPlayback->TrackId);
     }
     void OnTrackClosed(const std::string& playbackId, const std::string& reason)
@@ -131,6 +137,7 @@ struct StateManagerImpl : public StateManager
 
             playback->Closed = true;
             playback->PlayedToEnd = reason == "trackdone";
+            playback->LifeTime.MarkEnd();
 
             if (playback == _currPlayback) {
                 _currPlayback = nullptr;
@@ -149,21 +156,22 @@ struct StateManagerImpl : public StateManager
     }
     void ReceiveOggPage(uintptr_t syncId, ogg_page* page)
     {
-        auto state = GetOggStream(syncId);
+        auto stream = GetOggStream(syncId);
 
-        if (!state->EOS) {
-            state->FileStream.write((char*)page->header, page->header_len);
-            state->FileStream.write((char*)page->body, page->body_len);
-            state->NumPages++;
+        if (!stream->EOS) {
+            stream->FileStream.write((char*)page->header, page->header_len);
+            stream->FileStream.write((char*)page->body, page->body_len);
+            stream->NumPages++;
 
             if (_currPlayback != nullptr) {
-                _currPlayback->LiveStreams[state]++;
+                _currPlayback->LiveStreams.insert(stream);
             }
             if (page->header[5] & 0x04) { //ogg_page_eos
-                state->EOS = true;
-                state->FileStream.close();
-                _oggs.erase(syncId);
+                stream->FileStream.close();
+                stream->LifeTime.MarkEnd();
+                stream->EOS = true;
 
+                _oggs.erase(syncId);
                 FlushClosedTracks();
             }
         }
@@ -195,6 +203,7 @@ struct StateManagerImpl : public StateManager
         fs::create_directories(stream->FileName.parent_path());
 
         stream->FileStream.open(stream->FileName, std::ios::out | std::ios::binary);
+        stream->LifeTime.MarkStart();
 
         LogDebug("Detected new ogg stream, dumping to {}", stream->FileName.string());
 
@@ -229,12 +238,14 @@ struct StateManagerImpl : public StateManager
     std::shared_ptr<OggStream> FindSourceStream(std::shared_ptr<PlaybackInfo> playback)
     {
         std::shared_ptr<OggStream> bestStream;
-        int bestFreq = 8; //ignore short streams
+        int64_t bestScore = 0;
 
-        for (auto& [stream, freq] : playback->LiveStreams) {
-            if (freq > bestFreq) {
+        for (auto& stream : playback->LiveStreams) {
+            int64_t score = playback->LifeTime.GetOverlappingMillis(stream->LifeTime);
+
+            if (score > bestScore) {
                 bestStream = stream;
-                bestFreq = freq;
+                bestScore = score;
             }
         }
         return bestStream;
@@ -259,7 +270,7 @@ struct StateManagerImpl : public StateManager
             auto trackPath = RenderTrackPath(std::get<0>(pathKeys), meta);
             auto coverPath = RenderTrackPath(std::get<1>(pathKeys), meta);
 
-            auto tmpCoverPath = _dataDir / "temp" / (SanitizeFilename(meta.CoverUrl) + ".jpg");
+            auto tmpCoverPath = _dataDir / "temp" / (Utils::RemoveInvalidPathChars(meta.CoverUrl) + ".jpg");
 
             if (!fs::exists(tmpCoverPath)) {
                 DownloadFile(tmpCoverPath, meta.CoverUrl);
@@ -293,7 +304,7 @@ struct StateManagerImpl : public StateManager
             LogInfo("Converting {} - {}...", meta.Artists[0], meta.TrackName);
             LogDebug("  args: {}", args);
 
-            DWORD exitCode = StartProcess(_ffmpegPath, args, true);
+            uint32_t exitCode = Utils::StartProcess(_ffmpegPath, args, _dataDir.string(), true);
             if (exitCode != 0) {
                 throw std::runtime_error("Conversion failed. (ffmpeg returned " + std::to_string(exitCode) + ")");
             }
@@ -419,6 +430,23 @@ struct StateManagerImpl : public StateManager
         file.write((char*)resp.Content.data(), resp.Content.size());
     }
 
+    fs::path RenderTrackPath(const std::string& fmtKey, const TrackMetadata& metadata)
+    {
+        std::string fmt = _config[fmtKey].get<std::string>();
+
+        auto FillArg = [&](const std::string& name, const std::string& value) {
+            auto repl = Utils::RemoveInvalidPathChars(value);
+            Utils::StrReplace(fmt, name, repl);
+        };
+        FillArg("{artist_name}", metadata.Artists[0]);
+        FillArg("{album_name}", metadata.AlbumName);
+        FillArg("{track_name}", metadata.TrackName);
+        FillArg("{track_num}", std::to_string(metadata.TrackNum));
+        FillArg("{release_year}", std::to_string(metadata.GetReleaseYear()));
+        
+        return fs::u8path(Utils::ExpandEnvVars(fmt));
+    }
+    
     fs::path FindFFmpegPath()
     {
         //Try Soggfy/ffmpeg/ffmpeg.exe
@@ -436,86 +464,6 @@ struct StateManagerImpl : public StateManager
             return fs::path(envPath);
         }
         return {};
-    }
-    uint32_t StartProcess(const std::string& filename, const std::string& args, bool waitForExit)
-    {
-        std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> utfConv;
-        std::wstring filenameW = utfConv.from_bytes(filename);
-        std::wstring argsW = utfConv.from_bytes("\"" + filename + "\" " + args);
-
-        DWORD exitCode = 0;
-
-        PROCESS_INFORMATION processInfo = {};
-        STARTUPINFO startInfo = {};
-        startInfo.cb = sizeof(STARTUPINFO);
-        startInfo.dwFlags = STARTF_USESHOWWINDOW;
-        startInfo.wShowWindow = SW_HIDE;
-
-        DWORD flags = CREATE_NEW_CONSOLE;
-
-        if (!CreateProcess(filenameW.c_str(), argsW.data(), NULL, NULL, FALSE, flags, NULL, _dataDir.wstring(), &startInfo, &processInfo)) {
-            throw std::runtime_error("Failed to create process " + filename + " (error " + std::to_string(GetLastError()) + ")");
-        }
-        if (waitForExit) {
-            WaitForSingleObject(processInfo.hProcess, INFINITE);
-            GetExitCodeProcess(processInfo.hProcess, &exitCode);
-        }
-        CloseHandle(processInfo.hThread);
-        CloseHandle(processInfo.hProcess);
-
-        return exitCode;
-    }
-    
-    fs::path RenderTrackPath(const std::string& fmtKey, const TrackMetadata& metadata)
-    {
-        std::string fmt = _config[fmtKey].get<std::string>();
-
-        auto FillArg = [&](const std::string& needle, const std::string& replacement) {
-            auto repl = SanitizeFilename(replacement);
-            //https://stackoverflow.com/a/4643526
-            size_t index = 0;
-            while (true) {
-                index = fmt.find(needle, index);
-                if (index == std::string::npos) break;
-
-                fmt.replace(index, needle.length(), repl);
-                index += repl.length();
-            }
-        };
-        FillArg("{artist_name}", metadata.Artists[0]);
-        FillArg("{album_name}", metadata.AlbumName);
-        FillArg("{track_name}", metadata.TrackName);
-        FillArg("{track_num}", std::to_string(metadata.TrackNum));
-        FillArg("{release_year}", std::to_string(metadata.GetReleaseYear()));
-        
-        return fs::u8path(ExpandEnvVars(fmt));
-    }
-    //Call WINAPI ExpandEnvironmentStrings(), assuming str is UTF8.
-    std::string ExpandEnvVars(const std::string& str)
-    {
-        std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> utfConv;
-        std::wstring srcW = utfConv.from_bytes(str);
-
-        DWORD len = ExpandEnvironmentStrings(srcW.c_str(), NULL, 0);
-
-        std::wstring dstW(len, '\0');
-        ExpandEnvironmentStrings(srcW.c_str(), dstW.data(), len);
-        dstW.resize(len - 1); //don't count null terminator in .size()
-
-        return utfConv.to_bytes(dstW);
-    }
-    std::string SanitizeFilename(const std::string& src)
-    {
-        std::string dst;
-        dst.reserve(src.length());
-
-        for (char ch : src) {
-            if ((ch >= 0x00 && ch < 0x20) || strchr("\\/:*?\"<>|", ch)) {
-                continue;
-            }
-            dst += ch;
-        }
-        return dst;
     }
 };
 

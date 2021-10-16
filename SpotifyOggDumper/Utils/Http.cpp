@@ -86,7 +86,7 @@ namespace Http
 
                 //try to alloc 2x the current buffer size to avoid reallocating every chunk
                 if (content.capacity() < prevSize + bytesAvail) {
-                    content.reserve(max(prevSize * 2, bytesAvail));
+                    content.reserve(std::max(prevSize * 2, (size_t)bytesAvail));
                 }
                 content.resize(prevSize + bytesAvail);
                 
