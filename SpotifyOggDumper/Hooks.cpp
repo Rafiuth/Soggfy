@@ -148,30 +148,6 @@ static const HookTable HookTables[] =
             { 0x008B10EC, &CreateJsonAccessToken_Detour,    (LPVOID*)&CreateJsonAccessToken_Org },
             { 0x009A065B, &CreateTrackPlayer_Detour,        (LPVOID*)&CreateTrackPlayer_Org     },
         }
-    },
-    {
-        {1, 1, 69, 612},   //version
-        {
-            { 0x00A08687, &OggSyncPageOut_Detour,           (LPVOID*)&OggSyncPageOut_Org        },
-            { 0x00CBA138, &WriteLog_Detour,                 (LPVOID*)&WriteLog_Org              },
-            { 0x008AFAC3, &CreateJsonAccessToken_Detour,    (LPVOID*)&CreateJsonAccessToken_Org },
-        }
-    },
-    {
-        {1, 1, 68, 632},   //version
-        {
-            { 0x00D2D5D0, &OggSyncPageOut_Detour,           (LPVOID*)&OggSyncPageOut_Org        },
-            { 0x011B22E0, &WriteLog_Detour,                 (LPVOID*)&WriteLog_Org              },
-            { 0x00B2D470, &CreateJsonAccessToken_Detour,    (LPVOID*)&CreateJsonAccessToken_Org },
-        }
-    },
-    {
-        {1, 1, 68, 628},   //version
-        {
-            { 0x00D2D2D0, &OggSyncPageOut_Detour,           (LPVOID*)&OggSyncPageOut_Org        },
-            { 0x011B1CB0, &WriteLog_Detour,                 (LPVOID*)&WriteLog_Org              },
-            { 0x00B2D490, &CreateJsonAccessToken_Detour,    (LPVOID*)&CreateJsonAccessToken_Org },
-        }
     }
 };
 
@@ -266,10 +242,6 @@ DWORD WINAPI Init(LPVOID param)
         auto ch = std::tolower(std::cin.get());
         
         if (ch == 's') {
-            if (!CreateTrackPlayer_Org) {
-                LogError("This feature requires Spotify v1.1.70.610 or later.");
-                continue;
-            }
             double newSpeed;
             if (std::cin >> newSpeed) {
                 _playbackSpeed = newSpeed;
