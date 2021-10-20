@@ -19,5 +19,5 @@ This project takes a completely different approach - by hooking directly into fu
 - Tracks are dumped in real time, seeking or skipping will cancel the dump.
 - Default save path is `%userprofile%/Music/Soggfy`. It can be changed in `config.json`.
 - Quality depends on account type: 160Kb/s for free accounts, and 320Kb/s for premium accounts. It may also depend on the client settings.
-- There could be a non-zero chance of getting banned by using this (tracked in [#1](https://github.com/Rafiuth/Soggfy/issues/1))
+- You could get banned by using this. Please consider using alt accounts or keeping backups (see [Exportify](https://watsonbox.github.io/exportify) or [SpotMyBackup](http://www.spotmybackup.com)).
 - Last supported version: [1.1.70.610.g4585142b](https://upgrade.scdn.co/upgrade/client/win32-x86/spotify_installer-1.1.70.610.g4585142b-8.exe)
