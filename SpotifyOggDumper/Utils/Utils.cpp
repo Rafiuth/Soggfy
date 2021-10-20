@@ -15,18 +15,27 @@ namespace Utils
             index += replacement.length();
         }
     }
+    std::string StrWideToUtf(const std::wstring& str)
+    {
+        std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> conv;
+        return conv.to_bytes(str);
+    }
+    std::wstring StrUtfToWide(const std::string& str)
+    {
+        std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> conv;
+        return conv.from_bytes(str);
+    }
 
     std::string ExpandEnvVars(const std::string& str)
     {
-        std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> utfConv;
-        std::wstring srcW = utfConv.from_bytes(str);
+        std::wstring srcW = StrUtfToWide(str);
 
         DWORD len = ExpandEnvironmentStrings(srcW.c_str(), NULL, 0);
 
         std::wstring dstW(len - 1, '\0');
         ExpandEnvironmentStrings(srcW.c_str(), dstW.data(), len);
 
-        return utfConv.to_bytes(dstW);
+        return StrWideToUtf(dstW);
     }
 
     std::string RemoveInvalidPathChars(const std::string& src)
@@ -43,12 +52,11 @@ namespace Utils
         return dst;
     }
 
-    uint32_t StartProcess(const std::string& filename, const std::string& args, const std::string& workDir, bool waitForExit)
+    uint32_t StartProcess(const fs::path& filename, const std::wstring& args, const fs::path& workDir, bool waitForExit)
     {
-        std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> utfConv;
-        std::wstring filenameW = utfConv.from_bytes(filename);
-        std::wstring argsW = utfConv.from_bytes("\"" + filename + "\" " + args);
-        std::wstring workDirW = utfConv.from_bytes(workDir);
+        std::wstring filenameW = filename.wstring();
+        std::wstring argsW = L"\"" + filenameW + L"\" " + args;
+        std::wstring workDirW = workDir.wstring();
 
         DWORD exitCode = 0;
 
@@ -61,7 +69,7 @@ namespace Utils
         DWORD flags = CREATE_NEW_CONSOLE;
 
         if (!CreateProcess(filenameW.c_str(), argsW.data(), NULL, NULL, FALSE, flags, NULL, workDirW.c_str(), &startInfo, &processInfo)) {
-            throw std::runtime_error("Failed to create process " + filename + " (error " + std::to_string(GetLastError()) + ")");
+            throw std::runtime_error("Failed to create process " + filename.string() + " (error " + std::to_string(GetLastError()) + ")");
         }
         if (waitForExit) {
             WaitForSingleObject(processInfo.hProcess, INFINITE);

@@ -76,7 +76,7 @@ struct StateManagerImpl : public StateManager
     std::unordered_map<uintptr_t, std::shared_ptr<OggStream>> _oggs;
     int _nextStreamId = 0;
 
-    std::string _ffmpegPath;
+    fs::path _ffmpegPath;
     json _config;
 
     StateManagerImpl(const fs::path& dataDir) :
@@ -97,7 +97,7 @@ struct StateManagerImpl : public StateManager
         std::error_code deleteError;
         fs::remove_all(dataDir / "temp", deleteError);
 
-        if (_config.contains("convert_args") && (_ffmpegPath = FindFFmpegPath().string()).empty()) {
+        if (_config.contains("convert_args") && (_ffmpegPath = FindFFmpegPath()).empty()) {
             LogWarn("config.json has 'convert_args' field but ffmpeg binaries were not found. Run DownloadFFmpeg.ps1 to fix this.");
         }
     }
@@ -299,12 +299,15 @@ struct StateManagerImpl : public StateManager
 
             if (fs::exists(outPath)) return;
 
-            std::string args = std::format("-i \"{}\" {} \"{}\"", path.string(), convArgs.get<std::string>(), outPath.string());
-
+            std::wstring args = std::format(L"-i \"{}\" {} \"{}\"", 
+                path.wstring(),
+                Utils::StrUtfToWide(convArgs.get<std::string>()),
+                outPath.wstring()
+            );
             LogInfo("Converting {} - {}...", meta.Artists[0], meta.TrackName);
-            LogDebug("  args: {}", args);
+            LogDebug("  args: {}", Utils::StrWideToUtf(args));
 
-            uint32_t exitCode = Utils::StartProcess(_ffmpegPath, args, _dataDir.string(), true);
+            uint32_t exitCode = Utils::StartProcess(_ffmpegPath, args, _dataDir, true);
             if (exitCode != 0) {
                 throw std::runtime_error("Conversion failed. (ffmpeg returned " + std::to_string(exitCode) + ")");
             }
@@ -331,7 +334,7 @@ struct StateManagerImpl : public StateManager
             artists += artistName;
         }
 
-        TagLib::Ogg::Vorbis::File ogg(path.string().c_str());
+        TagLib::Ogg::Vorbis::File ogg(path.wstring().c_str());
         auto* tag = ogg.tag();
         
         auto coverArt = new TagLib::FLAC::Picture();

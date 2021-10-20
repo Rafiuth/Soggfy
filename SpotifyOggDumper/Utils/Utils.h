@@ -1,16 +1,22 @@
 #pragma once
 #include "../pch.h"
+#include <filesystem>
 
 namespace Utils
 {
+    namespace fs = std::filesystem;
+
     void StrReplace(std::string& str, const std::string& needle, const std::string& replacement);
+
+    std::string StrWideToUtf(const std::wstring& str);
+    std::wstring StrUtfToWide(const std::string& str);
 
     //Call WINAPI ExpandEnvironmentStrings(), assuming str is UTF8.
     std::string ExpandEnvVars(const std::string& str);
 
     std::string RemoveInvalidPathChars(const std::string& src);
 
-    uint32_t StartProcess(const std::string& filename, const std::string& args, const std::string& workDir, bool waitForExit = false);
+    uint32_t StartProcess(const fs::path& filename, const std::wstring& args, const fs::path& workDir, bool waitForExit = false);
 
     int64_t CurrentMillis();
 }
