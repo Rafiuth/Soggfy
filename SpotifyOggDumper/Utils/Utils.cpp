@@ -15,6 +15,17 @@ namespace Utils
             index += replacement.length();
         }
     }
+    const char* FindPosition(const char* str, int strLen, const char* needle, int needleLen)
+    {
+        auto strEnd = str + strLen - needleLen;
+        for (; str < strEnd; str++) {
+            if (memcmp(str, needle, needleLen) == 0) {
+                return str;
+            }
+        }
+        return nullptr;
+    }
+
     std::string StrWideToUtf(const std::wstring& str)
     {
         std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> conv;

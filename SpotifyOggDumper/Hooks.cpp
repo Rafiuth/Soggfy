@@ -1,8 +1,8 @@
 #include "pch.h"
+#include <mutex>
 #include <deque>
 #include <MinHook.h>
 #include "AppVersion.h"
-#include "OggDefs.h"
 #include "StateManager.h"
 #include "Utils/Log.h"
 
@@ -20,14 +20,69 @@ double _playbackSpeed = -1.0;
     NAME##_FuncType NAME##_Org;                                 \
     RET_TYPE CALL_CONV NAME##_Detour##SIG
 
-DETOUR_FUNC(__cdecl, int, OggSyncPageOut, (ogg_sync_state* sync, ogg_page* page))
+template <int... Offsets>
+constexpr void* TraversePointers(void* ptr)
 {
-    int ret = OggSyncPageOut_Org(sync, page);
-    
-    //LogTrace("PageOut oy={:#08x} ret={} hdrLen={} bodyLen={}", (uintptr_t)oy, ret, og->header_len, og->body_len);
+    for (int offset : { Offsets... }) {
+        ptr = *(char**)((char*)ptr + offset);
+    }
+    return ptr;
+}
 
-    if (ret > 0) {
-        _stateMgr->ReceiveOggPage((uintptr_t)sync, page);
+/*
+undefined4 __thiscall
+FUN_009e08f1(void *this,undefined4 param_2,void **param_3,void **param_4, undefined4 param_5)
+*/
+DETOUR_FUNC(__fastcall, int, DecodeAudioData, (
+    void* ecx, void* edx, int param_2, void** param_3, void** param_4, int param_5
+))
+{
+    //PlayerDriver can be found at ecx in seek function
+    //struct PlayerDriver { 
+    //    0x340  uint8_t playback_id[16]
+    //}
+    //[[[ecx+3c]+294]+150]+0
+    //The decoder->driver path can be found with CheatEngine:
+    //1. Find the driver address with the track seek function
+    //2. Find the parent decoder address (in caller of this function)
+    //3. Use the pointer scanner:
+    //  1. Search for Addr: driver address
+    //  2. BaseAddr range: <decoder addr> .. <decoder addr> + 1000
+    //If things go well, you should endup with less than 1k results.
+    //4. Pick one and see if it works with the goto address thing (cheatengine works, but x32dbg shows the result in real time)
+    
+    //009E1086 | mov ecx,dword ptr ss:[ebp-2C]  ; we need to access this
+    //009E1089 | push eax                     
+    //009E108A | lea eax,dword ptr ss:[ebp-50]
+    //009E108D | push eax                     
+    //009E108E | mov ecx,dword ptr ds:[ecx+38]
+    //009E1091 | call spotify.9E08F1            ; call <the func this detour hooks>
+    void* _ebp;
+    __asm {
+        mov _ebp, ebp
+    }
+    //caller `ebp-2C` = ebp + 90;   `(ebp - 2C) - esp`    before prolog's `mov ebp, esp`
+    //path = [[[[ebp+90]+3c]+294]+150]+0
+    void* playerPtr = TraversePointers<0x90, 0x3C, 0x294, 0x150>(_ebp);
+    auto playbackId = (uint8_t*)playerPtr + 0x340;
+
+    std::string playbackIdStr(32, '\0');
+    for (int i = 0; i < 16; i++) {
+        constexpr auto ALPHA = "0123456789abcdef";
+        playbackIdStr[i * 2 + 0] = ALPHA[playbackId[i] >> 4];
+        playbackIdStr[i * 2 + 1] = ALPHA[playbackId[i] & 15];
+    }
+    auto buf = (char*)param_4[0];
+    int bufLen = (int)param_4[1];
+
+    int ret = DecodeAudioData_Org(ecx, edx, param_2, param_3, param_4, param_5);
+
+    int bytesRead = bufLen - (int)param_4[1];
+
+    if (bytesRead != 0) {
+        _mutex.lock();
+        _stateMgr->ReceiveAudioData(playbackIdStr, buf, bytesRead);
+        _mutex.unlock();
     }
     return ret;
 }
@@ -133,6 +188,7 @@ DETOUR_FUNC(__fastcall, void, CreateTrackPlayer, (
     CreateTrackPlayer_Org(ecx, edx, param_2, param_3, speed, param_5, param_6, param_7, param_8, param_9);
 }
 
+
 struct HookTableEntry
 {
     uintptr_t Addr;
@@ -149,7 +205,7 @@ static const HookTable HookTables[] =
     {
         {1, 1, 70, 610},   //version
         {
-            { 0x00A12421, &OggSyncPageOut_Detour,           (LPVOID*)&OggSyncPageOut_Org        },
+            { 0x009E08F1, &DecodeAudioData_Detour,          (LPVOID*)&DecodeAudioData_Org       },
             { 0x00CC4953, &WriteLog_Detour,                 (LPVOID*)&WriteLog_Org              },
             { 0x008B10EC, &CreateJsonAccessToken_Detour,    (LPVOID*)&CreateJsonAccessToken_Org },
             { 0x009A065B, &CreateTrackPlayer_Detour,        (LPVOID*)&CreateTrackPlayer_Org     },

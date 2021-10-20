@@ -113,7 +113,6 @@
     <ClInclude Include="Utils\Http.h" />
     <ClInclude Include="StateManager.h" />
     <ClInclude Include="Utils\Log.h" />
-    <ClInclude Include="OggDefs.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ItemGroup>

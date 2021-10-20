@@ -7,6 +7,7 @@ namespace Utils
     namespace fs = std::filesystem;
 
     void StrReplace(std::string& str, const std::string& needle, const std::string& replacement);
+    const char* FindPosition(const char* str, int strLen, const char* needle, int needleLen);
 
     std::string StrWideToUtf(const std::wstring& str);
     std::wstring StrUtfToWide(const std::string& str);

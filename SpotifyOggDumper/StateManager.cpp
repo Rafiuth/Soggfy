@@ -9,7 +9,6 @@ namespace fs = std::filesystem;
 using namespace nlohmann;
 
 struct PlaybackInfo;
-struct OggStream;
 
 struct PlaybackInfo
 {
@@ -18,19 +17,10 @@ struct PlaybackInfo
     int StartPos = 0;
     bool Closed = false;
     bool PlayedToEnd = false; //whether closeReason == "trackdone"
-    TimeRange LifeTime;
 
-    //Set of streams that were alive during this playback.
-    std::unordered_set<std::shared_ptr<OggStream>> LiveStreams;
-};
-struct OggStream
-{
+    std::string ActualExt;
     fs::path FileName;
     std::ofstream FileStream;
-    int NumPages = 0;
-    bool EOS = false;
-
-    TimeRange LifeTime;
 };
 
 enum class TrackType
@@ -71,10 +61,6 @@ struct StateManagerImpl : public StateManager
     std::string _accessToken;
 
     std::unordered_map<std::string, std::shared_ptr<PlaybackInfo>> _playbacks;
-    std::shared_ptr<PlaybackInfo> _currPlayback;
-
-    std::unordered_map<uintptr_t, std::shared_ptr<OggStream>> _oggs;
-    int _nextStreamId = 0;
 
     fs::path _ffmpegPath;
     json _config;
@@ -111,6 +97,10 @@ struct StateManagerImpl : public StateManager
         }
         auto info = std::make_shared<PlaybackInfo>();
         info->TrackId = trackId;
+        info->FileName = _dataDir / "temp" / ("playback_" + playbackId + ".dat");
+        fs::create_directories(info->FileName.parent_path());
+        info->FileStream.open(info->FileName, std::ios::out | std::ios::binary);
+
         _playbacks[playbackId] = info;
     }
     void OnTrackOpened(const std::string& playbackId, int positionMs)
@@ -118,14 +108,12 @@ struct StateManagerImpl : public StateManager
         auto itr = _playbacks.find(playbackId);
         if (itr == _playbacks.end()) {
             LogWarn("Track opened for unknown playback, ignoring.");
-            _currPlayback = nullptr;
             return;
         }
-        _currPlayback = itr->second;
-        _currPlayback->StartPos = positionMs;
-        _currPlayback->LifeTime.MarkStart();
+        auto& playback = itr->second;
+        playback->StartPos = positionMs;
 
-        LogInfo("New track detected: {}", _currPlayback->TrackId);
+        LogInfo("New track detected: {}", playback->TrackId);
     }
     void OnTrackClosed(const std::string& playbackId, const std::string& reason)
     {
@@ -133,15 +121,11 @@ struct StateManagerImpl : public StateManager
         
         auto itr = _playbacks.find(playbackId);
         if (itr != _playbacks.end()) {
-            auto playback = itr->second;
+            auto& playback = itr->second;
 
             playback->Closed = true;
             playback->PlayedToEnd = reason == "trackdone";
-            playback->LifeTime.MarkEnd();
 
-            if (playback == _currPlayback) {
-                _currPlayback = nullptr;
-            }
             FlushClosedTracks();
         }
     }
@@ -154,28 +138,41 @@ struct StateManagerImpl : public StateManager
         }
 #endif
     }
-    void ReceiveOggPage(uintptr_t syncId, ogg_page* page)
+
+    void ReceiveAudioData(const std::string& playbackId, const char* data, int length)
     {
-        auto stream = GetOggStream(syncId);
+        auto itr = _playbacks.find(playbackId);
+        if (itr == _playbacks.end()) return;
 
-        if (!stream->EOS) {
-            stream->FileStream.write((char*)page->header, page->header_len);
-            stream->FileStream.write((char*)page->body, page->body_len);
-            stream->NumPages++;
+        auto playback = itr->second;
+        auto& fs = playback->FileStream;
 
-            if (_currPlayback != nullptr) {
-                _currPlayback->LiveStreams.insert(stream);
-            }
-            if (page->header[5] & 0x04) { //ogg_page_eos
-                stream->FileStream.close();
-                stream->LifeTime.MarkEnd();
-                stream->EOS = true;
+        if (!fs.is_open()) {
+            LogWarn("Received audio data after playback ended (this shouldn't happen). Last track could've been truncated.");
+            return;
+        }
+        if (fs.tellp() == 0) {
+            if (memcmp(data, "OggS", 4) == 0) {
+                //skip spotify's custom ogg page (it sets the EOS flag, causing players to think the file is corrupt)
+                auto nextPage = Utils::FindPosition(data + 4, length - 4, "OggS", 4);
 
-                _oggs.erase(syncId);
-                FlushClosedTracks();
+                if (nextPage < 0) {
+                    //this may happen if the buffer is too small.
+                    LogWarn("Could not skip Spotify's custom OGG page. Downloaded file might be broken. ({})", playbackId);
+                } else {
+                    length -= nextPage - data;
+                    data = nextPage;
+                }
+                playback->ActualExt = "ogg";
+            } else if (memcmp(data, "ID3", 3) == 0 || (data[0] == 0xFF && (data[1] & 0xF0) == 0xF0)) {
+                playback->ActualExt = "mp3";
+            } else {
+                LogWarn("Unrecognized audio data type. Downloaded file might be broken. ({})", playbackId);
             }
         }
+        fs.write(data, length);
     }
+
     void UpdateAccToken(const std::string& token)
     {
         LogDebug("Update access token: {}", token);
@@ -183,32 +180,9 @@ struct StateManagerImpl : public StateManager
     }
     void Shutdown()
     {
-        for (auto& [id, stream] : _oggs) {
-            stream->FileStream.close();
+        for (auto& [id, playback] : _playbacks) {
+            playback->FileStream.close();
         }
-    }
-
-    std::shared_ptr<OggStream> GetOggStream(uintptr_t syncId)
-    {
-        auto itr = _oggs.find(syncId);
-        if (itr != _oggs.end()) {
-            if (itr->second->EOS) {
-                LogWarn("Detected a possible collision with ogg stream ids, last few tracks could become corrupted.");
-            }
-            return itr->second;
-        }
-        auto stream = std::make_shared<OggStream>();
-
-        stream->FileName = _dataDir / "temp" / ("stream_" + std::to_string(_nextStreamId++) + ".ogg");
-        fs::create_directories(stream->FileName.parent_path());
-
-        stream->FileStream.open(stream->FileName, std::ios::out | std::ios::binary);
-        stream->LifeTime.MarkStart();
-
-        LogDebug("Detected new ogg stream, dumping to {}", stream->FileName.string());
-
-        _oggs[syncId] = stream;
-        return stream;
     }
     
     void FlushClosedTracks()
@@ -219,39 +193,23 @@ struct StateManagerImpl : public StateManager
         }
         //Iterate and remove finished playbacks
         auto numFlushed = std::erase_if(_playbacks, [&](const auto& elem) {
-            auto playback = elem.second;
+            auto& playback = elem.second;
             if (!playback->Closed) return false;
 
-            auto stream = FindSourceStream(playback);
-            if (stream == nullptr) return false; //defer until a the stream is closed
-            
             if (playback->StartPos == 0 && playback->PlayedToEnd && !playback->WasSeeked) {
-                std::thread t(&StateManagerImpl::TagAndMoveToOutput, this, playback, stream);
+                playback->FileStream.close();
+
+                std::thread t(&StateManagerImpl::TagAndMoveToOutput, this, playback);
                 t.detach();
             } else {
                 LogInfo("Discarding track {} because it was not fully played.", playback->TrackId);
             }
             return true;
         });
-        LogDebug("FlushTracks: flushed {} tracks. Alive: {} playbacks, {} streams.", numFlushed, _playbacks.size(), _oggs.size());
-    }
-    std::shared_ptr<OggStream> FindSourceStream(std::shared_ptr<PlaybackInfo> playback)
-    {
-        std::shared_ptr<OggStream> bestStream;
-        int64_t bestScore = 0;
-
-        for (auto& stream : playback->LiveStreams) {
-            int64_t score = playback->LifeTime.GetOverlappingMillis(stream->LifeTime);
-
-            if (score > bestScore) {
-                bestStream = stream;
-                bestScore = score;
-            }
-        }
-        return bestStream;
+        LogDebug("FlushTracks: flushed {} tracks. Alive playbacks: {}.", numFlushed, _playbacks.size());
     }
 
-    void TagAndMoveToOutput(std::shared_ptr<PlaybackInfo> playback, std::shared_ptr<OggStream> stream)
+    void TagAndMoveToOutput(std::shared_ptr<PlaybackInfo> playback)
     {
         auto& trackId = playback->TrackId;
 
@@ -260,7 +218,7 @@ struct StateManagerImpl : public StateManager
 
             LogInfo("Saving track {}", trackId);
             LogInfo("  title: {} - {}", meta.Artists[0], meta.TrackName);
-            LogDebug("  stream: {}", stream->FileName.filename().string());
+            LogDebug("  stream: {}", playback->FileName.filename().string());
             LogDebug("  meta: {}", meta.RawData.dump());
 
             auto pathKeys = meta.Type == TrackType::Music
@@ -279,8 +237,10 @@ struct StateManagerImpl : public StateManager
                 fs::create_directories(coverPath.parent_path());
                 fs::copy_file(tmpCoverPath, coverPath);
             }
-            WriteTags(stream->FileName, tmpCoverPath, meta);
-            CreateFinalTrack(stream->FileName, trackPath, meta);
+            if (playback->ActualExt == "ogg") {
+                WriteTags(playback->FileName, tmpCoverPath, meta);
+            }
+            CreateFinalTrack(playback->FileName, trackPath, meta);
         } catch (std::exception& ex) {
             LogError("Failed to save track {}: {}", trackId, ex.what());
         }

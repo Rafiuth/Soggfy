@@ -1,6 +1,5 @@
 #pragma once
 #include "pch.h"
-#include "OggDefs.h"
 
 class StateManager
 {
@@ -11,7 +10,7 @@ public:
 
     virtual void OnTrackSeeked(const std::string& playbackId) = 0;
 
-    virtual void ReceiveOggPage(uintptr_t syncId, ogg_page* page) = 0;
+    virtual void ReceiveAudioData(const std::string& playbackId, const char* data, int length) = 0;
 
     virtual void UpdateAccToken(const std::string& token) = 0;
 
