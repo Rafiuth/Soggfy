@@ -9,6 +9,8 @@
 HMODULE _selfModule;
 std::deque<std::string> _logHistory;
 std::unique_ptr<StateManager> _stateMgr;
+std::mutex _mutex;
+
 double _playbackSpeed = -1.0;
 
 //Note: __thiscall can't be used directly; as a workaround, try __fastcall with an extra parameter for edx after 'this':
@@ -56,6 +58,8 @@ DETOUR_FUNC(__cdecl, void, WriteLog, (LogParams pars))
     std::string str(buf);
     LogTrace("* " + str);
 
+    _mutex.lock();
+
     //Keep history of at most 16 messages
     if (_logHistory.size() > 16) {
         _logHistory.pop_back();
@@ -100,6 +104,8 @@ DETOUR_FUNC(__cdecl, void, WriteLog, (LogParams pars))
     if (MatchesRegex(str, R"(Seeking track to \d+ ms \(playback_id (.+?)\))")) {
         _stateMgr->OnTrackSeeked(match.str(1));
     }
+    _mutex.unlock();
+
     WriteLog_Org(pars);
 }
 DETOUR_FUNC(__cdecl, int, CreateJsonAccessToken, (void* param_1, char** param_2))
