@@ -5,6 +5,8 @@ Previous Spotify downloader projects ([XSpotify](https://web.archive.org/web/202
 
 This project takes a completely different approach - by hooking directly into functions that demux the (already decrypted) OGG stream, a replica of the track can be reconstructed without any quality loss. The resulting files are automatically tagged with metadata fetched from Spotify's public API.
 
+**Soggfy does not download from YouTube, or other sources unlike most other "Spotify Downloading Tools." It actually dumps from Spotify!**
+
 # Installation
 1. Go to the [releases page](https://github.com/Rafiuth/Soggfy/releases) and download the latest version of Soggfy from the `.7z` file
 2. Download and install [7-zip](https://7-zip.org), right click your downloaded `.7z`, then go to 7-zip in the right-click toolbar, and click the "Extract" button.
