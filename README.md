@@ -20,6 +20,7 @@ This project takes a completely different approach - by hooking directly into fu
 - This program is only for Windows as of now.
 - Tracks are dumped in real time, seeking or skipping will cancel the dump / download.
 - Podcasts are downloadable as long as they are on OGG format. If a podcast is in MP3, then it will not be downloaded. This means some podcasts such as The Joe Rogan Experience, Misfits, Storytime with Seth Rogan, and others cannot be downloaded. Note that some podcasts aren't 160Kb/s or 320Kb/s either, they can be 96Kb/s too.
+- Video podcasts are unfortunately, undownloadable. They require bypassing Widevine DRM, which we can't do yet. Downloading for Video Podcasts may come in the future though.
 - Default save path is `%userprofile%/Music/Soggfy`. It can be changed in `config.json`.
 - Quality depends on account type: 160Kb/s for free accounts, and 320Kb/s for premium accounts. It may also depend on the client settings.
 - **You could get banned by using this. Please consider using alt accounts or keeping backups (see [Exportify](https://watsonbox.github.io/exportify) or [SpotMyBackup](http://www.spotmybackup.com)).**
