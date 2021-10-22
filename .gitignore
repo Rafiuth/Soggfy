@@ -1,6 +1,7 @@
 .vs/
 *.user
 *.suo
+*.aps
 build/
 obj/
 vcpkg_installed/

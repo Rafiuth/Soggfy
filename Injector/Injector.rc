@@ -1,0 +1,34 @@
+#include <winver.h>
+
+#ifdef _WIN32
+  LANGUAGE 0x9, 0x1
+  #pragma code_page(1252)
+#endif
+
+1 VERSIONINFO
+ FILEVERSION    1,0,0,1
+ PRODUCTVERSION 1,0,0,1
+ FILEFLAGSMASK  0x1L
+ FILEFLAGS      VS_FF_DEBUG
+ FILEOS         VOS__WINDOWS32
+ FILETYPE       VFT_APP
+BEGIN
+  BLOCK "StringFileInfo"
+  BEGIN
+    BLOCK "040904E4"
+    BEGIN
+      VALUE "FileDescription",  "Soggfy Injector"
+      VALUE "FileVersion",      "1.0.0.1"
+      VALUE "InternalName",     "Injector.exe"
+      VALUE "OriginalFilename", "Injector.exe"
+      VALUE "ProductName",      "Soggfy Injector"
+      VALUE "ProductVersion",   "1.0.0.1"
+    END
+  END
+  BLOCK "VarFileInfo"
+  BEGIN
+    VALUE "Translation", 0, 1200
+  END
+END
+
+103               ICON                    "soggfy.ico"
