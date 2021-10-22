@@ -4,7 +4,6 @@
   "version": "1.0",
   "dependencies": [
     "minhook",
-    "nlohmann-json",
-    "taglib"
+    "nlohmann-json"
   ]
 }

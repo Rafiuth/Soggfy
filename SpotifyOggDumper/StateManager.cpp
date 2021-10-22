@@ -8,8 +8,6 @@
 namespace fs = std::filesystem;
 using namespace nlohmann;
 
-struct PlaybackInfo;
-
 struct PlaybackInfo
 {
     std::string TrackId;
@@ -23,35 +21,18 @@ struct PlaybackInfo
     std::ofstream FileStream;
 };
 
-enum class TrackType
-{
-    Music, PodcastEpisode
-};
 struct TrackMetadata
 {
-    TrackType Type;
-
-    std::string TrackName;
-    std::vector<std::string> Artists;
-    std::string AlbumName;
-    std::string AlbumType;
-    std::string ReleaseDate; //Format: Year-Month-Day
+    //Properties that can be passed directly to ffmpeg
+    //https://wiki.multimedia.cx/index.php/FFmpeg_Metadata
+    std::unordered_map<std::string, std::string> Props;
     std::string CoverUrl;
-    int TrackNum = 0;
-    int DiscNum = 0;
-    int TotalTracks = 0;
-
-    //Music only
-    std::string ISRC;
-
-    //Podcast only
-    std::string Description;
-
+    std::string Type; //either "track" or "podcast"
     json RawData;
 
-    int GetReleaseYear() const
+    std::string GetName() const
     {
-        return std::stoi(ReleaseDate.substr(0, ReleaseDate.find('-')));
+        return Props.at("album_artist") + " - " + Props.at("title");
     }
 };
 
@@ -83,8 +64,9 @@ struct StateManagerImpl : public StateManager
         std::error_code deleteError;
         fs::remove_all(dataDir / "temp", deleteError);
 
-        if (_config.contains("convert_args") && (_ffmpegPath = FindFFmpegPath()).empty()) {
-            LogWarn("config.json has 'convert_args' field but ffmpeg binaries were not found. Run DownloadFFmpeg.ps1 to fix this.");
+        _ffmpegPath = FindFFmpegPath();
+        if (_ffmpegPath.empty()) {
+            LogWarn("FFmpeg binaries were not found, downloaded files will not be tagged nor converted. Run DownloadFFmpeg.ps1 to fix this.");
         }
     }
 
@@ -99,7 +81,7 @@ struct StateManagerImpl : public StateManager
         info->TrackId = trackId;
         info->FileName = _dataDir / "temp" / ("playback_" + playbackId + ".dat");
         fs::create_directories(info->FileName.parent_path());
-        info->FileStream.open(info->FileName, std::ios::out | std::ios::binary);
+        info->FileStream.open(info->FileName, std::ios::binary);
 
         _playbacks[playbackId] = info;
     }
@@ -144,7 +126,7 @@ struct StateManagerImpl : public StateManager
         auto itr = _playbacks.find(playbackId);
         if (itr == _playbacks.end()) return;
 
-        auto playback = itr->second;
+        auto& playback = itr->second;
         auto& fs = playback->FileStream;
 
         if (!fs.is_open()) {
@@ -158,7 +140,7 @@ struct StateManagerImpl : public StateManager
 
                 if (nextPage < 0) {
                     //this may happen if the buffer is too small.
-                    LogWarn("Could not skip Spotify's custom OGG page. Downloaded file might be broken. ({})", playbackId);
+                    LogWarn("Could not skip Spotify's custom OGG page. Downloaded file might be broken. ({})", playback->TrackId);
                 } else {
                     length -= nextPage - data;
                     data = nextPage;
@@ -167,7 +149,7 @@ struct StateManagerImpl : public StateManager
             } else if (memcmp(data, "ID3", 3) == 0 || (data[0] == 0xFF && (data[1] & 0xF0) == 0xF0)) {
                 playback->ActualExt = "mp3";
             } else {
-                LogWarn("Unrecognized audio data type. Downloaded file might be broken. ({})", playbackId);
+                LogWarn("Unrecognized audio data type. Downloaded file might be broken. ({})", playback->TrackId);
             }
         }
         fs.write(data, length);
@@ -217,16 +199,12 @@ struct StateManagerImpl : public StateManager
             auto meta = FetchTrackMetadata(trackId);
 
             LogInfo("Saving track {}", trackId);
-            LogInfo("  title: {} - {}", meta.Artists[0], meta.TrackName);
+            LogInfo("  title: {}", meta.GetName());
             LogDebug("  stream: {}", playback->FileName.filename().string());
             LogDebug("  meta: {}", meta.RawData.dump());
 
-            auto pathKeys = meta.Type == TrackType::Music
-                ? std::make_tuple("track_path_fmt", "cover_path_fmt")
-                : std::make_tuple("podcast_path_fmt", "podcast_cover_path_fmt");
-
-            auto trackPath = RenderTrackPath(std::get<0>(pathKeys), meta);
-            auto coverPath = RenderTrackPath(std::get<1>(pathKeys), meta);
+            auto trackPath = RenderTrackPath(meta.Type + "_path_fmt", meta);
+            auto coverPath = RenderTrackPath(meta.Type + "_cover_path_fmt", meta);
 
             auto tmpCoverPath = _dataDir / "temp" / (Utils::RemoveInvalidPathChars(meta.CoverUrl) + ".jpg");
 
@@ -237,90 +215,141 @@ struct StateManagerImpl : public StateManager
                 fs::create_directories(coverPath.parent_path());
                 fs::copy_file(tmpCoverPath, coverPath);
             }
-            if (playback->ActualExt == "ogg") {
-                WriteTags(playback->FileName, tmpCoverPath, meta);
+
+            fs::create_directories(trackPath.parent_path());
+            if (_ffmpegPath.empty()) {
+                fs::rename(playback->FileName, trackPath);
+                return;
             }
-            CreateFinalTrack(playback->FileName, trackPath, meta);
+            auto convFmt = _config["convert_to"].get<std::string>();
+
+            if (!convFmt.empty()) {
+                auto& fmt = _config["formats"][convFmt];
+
+                auto convExt = fmt["ext"].get<std::string>();
+                auto convArgs = fmt["args"].get<std::string>();
+
+                fs::path outPath = trackPath;
+                outPath.replace_extension(convExt);
+
+                InvokeFFmpeg(playback->FileName, tmpCoverPath, outPath, convArgs, meta);
+            }
+            if (convFmt.empty() || _config["convert_keep_ogg"].get<bool>()) {
+                fs::path outPath = trackPath;
+                outPath.replace_extension(playback->ActualExt);
+
+                InvokeFFmpeg(playback->FileName, tmpCoverPath, outPath, "-c copy", meta);
+            }
+            fs::remove(playback->FileName);
         } catch (std::exception& ex) {
             LogError("Failed to save track {}: {}", trackId, ex.what());
         }
     }
-
-    void CreateFinalTrack(const fs::path& path, const fs::path& dstPath, const TrackMetadata& meta)
+    void InvokeFFmpeg(const fs::path& path, const fs::path& coverPath, const fs::path& outPath, const std::string& extraArgs, const TrackMetadata& meta)
     {
-        fs::create_directories(dstPath.parent_path());
+        if (fs::exists(outPath)) {
+            LogDebug("File {} already exists. Skipping conversion.", outPath.filename().string());
+            return;
+        }
+        std::vector<std::wstring> args;
+        args.push_back(L"-i");
+        args.push_back(path.wstring());
 
-        auto& convArgs = _config["convert_args"];
-        auto& convExt = _config["convert_ext"];
-
-        if (convArgs.is_string() && !_ffmpegPath.empty()) {
-            fs::path outPath = dstPath;
-            outPath.replace_extension(convExt.get<std::string>());
-
-            if (fs::exists(outPath)) return;
-
-            std::wstring args = std::format(L"-i \"{}\" {} \"{}\"", 
-                path.wstring(),
-                Utils::StrUtfToWide(convArgs.get<std::string>()),
-                outPath.wstring()
-            );
-            LogInfo("Converting {} - {}...", meta.Artists[0], meta.TrackName);
-            LogDebug("  args: {}", Utils::StrWideToUtf(args));
-
-            uint32_t exitCode = Utils::StartProcess(_ffmpegPath, args, _dataDir, true);
-            if (exitCode != 0) {
-                throw std::runtime_error("Conversion failed. (ffmpeg returned " + std::to_string(exitCode) + ")");
-            }
-            LogInfo("...done");
-
-            if (_config.value("convert_keep_ogg", false)) {
-                fs::rename(path, dstPath);
-            } else {
-                fs::remove(path);
-            }
+        if (outPath.extension() == ".ogg" || outPath.extension() == ".opus") {
+            //ffmpeg can't create OGGs with covers directly, we need to manually
+            //create a flac metadata block and attach it instead.
+            args.push_back(L"-i");
+            args.push_back(CreateCoverMetaBlock(coverPath).wstring());
+            Utils::SplitCommandLine(L"-map_metadata 1", args);
         } else {
-            fs::rename(path, dstPath);
+            args.push_back(L"-i");
+            args.push_back(coverPath.wstring());
+            Utils::SplitCommandLine(L"-map 0:0 -map 1:0", args);
         }
+        if (!extraArgs.empty()) {
+            Utils::SplitCommandLine(Utils::StrUtfToWide(extraArgs), args);
+        }
+        for (auto& [k, v] : meta.Props) {
+            args.push_back(L"-metadata");
+            args.push_back(Utils::StrUtfToWide(k + "=" + v));
+        };
+        args.push_back(outPath.wstring());
+        args.push_back(L"-y");
+
+        LogDebug("Converting {}...", meta.GetName());
+        LogDebug("  args: {}", Utils::StrWideToUtf(Utils::CreateCommandLine(args)));
+
+        uint32_t exitCode = Utils::StartProcess(_ffmpegPath, args, _dataDir, true);
+        if (exitCode != 0) {
+            throw std::runtime_error("Conversion failed. (ffmpeg returned " + std::to_string(exitCode) + ")");
+        }
+        LogInfo("Done converting {}.", meta.GetName());
     }
-
-    void WriteTags(const fs::path& path, const fs::path& coverPath, const TrackMetadata& meta)
+    fs::path CreateCoverMetaBlock(const fs::path& coverPath)
     {
-        std::ifstream coverFile(coverPath, std::ios::binary);
-        auto coverData = std::vector<char>(std::istreambuf_iterator<char>(coverFile), std::istreambuf_iterator<char>());
+        fs::path outPath = coverPath;
+        outPath.replace_extension(".ffmd");
 
-        std::string artists;
-        for (auto& artistName : meta.Artists) {
-            if (artists.size() > 0) artists += ", ";
-            artists += artistName;
+        if (!fs::exists(outPath)) {
+            //https://superuser.com/a/169158
+            //https://xiph.org/flac/format.html#metadata_block_picture
+            std::string data;
+            data.append("\x00\x00\x00\x03", 4);                 //Type: Front cover
+            data.append("\x00\x00\x00\x0A" "image/jpeg", 14);   //Mime type
+            data.append("\x00\x00\x00\x0B" "Front Cover", 15);  //Description
+            data.append("\x00\x00\x00\x00", 4);                 //Width
+            data.append("\x00\x00\x00\x00", 4);                 //Height
+            data.append("\x00\x00\x00\x00", 4);                 //Bits per pixel
+            data.append("\x00\x00\x00\x00", 4);                 //Palette size
+
+            std::ifstream imageFs(coverPath, std::ios::binary);
+            imageFs.seekg(0, std::ios::end);
+            int imageLen = (int)imageFs.tellg();
+
+            //Data length
+            data.append({
+                (char)(imageLen >> 24),
+                (char)(imageLen >> 16),
+                (char)(imageLen >> 8),
+                (char)(imageLen >> 0),
+            });
+            //Data
+            imageFs.seekg(0);
+            data.append(std::istreambuf_iterator<char>(imageFs), std::istreambuf_iterator<char>());
+
+            //Write out the encoded ffmpeg block
+            std::ofstream outs(outPath, std::ios::binary);
+            outs << ";FFMETADATA1\n";
+            outs << "METADATA_BLOCK_PICTURE=";
+            outs << EncodeBase64(data.data(), data.size()) << "\n";
         }
+        return outPath;
+    }
+    std::string EncodeBase64(const char* data, size_t len)
+    {
+        //https://stackoverflow.com/a/6782480
+        const char ALPHA[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        const int MOD_TABLE[] = { 0, 2, 1 };
 
-        TagLib::Ogg::Vorbis::File ogg(path.wstring().c_str());
-        auto* tag = ogg.tag();
-        
-        auto coverArt = new TagLib::FLAC::Picture();
-        coverArt->setType(TagLib::FLAC::Picture::Type::FrontCover);
-        coverArt->setMimeType("image/jpeg");
-        coverArt->setDescription("Front Cover");
-        coverArt->setData(TagLib::ByteVector(coverData.data(), (uint32_t)coverData.size()));
+        size_t outLen = 4 * ((len + 2) / 3);
+        std::string res(outLen, '\0');
 
-        tag->addPicture(coverArt);
-        tag->setTitle(TagLib::String(meta.TrackName, TagLib::String::UTF8));
-        tag->setArtist(TagLib::String(artists, TagLib::String::UTF8));
-        tag->setAlbum(TagLib::String(meta.AlbumName, TagLib::String::UTF8));
-        tag->setTrack(meta.TrackNum);
-        tag->setYear(meta.GetReleaseYear());
+        for (size_t i = 0, j = 0; i < len;) {
+            uint8_t octet_a = i < len ? (uint8_t)data[i++] : 0;
+            uint8_t octet_b = i < len ? (uint8_t)data[i++] : 0;
+            uint8_t octet_c = i < len ? (uint8_t)data[i++] : 0;
 
-        tag->addField("DATE", meta.ReleaseDate);
-        tag->addField("TOTALTRACKS", std::to_string(meta.TotalTracks));
-        
-        if (meta.Type == TrackType::Music) {
-            tag->addField("DISCNUMBER", std::to_string(meta.DiscNum));
-            tag->addField("ISRC", meta.ISRC);
-            tag->addField("RELEASETYPE", meta.AlbumType);
-        } else if (meta.Type == TrackType::PodcastEpisode) {
-            tag->addField("DESCRIPTION", TagLib::String(meta.Description, TagLib::String::UTF8));
+            uint32_t triple = (octet_a << 16) | (octet_b << 8) | octet_c;
+
+            res[j++] = ALPHA[(triple >> 3 * 6) & 63];
+            res[j++] = ALPHA[(triple >> 2 * 6) & 63];
+            res[j++] = ALPHA[(triple >> 1 * 6) & 63];
+            res[j++] = ALPHA[(triple >> 0 * 6) & 63];
         }
-        ogg.save();
+        for (int i = 0; i < MOD_TABLE[len % 3]; i++) {
+            res[outLen - 1 - i] = '=';
+        }
+        return res;
     }
 
     TrackMetadata FetchTrackMetadata(const std::string& trackId)
@@ -348,34 +377,42 @@ struct StateManagerImpl : public StateManager
         md.RawData = json;
 
         if (json["type"] == "track") {
-            md.Type = TrackType::Music;
-            md.TrackName = json["name"];
+            std::string date = json["album"]["release_date"];
+            std::string artists;
             for (auto& artist : json["artists"]) {
-                md.Artists.emplace_back(artist["name"]);
+                if (artists.size() != 0) artists += ", ";
+                artists += artist["name"];
             }
-            md.AlbumName = json["album"]["name"];
-            md.AlbumType = json["album"]["album_type"];
-            md.ReleaseDate = json["album"]["release_date"];
-            md.CoverUrl = json["album"]["images"][0]["url"];
-            md.TotalTracks = json["album"]["total_tracks"];
-            md.TrackNum = json["track_number"];
-            md.DiscNum = json["disc_number"];
+            md.Type = "track";
+            md.Props["title"] = json["name"];
+            md.Props["artist"] = artists;
+            md.Props["album_artist"] = json["artists"][0]["name"];
+            md.Props["album"] = json["album"]["name"];
+            md.Props["releasetype"] = json["album"]["album_type"];
+            md.Props["date"] = date;
+            md.Props["year"] = date.substr(0, 4);
+            md.Props["track"] = std::to_string(json["track_number"].get<int>());
+            md.Props["totaltracks"] = std::to_string(json["album"]["total_tracks"].get<int>());
+            md.Props["disc"] = std::to_string(json["disc_number"].get<int>());
 
             if (json["external_ids"].contains("isrc")) {
-                md.ISRC = json["external_ids"]["isrc"];
-            } else {
-                md.ISRC = "unknown";
+                md.Props["isrc"] = json["external_ids"]["isrc"];
             }
+            md.CoverUrl = json["album"]["images"][0]["url"];
         } else if (json["type"] == "episode") {
-            md.Type = TrackType::PodcastEpisode;
-            md.TrackName = json["name"];
-            md.Artists.emplace_back(json["show"]["publisher"]);
-            md.AlbumName = json["show"]["name"];
-            md.ReleaseDate = json["release_date"];
+            std::string date = json["release_date"];
+
+            md.Type = "podcast";
+            md.Props["title"] = json["name"];
+            md.Props["publisher"] = json["show"]["publisher"];
+            md.Props["album_artist"] = json["show"]["publisher"];
+            md.Props["album"] = json["show"]["name"];
+            md.Props["date"] = date;
+            md.Props["year"] = date.substr(0, 4);
+            md.Props["totaltracks"] = std::to_string(json["show"]["total_episodes"].get<int>());
+            md.Props["description"] = json["description"];
+
             md.CoverUrl = json["images"][0]["url"];
-            md.TotalTracks = json["show"]["total_episodes"];
-            md.TrackNum = 0;
-            md.Description = json["description"];
         } else {
             throw std::runtime_error("Don't know how to parse track metadata (type=" + json["type"].get<std::string>() + ")");
         }
@@ -397,16 +434,10 @@ struct StateManagerImpl : public StateManager
     {
         std::string fmt = _config[fmtKey].get<std::string>();
 
-        auto FillArg = [&](const std::string& name, const std::string& value) {
-            auto repl = Utils::RemoveInvalidPathChars(value);
-            Utils::StrReplace(fmt, name, repl);
-        };
-        FillArg("{artist_name}", metadata.Artists[0]);
-        FillArg("{album_name}", metadata.AlbumName);
-        FillArg("{track_name}", metadata.TrackName);
-        FillArg("{track_num}", std::to_string(metadata.TrackNum));
-        FillArg("{release_year}", std::to_string(metadata.GetReleaseYear()));
-        
+        fmt = Utils::StrRegexReplace(fmt, std::regex("\\{(.+?)\\}"), [&](std::smatch const& m) {
+            auto& val = metadata.Props.at(m.str(1));
+            return Utils::RemoveInvalidPathChars(val);
+        });
         return fs::u8path(Utils::ExpandEnvVars(fmt));
     }
     

@@ -1,5 +1,6 @@
 #include "Utils.h"
 #include <chrono>
+#include <shellapi.h>
 
 namespace Utils
 {
@@ -15,6 +16,24 @@ namespace Utils
             index += replacement.length();
         }
     }
+    std::string StrRegexReplace(
+        const std::string& input,
+        const std::regex& regex,
+        std::function<std::string(std::smatch const& match)> format)
+    {
+        //https://stackoverflow.com/a/57420759
+        std::ostringstream output;
+        std::sregex_iterator begin(input.begin(), input.end(), regex), end;
+        ptrdiff_t endPos = 0;
+
+        for (; begin != end; begin++) {
+            output << begin->prefix() << format(*begin);
+            endPos = begin->position() + begin->length();
+        }
+        output << input.substr(endPos);
+        return output.str();
+    }
+
     const char* FindPosition(const char* str, int strLen, const char* needle, int needleLen)
     {
         auto strEnd = str + strLen - needleLen;
@@ -26,15 +45,15 @@ namespace Utils
         return nullptr;
     }
 
-    std::string StrWideToUtf(const std::wstring& str)
+    std::string StrWideToUtf(std::wstring_view str)
     {
         std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> conv;
-        return conv.to_bytes(str);
+        return conv.to_bytes(str.data(), str.data() + str.size());
     }
-    std::wstring StrUtfToWide(const std::string& str)
+    std::wstring StrUtfToWide(std::string_view str)
     {
         std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> conv;
-        return conv.from_bytes(str);
+        return conv.from_bytes(str.data(), str.data() + str.size());
     }
 
     std::string ExpandEnvVars(const std::string& str)
@@ -63,10 +82,10 @@ namespace Utils
         return dst;
     }
 
-    uint32_t StartProcess(const fs::path& filename, const std::wstring& args, const fs::path& workDir, bool waitForExit)
+    uint32_t StartProcess(const fs::path& filename, const std::vector<std::wstring>& args, const fs::path& workDir, bool waitForExit)
     {
         std::wstring filenameW = filename.wstring();
-        std::wstring argsW = L"\"" + filenameW + L"\" " + args;
+        std::wstring argsW = CreateCommandLine(args, filename);
         std::wstring workDirW = workDir.wstring();
 
         DWORD exitCode = 0;
@@ -90,6 +109,71 @@ namespace Utils
         CloseHandle(processInfo.hProcess);
 
         return exitCode;
+    }
+
+    //https://docs.microsoft.com/en-us/archive/blogs/twistylittlepassagesallalike/everyone-quotes-command-line-arguments-the-wrong-way
+    void ArgvQuote(std::wstring& cmdLine, const std::wstring& arg, bool force = false)
+    {
+        // Unless we're told otherwise, don't quote unless we actually
+        // need to do so --- hopefully avoid problems if programs won't
+        // parse quotes properly
+        if (!force && !arg.empty() && arg.find_first_of(L" \t\n\v\"") == arg.npos) {
+            cmdLine.append(arg);
+        } else {
+            cmdLine.push_back(L'"');
+
+            for (auto it = arg.begin(); ; ++it) {
+                int numBackslashes = 0;
+
+                while (it != arg.end() && *it == L'\\') {
+                    ++it;
+                    ++numBackslashes;
+                }
+
+                if (it == arg.end()) {
+                    // Escape all backslashes, but let the terminating
+                    // double quotation mark we add below be interpreted
+                    // as a metacharacter.
+                    cmdLine.append(numBackslashes * 2, L'\\');
+                    break;
+                } else if (*it == L'"') {
+                    // Escape all backslashes and the following
+                    // double quotation mark.
+                    cmdLine.append(numBackslashes * 2 + 1, L'\\');
+                    cmdLine.push_back(*it);
+                } else {
+                    // Backslashes aren't special here.
+                    cmdLine.append(numBackslashes, L'\\');
+                    cmdLine.push_back(*it);
+                }
+            }
+            cmdLine.push_back(L'"');
+        }
+    }
+    void SplitCommandLine(const std::wstring& cmdLine, std::vector<std::wstring>& dest)
+    {
+        int numArgs;
+        LPWSTR* args = CommandLineToArgvW(cmdLine.data(), &numArgs);
+
+        for (int i = 0; i < numArgs; i++) {
+            dest.push_back(std::wstring(args[i]));
+        }
+        LocalFree(args);
+    }
+    std::wstring CreateCommandLine(std::vector<std::wstring> args, fs::path filename)
+    {
+        std::wstring cmdLine;
+
+        if (!filename.empty()) {
+            ArgvQuote(cmdLine, filename.wstring());
+        }
+        for (auto& arg : args) {
+            if (!cmdLine.empty()) {
+                cmdLine.push_back(L' ');
+            }
+            ArgvQuote(cmdLine, arg);
+        }
+        return cmdLine;
     }
 
     int64_t CurrentMillis()

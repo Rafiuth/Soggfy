@@ -29,10 +29,6 @@
 
 #include <nlohmann/json.hpp>
 
-#define TAGLIB_STATIC
-#include <taglib/attachedpictureframe.h>
-#include <taglib/vorbisfile.h>
-
 //undef windows macros that conflict with stdlib
 #undef min
 #undef max
