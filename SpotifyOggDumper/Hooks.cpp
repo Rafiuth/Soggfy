@@ -1,4 +1,4 @@
-#include "pch.h"
+#include "Hooks.h"
 #include <mutex>
 #include <deque>
 #include <MinHook.h>
@@ -12,22 +12,6 @@ std::unique_ptr<StateManager> _stateMgr;
 std::mutex _mutex;
 
 double _playbackSpeed = -1.0;
-
-//Note: __thiscall can't be used directly; as a workaround, try __fastcall with an extra parameter for edx after 'this':
-//__thiscall FN(void* this, int x)  ->  __fastcall FN(void* ecx, void* edx, int x)
-#define DETOUR_FUNC(CALL_CONV, RET_TYPE, NAME,  SIG)            \
-    typedef RET_TYPE (CALL_CONV *NAME##_FuncType)SIG;           \
-    NAME##_FuncType NAME##_Org;                                 \
-    RET_TYPE CALL_CONV NAME##_Detour##SIG
-
-template <int... Offsets>
-constexpr void* TraversePointers(void* ptr)
-{
-    for (int offset : { Offsets... }) {
-        ptr = *(char**)((char*)ptr + offset);
-    }
-    return ptr;
-}
 
 /*
 undefined4 __thiscall
@@ -75,7 +59,7 @@ DETOUR_FUNC(__fastcall, int, DecodeAudioData, (
     auto buf = (char*)param_4[0];
     int bufLen = (int)param_4[1];
 
-    int ret = DecodeAudioData_Org(ecx, edx, param_2, param_3, param_4, param_5);
+    int ret = DecodeAudioData_Orig(ecx, edx, param_2, param_3, param_4, param_5);
 
     int bytesRead = bufLen - (int)param_4[1];
 
@@ -161,15 +145,16 @@ DETOUR_FUNC(__cdecl, void, WriteLog, (LogParams pars))
     }
     _mutex.unlock();
 
-    WriteLog_Org(pars);
+    WriteLog_Orig(pars);
 }
-DETOUR_FUNC(__cdecl, int, CreateJsonAccessToken, (void* param_1, char** param_2))
+//void FUN_008b41bf(undefined4 param_1,undefined4 param_2,int *param_3)
+DETOUR_FUNC(__cdecl, int, CreateJsonAccessToken, (void* param_1, void* param_2, void* param_3))
 {
     if (param_2) {
         auto accToken = *(char**)param_2;
         _stateMgr->UpdateAccToken(accToken);
     }
-    return CreateJsonAccessToken_Org(param_1, param_2);
+    return CreateJsonAccessToken_Orig(param_1, param_2, param_3);
 }
 
 /* 
@@ -185,58 +170,64 @@ DETOUR_FUNC(__fastcall, void, CreateTrackPlayer, (
     if (_playbackSpeed > 0.0) {
         speed = _playbackSpeed;
     }
-    CreateTrackPlayer_Org(ecx, edx, param_2, param_3, speed, param_5, param_6, param_7, param_8, param_9);
+    CreateTrackPlayer_Orig(ecx, edx, param_2, param_3, speed, param_5, param_6, param_7, param_8, param_9);
 }
 
-
-struct HookTableEntry
-{
-    uintptr_t Addr;
-    LPVOID Detour;
-    LPVOID* OrgFunc;
-};
-struct HookTable
-{
-    AppVersion Version;
-    HookTableEntry Entries[16];
-};
-static const HookTable HookTables[] =
+static const HookInfo HookTargets[] =
 {
     {
-        {1, 1, 70, 610},   //version
-        {
-            { 0x009E08F1, &DecodeAudioData_Detour,          (LPVOID*)&DecodeAudioData_Org       },
-            { 0x00CC4953, &WriteLog_Detour,                 (LPVOID*)&WriteLog_Org              },
-            { 0x008B10EC, &CreateJsonAccessToken_Detour,    (LPVOID*)&CreateJsonAccessToken_Org },
-            { 0x009A065B, &CreateTrackPlayer_Detour,        (LPVOID*)&CreateTrackPlayer_Org     },
-        }
+        &DecodeAudioData_Detour, (LPVOID*)&DecodeAudioData_Orig,
+        Fingerprint(
+            L"Spotify.exe",
+            "\x55\x8B\xEC\x8B\x11\x56\x8B\x75\x10\x57\x8B\x7D\x0C\xFF\x75\x14\x8B\x47\x04\x89\x45\x0C\x8B\x46\x04\x89\x45\x10\x8D\x45\x10\x50\xFF\x36\x8D\x45\x0C\x50\xFF\x37\xFF\x75\x08\xFF\x52\x04\x8B\x55\x0C\x8B\xCA\x29\x57\x04\x8B\x45\x08\xC1\xE1\x02\x01\x0F\x8B\x4D\x10\x01\x0E\x29\x4E\x04\x5F\x5E\x5D\xC2\x10\x00",
+            "\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF"
+        )
+    },
+    {
+        &WriteLog_Detour, (LPVOID*)&WriteLog_Orig,
+        Fingerprint(
+            L"Spotify.exe",
+            "\x6A\x24\xB8\xFE\x2E\xD1\x00\xE8\x2E\x26\x02\x00\x8B\x7D\x10\x33\xC0\x8B\x75\x14\x89\x45\xD8\x89\x45\xE8\xC7\x45\xEC\x0F\x00\x00\x00\x88\x45\xD8\x89\x45\xFC\x8D\x45\x24\x50\xFF\x75\x20\x8D\x45\xD8\x50\xE8\x6D\x2E\x00\x00\x8D\x45\xD8\x50\xFF\x75\x1C\xFF\x75\x18\x56\x57\xFF\x75\x0C\xFF\x75\x08\xE8\x40\x00\x00\x00\x8B\x45\xEC\x83\xC4\x28\x83\xF8\x10\x72\x2F\x8B\x4D\xD8\x40\x89\x45\xD4\x89\x4D\xD0\x3D\x00\x10\x00\x00\x72\x15\x8D\x45\xD4\x50\x8D\x45\xD0\x50\xE8\x94\x31\x7C\xFF",
+            "\xFF\xFF\xFF\x00\x00\x00\x00\xFF\x00\x00\x00\x00\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\x00\x00\x00\x00\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\x00\x00\x00\x00\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\x00\x00\x00\x00"
+        )
+    },
+    {
+        &CreateJsonAccessToken_Detour, (LPVOID*)&CreateJsonAccessToken_Orig,
+        Fingerprint(
+            L"Spotify.exe",
+            "\x55\x8B\xEC\x6A\xFF\x68\xBB\x8E\xD8\x00\x64\xA1\x00\x00\x00\x00\x50\x81\xEC\xA4\x00\x00\x00\xA1\x18\x00\x07\x01\x33\xC5\x89\x45\xF0\x56\x57\x50\x8D\x45\xF4\x64\xA3\x00\x00\x00\x00\x8B\x45\x08\x8B\x4D\x0C\x89\x45\x98\x8B\x45\x10\x51\x8D\x8D\x50\xFF\xFF\xFF\x8B\x38\x8B\x70\x04\xE8\xB7\x40\xC5\xFF\x89\x7D\x90\x89\x75\x94\x8B\x45\x98\x83\x65\xFC\x00\x8B\x30\xC6\x45\xFC\x01\x85\xFF\x75\x30\x80\x7D\x88\x00\x74\x2A\x8D\x85\x50\xFF\xFF\xFF\x50\x8D\x45\xD8\x50\xE8\x11\xFF\xFF\xFF",
+            "\xFF\xFF\xFF\xFF\xFF\xFF\x00\x00\x00\x00\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\x00\x00\x00\x00\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\x00\x00\x00\x00\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\x00\x00\x00\x00"
+        )
+    },
+    {
+        &CreateTrackPlayer_Detour, (LPVOID*)&CreateTrackPlayer_Orig,
+        Fingerprint(
+            L"Spotify.exe",
+            "\x6A\x74\xB8\x52\xBC\xD9\x00\xE8\x54\x67\x34\x00\x89\x4D\x88\x8B\x45\x18\x33\xDB\x8B\x7D\x08\x8B\x75\x0C\xF2\x0F\x10\x45\x10\x89\x45\x94\x8B\x45\x1C\x89\x45\x98\x8B\x45\x20\x89\x45\x9C\x8B\x45\x24\x89\x7D\x90\x89\x45\x90\x8B\x45\x28\x89\x45\xA0\x8D\x46\x08\x6A\x10\x50\x8D\x45\xCC\xF2\x0F\x11\x45\x80\x50\x89\x5D\x8C\xE8\x1A\x8E\x32\x00\x8D\x45\xCC\x50\x68\x30\xF5\xE8\x00\x53\x68\x19\x01\x00\x00\x68\x70\xC8\xDE\x00\x68\x7A\x42\xDE\x00\x53\x6A\x04\xE8\x83\x42\x32\x00",
+            "\xFF\xFF\xFF\x00\x00\x00\x00\xFF\x00\x00\x00\x00\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\x00\x00\x00\x00\xFF\xFF\xFF\xFF\xFF\x00\x00\x00\x00\xFF\xFF\x00\x00\x00\x00\xFF\x00\x00\x00\x00\xFF\x00\x00\x00\x00\xFF\xFF\xFF\xFF\x00\x00\x00\x00"
+        )
     }
 };
 
-void InstallHooks(const HookTable& table)
+void InstallHooks()
 {
     MH_Initialize();
 
-    for (auto& entry : table.Entries) {
-        if (entry.Addr == 0) break;
-        if (MH_CreateHook((LPVOID)entry.Addr, entry.Detour, entry.OrgFunc) != MH_OK) {
-            throw std::runtime_error("Failed to create hook for " + std::to_string(entry.Addr));
+    for (auto& hook : HookTargets) {
+        std::vector<LPVOID> addrs;
+        hook.TargetFingerprint.SearchInModule(addrs);
+
+        if (addrs.size() != 1) {
+            throw std::runtime_error("Could not find address of hook target");
+        }
+        if (MH_CreateHook(addrs[0], hook.Detour, hook.OrigFunc) != MH_OK) {
+            throw std::runtime_error("Failed to create hook");
         }
     }
     auto enableResult = MH_EnableHook(MH_ALL_HOOKS);
     if (enableResult != MH_OK) {
         throw std::runtime_error("Failed to enable hooks (code " + std::to_string(enableResult) + ")");
     }
-}
-void InstallHooks(const AppVersion& version)
-{
-    for (auto& table : HookTables) {
-        if (version == table.Version) {
-            InstallHooks(table);
-            return;
-        }
-    }
-    throw std::runtime_error(std::format("No hook table available for version {}", version));
 }
 
 void Exit()
@@ -284,14 +275,14 @@ DWORD WINAPI Init(LPVOID param)
         R"(     ____\_\  \ \_______\ \_______\ \_______\ \__\__/  / /    )" "\n"
         R"(    |\_________\|_______|\|_______|\|_______|\|__|\___/ /     )" "\n"
         R"(    \|_________|                                 \|___|/      )" "\n" COL_RESET
-        R"(                                                        v1.4.4)";
+        R"(                                                        v1.4.6)";
     LogInfo(label);
 
     try {
         auto spotifyVersion = AppVersion::Of(L"Spotify.exe");
         LogInfo("Spotify version: {}", spotifyVersion);
 
-        InstallHooks(spotifyVersion);
+        InstallHooks();
     } catch (std::exception& ex) {
         LogError("Failed to install hooks: {}", ex.what());
         Exit();
