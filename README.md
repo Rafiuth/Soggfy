@@ -34,4 +34,4 @@ You can optionally prevent this by running `BlockSpotifyUpdates.bat`.
 - Default save path is `%userprofile%/Music/Soggfy`. It can be changed in `config.json`.
 - Quality depends on account type: 160Kb/s for free accounts, and 320Kb/s for premium accounts. It may also depend on the client settings.
 - **You could get banned by using this. Please consider using alt accounts or keeping backups (see [Exportify](https://watsonbox.github.io/exportify) or [SpotMyBackup](http://www.spotmybackup.com)).**
-- Last supported Spotify client version: [1.1.71.560.gc21c3367](https://upgrade.scdn.co/upgrade/client/win32-x86/spotify_installer-1.1.71.560.gc21c3367-42.exe)
+- Last supported Spotify client version: [1.1.72.439.gc253025e](https://upgrade.scdn.co/upgrade/client/win32-x86/spotify_installer-1.1.72.439.gc253025e-33.exe)
