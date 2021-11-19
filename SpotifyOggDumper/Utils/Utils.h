@@ -2,48 +2,53 @@
 #include "../pch.h"
 #include <filesystem>
 
+namespace fs = std::filesystem;
+
 namespace Utils
 {
-    namespace fs = std::filesystem;
+    void Replace(std::string& str, const std::string& needle, const std::string& replacement);
+    std::vector<std::string_view> Split(std::string_view str, std::string_view delim, bool includeEmptyTokens = true);
 
-    void StrReplace(std::string& str, const std::string& needle, const std::string& replacement);
-    std::string StrRegexReplace(
+    std::string RegexReplace(
         const std::string& input,
         const std::regex& regex,
-        std::function<std::string(std::smatch const& match)> format);
+        std::function<std::string(const std::smatch& match)> format
+    );
 
-    const char* FindPosition(const char* str, int strLen, const char* needle, int needleLen);
+    const char* FindSubstr(const char* str, int strLen, const char* needle, int needleLen);
 
-    std::string StrWideToUtf(std::wstring_view str);
-    std::wstring StrUtfToWide(std::string_view str);
+    std::string WideToUtf(std::wstring_view str);
+    std::wstring UtfToWide(std::string_view str);
+    std::string PathToUtf(const fs::path& path);
+
+    std::string EncodeBase64(std::string_view data);
+    std::string DecodeBase64(std::string_view str);
 
     //Call WINAPI ExpandEnvironmentStrings(), assuming str is UTF8.
     std::string ExpandEnvVars(const std::string& str);
 
     std::string RemoveInvalidPathChars(const std::string& src);
-
-    uint32_t StartProcess(const fs::path& filename, const std::vector<std::wstring>& args, const fs::path& workDir, bool waitForExit = false);
-    void SplitCommandLine(const std::wstring& cmdLine, std::vector<std::wstring>& dest);
-    std::wstring CreateCommandLine(std::vector<std::wstring> args, fs::path filename = {});
+    std::string GetHomeDirectory();
 
     int64_t CurrentMillis();
 }
 
-struct TimeRange
+class ProcessBuilder
 {
-    int64_t Start = 0, End = 0;
+    fs::path _exePath;
+    fs::path _workDir;
+    std::vector<std::wstring> _args;
 
-    inline void MarkStart() { Start = Utils::CurrentMillis(); }
-    inline void MarkEnd() { End = Utils::CurrentMillis(); }
-    inline bool IsMarked() { return Start != 0 && End != 0; }
+public:
+    void SetExePath(const fs::path& path) { _exePath = path; }
+    void SetWorkDir(const fs::path& path) { _workDir = path; }
 
-    inline int64_t GetOverlappingMillis(const TimeRange& other)
-    {
-        //a:    s...e
-        //b: s....e
-        //r:    ~~~
-        int64_t start = std::max(Start, other.Start);
-        int64_t end = std::min(End, other.End);
-        return std::max(end - start, 0LL);
-    }
+    void AddArgPath(const fs::path& path) { _args.push_back(path.wstring()); }
+    void AddArg(const std::string& str) { _args.push_back(Utils::UtfToWide(str)); }
+
+    void AddArgs(const std::string& str);
+
+    int Start(bool waitForExit = false);
+
+    std::string ToString();
 };
