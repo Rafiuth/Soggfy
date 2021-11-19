@@ -112,6 +112,7 @@
                 metadata: {},
                 pathVars: {},
                 lyrics: "",
+                lyricsExt: "",
                 coverArtId: track.metadata.image_xlarge_url.replaceAll(":", "_"),
                 save: data.playedFromStart,
             };
@@ -583,9 +584,17 @@
     background: #1db954;
 }
 .sgf-slider-label {
+    width: 64px;
     margin-right: 4px;
     text-align: right;
     font-size: 11px;
+    background: #333;
+    border: none;
+}
+.sgf-slider-label:hover, .sgf-slider-label:focus {
+    border: solid;
+    border-width: 1px;
+    border-color: #444;
 }
 `;
         
@@ -781,18 +790,25 @@
             let node = document.createElement("div");
             node.className = "sgf-slider-wrapper";
             node.innerHTML = `
-<span class="sgf-slider-label"></span>
+<input class="sgf-slider-label"></input>
 <input class="sgf-slider" type="range" min="${min}" max="${max}" step="${step}" value="${initialValue}">
 `;
-            let input = node.querySelector("input");
-            let label = node.querySelector("span");
-            label.innerText = formatter(initialValue);
-
-            input.oninput = () => {
-                label.innerText = formatter(parseFloat(input.value));
-            };
+            let slider = node.querySelector(".sgf-slider");
+            let label = node.querySelector(".sgf-slider-label");
+            label.value = formatter(initialValue);
+            
+            let updateLabel = () => label.value = formatter(parseFloat(slider.value));
+            slider.oninput = updateLabel;
+            
+            //remove custom format when editing via the textbox
+            label.oninput = () => slider.value = label.value;
+            label.onfocus = () => label.value = slider.value;
+            label.onblur = updateLabel;
+            
             if (callback) {
-                input.onchange = () => callback(key, parseFloat(input.value));
+                let fireCallback = () => callback(key, parseFloat(slider.value));
+                label.onchange = fireCallback;
+                slider.onchange = fireCallback;
             }
             return node;
         }
