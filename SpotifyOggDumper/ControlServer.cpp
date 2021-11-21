@@ -20,6 +20,15 @@ void ControlServer::Run()
         .resetIdleTimeoutOnSend = false,
         .sendPingsAutomatically = true,
 
+        .upgrade = [](uWS::HttpResponse<false>* res, uWS::HttpRequest* req, us_socket_context_t* context) {
+            auto secKey = req->getHeader("sec-websocket-key");
+            auto secProto = req->getHeader("sec-websocket-protocol");
+            auto secExts = req->getHeader("sec-websocket-extensions");
+
+            res->writeStatus("101 Switching Protocols");
+            res->writeHeader("Access-Control-Allow-Origin", "*");
+            res->upgrade(Connection(), secKey, secProto, secExts, context);
+        },
         .open = [&](WebSocket* ws) {
             LogInfo("Incomming connection from {}@{}", ws->getRemoteAddressAsText(), (void*)ws);
             ws->getUserData()->Socket = ws;
@@ -47,8 +56,8 @@ void ControlServer::Run()
         }
     });
 #if _DEBUG
-    _app->get("/", [](auto resp, auto req) {
-        resp->end("Soggfy it's working ;)");
+    _app->get("/", [](auto res, auto req) {
+        res->end("Soggfy it's working ;)");
     });
 #endif
 
@@ -61,8 +70,7 @@ void ControlServer::Run()
             std::string addr = "ws://127.0.0.1:" + std::to_string(_port) + "/sgf_ctrl";
             _msgHandler(nullptr, { MessageType::SERVER_OPEN, { { "addr", addr } } });
         } else {
-            //TODO: patch js to use this port
-            /*if (attemptNum > 64)*/ {
+            if (attemptNum > 64) {
                 throw std::exception("Failed to open control server.");
             }
             LogDebug("Failed to listen on port {}, trying again...", _port);
@@ -72,19 +80,27 @@ void ControlServer::Run()
         }
     };
     _app->listen("127.0.0.1", _port, LIBUS_LISTEN_EXCLUSIVE_PORT, listenHandler);
-    _app->run();
+    _app->run(); //will block until _socket and all connections are closed
+
+    std::lock_guard lock(_doneMutex);
+    _doneCond.notify_all();
+    _app = nullptr;
 }
 void ControlServer::Stop()
 {
     if (_socket) {
-        //FIXME: find a way to shutdown this shit without crashing
+        
         _loop->defer([&]() {
-            for (auto ws : _clients) {
+            //create a copy because the closeHandler fired by end() will invalidate the iterator
+            auto clients = _clients;
+            for (auto ws : clients) {
                 ws->end(1001, "Server is shutting down");
             }
             us_listen_socket_close(0, _socket);
             _socket = nullptr;
         });
+        std::unique_lock lock(_doneMutex);
+        _doneCond.wait(lock);
     }
 }
 

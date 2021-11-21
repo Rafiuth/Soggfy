@@ -1,5 +1,6 @@
 #pragma once
 #include "pch.h"
+#include <condition_variable>
 #include <uwebsockets/App.h>
 #include "StateManager.h"
 
@@ -40,6 +41,9 @@ private:
     uWS::Loop* _loop = nullptr;
     us_listen_socket_t* _socket = nullptr;
     std::unordered_set<WebSocket*> _clients;
+
+    std::condition_variable _doneCond;
+    std::mutex _doneMutex;
 
     int _port = 28653;
     MessageHandler _msgHandler;
