@@ -17,27 +17,41 @@ struct Fingerprint
         Length = len - 1; //exclude null terminator
     }
 
-    void SearchInModule(std::vector<uintptr_t>& results) const
+    uintptr_t SearchInModule() const
     {
         auto mod = (char*)GetModuleHandle(ModuleName);
         auto dosHdr = (IMAGE_DOS_HEADER*)mod;
         auto ntHdrs = (IMAGE_NT_HEADERS*)(mod + dosHdr->e_lfanew);
         auto optHdr = &ntHdrs->OptionalHeader;
 
-        return Search(results, mod + optHdr->BaseOfCode, optHdr->SizeOfCode);
+        return Search(mod + optHdr->BaseOfCode, optHdr->SizeOfCode);
     }
-    void Search(std::vector<uintptr_t>& results, const char* data, int dataLen) const
+    uintptr_t Search(const char* data, int dataLen) const
     {
+        uintptr_t result = 0;
+        int matches = 0;
+
         for (int i = 0; i < dataLen - Length; i++) {
-            //check if there's a match at i
-            for (int j = 0; j < Length; j++) {
-                if ((data[i + j] ^ Pattern[j]) & Mask[j]) {
-                    goto TryAgain;
-                }
+            if (IsMatch(data + i)) {
+                result = (uintptr_t)(data + i);
+                matches++;
             }
-            results.push_back((uintptr_t)data + i);
-        TryAgain:;
         }
+        if (matches != 1) {
+            throw std::runtime_error("Fingerprint matches " + std::to_string(matches) + " locations, expected 1.");
+        }
+        return result;
+    }
+private:
+    inline bool IsMatch(const char* data) const
+    {
+        //check remaining bytes, if length is not a multiple of 4
+        for (int i = 0; i < Length; i++) {
+            if ((data[i] ^ Pattern[i]) & Mask[i]) {
+                return false;
+            }
+        }
+        return true;
     }
 };
 struct HookInfo
@@ -50,10 +64,10 @@ struct HookInfo
 
 //Note: __thiscall can't be used directly; as a workaround, try __fastcall with an extra parameter for edx after 'this':
 //__thiscall FN(void* this, int x)  ->  __fastcall FN(void* ecx, void* edx, int x)
-#define DETOUR_FUNC(callConv, retType, name,  sig)              \
-    typedef retType (callConv *name##_FuncType)sig;             \
+#define DETOUR_FUNC(callConv, retType, name,  args)             \
+    typedef retType (callConv *name##_FuncType)args;            \
     name##_FuncType name##_Orig;                                \
-    retType callConv name##_Detour##sig
+    retType callConv name##_Detour##args
 
 #define HOOK_INFO(targetDetour, fingerprint)                    \
     { &targetDetour##_Detour, (LPVOID*)&targetDetour##_Orig, #targetDetour, fingerprint }

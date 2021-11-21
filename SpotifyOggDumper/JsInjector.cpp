@@ -172,12 +172,8 @@ _CefContext* FindCefContext()
         "\x55\x89\xE5\x56\x8B\x35\xDC\xF1\x36\x17\x85\xF6\x74\x44\x80\x3E\x00\x74\x3F\x80\x7E\x01\x00\x75\x39\xE8",
         "\xFF\xFF\xFF\xFF\xFF\xFF\x00\x00\x00\x00\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF"
     );
-    std::vector<uintptr_t> addrs;
-    fingerprint.SearchInModule(addrs);
-    if (addrs.size() != 1) {
-        throw std::exception("Could not find CefShutdown()");
-    }
-    return **(_CefContext***)(addrs[0] + 6);
+    uintptr_t addr = fingerprint.SearchInModule();
+    return **(_CefContext***)(addr + 6);
 }
 
 namespace JsInjector

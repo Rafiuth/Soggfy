@@ -145,13 +145,9 @@ void InstallHooks()
     MH_Initialize();
 
     for (auto& hook : HookTargets) {
-        std::vector<uintptr_t> addrs;
-        hook.Fingerprint.SearchInModule(addrs);
+        uintptr_t addr = hook.Fingerprint.SearchInModule();
 
-        if (addrs.size() != 1) {
-            throw std::runtime_error(std::format("Could not find target function for hook {}: got {} matches", hook.Name, addrs.size()));
-        }
-        if (MH_CreateHook((LPVOID)addrs[0], hook.Detour, hook.OrigFunc) != MH_OK) {
+        if (MH_CreateHook((LPVOID)addr, hook.Detour, hook.OrigFunc) != MH_OK) {
             throw std::runtime_error("Failed to create hook");
         }
     }
