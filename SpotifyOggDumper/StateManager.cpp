@@ -85,6 +85,10 @@ struct StateManagerImpl : public StateManager
                 std::string srcJs(std::istreambuf_iterator<char>(srcJsFile), {});
 
                 Utils::Replace(srcJs, "ws://127.0.0.1:28653/sgf_ctrl", msg.Content["addr"]);
+                Utils::Replace(srcJs, "IS_INJECTED = false", "IS_INJECTED = true");
+#ifdef _DEBUG
+                Utils::Replace(srcJs, "IS_DEBUG = false", "IS_DEBUG = true");
+#endif
                 JsInjector::Inject(srcJs);
                 LogInfo("Ready");
                 break;
@@ -96,8 +100,11 @@ struct StateManagerImpl : public StateManager
             case MessageType::BYE: {
                 break;
             }
-            case MessageType::TRACK_DONE: {
-                TrackMetadata md = {
+            case MessageType::TRACK_META: {
+                std::string playbackId = content["playbackId"];
+                auto playback = GetPlayback(playbackId, false);
+
+                TrackMetadata meta = {
                     .Type       = content["type"],
                     .TrackUri   = content["trackUri"],
                     .Props      = content["metadata"],
@@ -107,7 +114,8 @@ struct StateManagerImpl : public StateManager
                     .CoverArtId = content["coverArtId"],
                     .CoverArtData = msg.BinaryContent
                 };
-                OnTrackDone(content["playbackId"], md, content["save"]);
+                std::thread(&StateManagerImpl::SaveTrack, this, playback, meta).detach();
+                RemovePlayback(playbackId);
                 break;
             }
             case MessageType::SYNC_CONFIG: {
@@ -121,21 +129,6 @@ struct StateManagerImpl : public StateManager
                 throw std::runtime_error("Unexpected message (type=" + std::to_string((int)msg.Type) + ")");
             }
         }
-    }
-
-    void OnTrackDone(const std::string& playbackId, const TrackMetadata& meta, bool save)
-    {
-        auto playback = GetPlayback(playbackId, false);
-        playback->FileStream.close();
-
-        if (save && !playback->Discard) {
-            if (playback->ActualExt.empty()) {
-                LogWarn("Unrecognized audio codec in track {} ({}), aborting download. This is a bug, please report.", meta.TrackUri, meta.GetName());
-            } else {
-                std::thread(&StateManagerImpl::SaveTrack, this, playback, meta).detach();
-            }
-        }
-        RemovePlayback(playbackId);
     }
 
     void ReceiveAudioData(const std::string& playbackId, const char* data, int length)
@@ -167,6 +160,24 @@ struct StateManagerImpl : public StateManager
             }
         }
         fs.write(data, length);
+    }
+    void OnTrackDone(const std::string& playbackId)
+    {
+        auto playback = GetPlayback(playbackId, false);
+        playback->FileStream.close();
+
+        if (playback->Discard) {
+            RemovePlayback(playbackId);
+            return;
+        }
+        if (playback->ActualExt.empty()) {
+            LogWarn("Unrecognized audio codec in playback {}, aborting download. This is a bug, please report.", playbackId);
+            return;
+        }
+        json content = {
+            { "playbackId", playbackId }
+        };
+        _ctrlSv.Broadcast({ MessageType::REQ_TRACK_META, content });
     }
     void DiscardTrack(const std::string& playbackId)
     {
@@ -235,7 +246,6 @@ struct StateManagerImpl : public StateManager
     }
     void InvokeFFmpeg(const fs::path& path, const fs::path& coverPath, const fs::path& outPath, const std::string& extraArgs, const TrackMetadata& meta)
     {
-        //TODO: use utf8 strings instead of wstring and add `std::string Utils::PathToUtf(fs::path&)`
         //TODO: fix 32k char command line limit for lyrics
         if (fs::exists(outPath)) {
             LogDebug("File {} already exists. Skipping conversion.", outPath.filename().string());
@@ -348,9 +358,10 @@ struct StateManagerImpl : public StateManager
         for (auto& [k, v] : metadata.PathVars) {
             vars.emplace(k, Utils::RemoveInvalidPathChars(v));
         }
-
         std::string path = Utils::RegexReplace(format, std::regex("\\{(.+?)\\}"), [&](auto& m) {
-            return vars.at(m.str(1));
+            auto varName = m.str(1);
+            auto itr = vars.find(varName);
+            return itr != vars.end() ? itr->second : "_";
         });
         return fs::u8path(path);
     }

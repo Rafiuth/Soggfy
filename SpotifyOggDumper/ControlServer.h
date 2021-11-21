@@ -7,13 +7,14 @@
 //Server=CPP Client=JS
 enum class MessageType
 {
-    TRACK_DONE  = 1,  //C -> S
-    SYNC_CONFIG = 2,  //C <> S
+    REQ_TRACK_META  = 1,  //S -> C
+    TRACK_META      = 2,  //C -> S
+    SYNC_CONFIG     = 3,  //C <> S
 
     //Internal
-    HELLO       = -1,   //Client connected
-    BYE         = -2,   //Client disconnected
-    SERVER_OPEN = -128  //Server listen success, message: { addr: string }
+    HELLO           = -1,   //Client connected
+    BYE             = -2,   //Client disconnected
+    SERVER_OPEN     = -128  //Server listen success, message: { addr: string }
 };
 struct Connection;
 struct Message;
@@ -35,6 +36,9 @@ public:
 
     void Run();
     void Stop();
+    
+    //Sends the specified message to all connected clients. Can be called from any thread.
+    void Broadcast(const Message& msg);
     
 private:
     std::unique_ptr<uWS::App> _app;

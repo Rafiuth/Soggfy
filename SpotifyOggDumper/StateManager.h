@@ -5,6 +5,7 @@ class StateManager
 {
 public:
     virtual void ReceiveAudioData(const std::string& playbackId, const char* data, int length) = 0;
+    virtual void OnTrackDone(const std::string& playbackId) = 0;
     //Marks the playback as incomplete (seeked or skipped), this will cancel it's download.
     virtual void DiscardTrack(const std::string& playbackId) = 0;
 

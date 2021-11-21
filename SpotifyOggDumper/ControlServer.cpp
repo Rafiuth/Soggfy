@@ -104,9 +104,22 @@ void ControlServer::Stop()
     }
 }
 
-void Connection::Send(const Message& msg)
+void SendData(WebSocket* socket, const std::string& data, uWS::OpCode opcode = uWS::BINARY)
 {
-    if (Socket->send(msg.Serialize(), uWS::BINARY) != WebSocket::SendStatus::SUCCESS) {
+    if (socket->send(data, opcode) != WebSocket::SendStatus::SUCCESS) {
         throw std::runtime_error("Failed to send message");
     }
+}
+
+void Connection::Send(const Message& msg)
+{
+    SendData(Socket, msg.Serialize());
+}
+void ControlServer::Broadcast(const Message& msg)
+{
+    _loop->defer([this, data = std::move(msg.Serialize())]() {
+        for (auto ws : _clients) {
+            SendData(ws, data);
+        }
+    });
 }

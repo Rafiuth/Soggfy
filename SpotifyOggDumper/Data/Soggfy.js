@@ -1,10 +1,12 @@
 //@ts-check
+//TODO: typescript port?
 
 (function Soggfy() {
     //@ts-ignore
     const Platform = document.querySelector("#main")?._reactRootContainer?._internalRoot?.current?.child?.child?.stateNode?.props?.children?.props?.children?.props?.children?.props?.platform;
     const Player = Platform?.getPlayerAPI();
     const CosmosAsync = Player?._cosmos;
+    const SpotifyTransport = Platform?.getAdManagers()?.hpto?.hptoApi?.webApi?.spotifyTransport; //TODO: this api reports telemetry, is it a good idea to use it?
 
     if (!Platform) {
         setTimeout(Soggfy, 500);
@@ -13,14 +15,21 @@
     const Log = function(msg) {
         console.log(msg);
     }
+    //these will be changed using string replace by JsInjector, don't change.
+    const IS_INJECTED = false;
+    const IS_DEBUG = false || !IS_INJECTED;
+    
+    if (IS_DEBUG) {
+        window._soggfy = this;
+    }
 
     let g_config = {
         enabled: true,
         downloadLyrics: true,
         embedCoverArt: true,
         outputFormat: {
-            args: "-c:a libmp3lame -b:a 320k -id3v2_version 3 -c:v copy",
-            ext: "mp3"
+            args: "-c copy",
+            ext: ""
         },
         playbackSpeed: 1.0,
         savePaths: {
@@ -35,6 +44,7 @@
         }
     };
     let g_conn = null;
+    let g_playerTracker;
 
     function isEnabled()
     {
@@ -44,98 +54,62 @@
     {
         constructor()
         {
-            this._currState = {
-                playback: null,
-                playedFromStart: false,
-                extraMetadata: null
-            };
-            Utils.createHook(Player._events._emitter.__proto__, "createEvent", (stage, args, ret) => {
-                if (stage !== "pre" || !args[1]) return;
+            this._playbacks = new Map();
 
+            Utils.createHook(Player._events._emitter.__proto__, "createEvent", (stage, args, ret) => {
                 let eventType = args[0];
                 let data = args[1];
-                
-                switch (eventType) {
-                    case "update": {
-                        if (data.playbackId) {
-                            this._handlePlayerState(data);
-                        }
-                        break;
-                    }
-                    case "transport_before_return_response": {
-                        if (this._isMetadataReqForCurrTrack(data.response.url, data.response.body)) {
-                            this._currState.extraMetadata = data.response.body;
-                        }
-                        break;
+                if (stage === "pre" && eventType === "update" && data.playbackId) {
+                    if (!this._playbacks.has(data.playbackId)) {
+                        this._playbacks.set(data.playbackId, data);
                     }
                 }
             });
         }
-        _isMetadataReqForCurrTrack(url, body)
-        {
-            //https://spclient.wg.spotify.com/metadata/4/track/8f738932d94a42b186b7567172012b04?market=from_token
-            let match = /metadata\/\d\/track\/([0-9a-f]+)/.exec(url);
-            if (match) {
-                let hexId = match[1];
-                let id = "spotify:track:" + this._hexToId(hexId);
-                return id == this._currState.playback?.item?.uri;
-            }
-            return false;
-        }
 
-        //called when the player state changes
-        _handlePlayerState(state)
+        async getPlaybackMetadata(playbackId)
         {
-            //detect if track was changed
-            if (this._currState.playback?.playbackId !== state.playbackId) {
-                if (this._currState.playback?.item) {
-                    this._onTrackDone(this._currState);
-                }
-                Log(`Change track: ${this._currState.playback?.playbackId} '${this._currState.playback?.item?.metadata?.title}' -> ${state.playbackId} '${state.item.metadata.title}' pos=${state.positionAsOfTimestamp}`);
-                this._currState = {
-                    playback: state,
-                    playedFromStart: state.positionAsOfTimestamp === 0,
-                    extraMetadata: null
-                };
-            }
-            this._currState.playback = state;
-        }
+            let playback = this._playbacks.get(playbackId);
 
-        async _onTrackDone(data)
-        {
-            let track = data.playback.item;
-            let coverData = null;
-            let msg = {
-                type: this._getTrackType(track.uri),
-                playbackId: data.playback.playbackId,
+            let track = playback.item;
+            let type = this._getTrackType(track.uri);
+            let meta = type === "track"
+                ? await this._getTrackMetaProps(track)
+                : await this._getPodcastMetaProps(track);
+            
+            let data = {
+                type: type,
+                playbackId: playback.playbackId,
                 trackUri: track.uri,
-                metadata: {},
-                pathVars: {},
+                metadata: meta,
+                pathVars: this._getPathVariables(meta),
                 lyrics: "",
                 lyricsExt: "",
-                coverArtId: track.metadata.image_xlarge_url.replaceAll(":", "_"),
-                save: data.playedFromStart,
+                coverArtId: track.metadata.image_xlarge_url.replaceAll(":", "_")
             };
-            if (msg.save) {
-                msg.metadata = msg.type === "track"
-                    ? await this._getTrackMetaProps(track, data.extraMetadata)
-                    : await this._getPodcastMetaProps(track);
-                msg.pathVars = this._getPathVariables(msg.metadata);
-                coverData = await this._getImageData(track.metadata.image_xlarge_url);
+            let coverData = await this._getImageData(track.metadata.image_xlarge_url);
 
-                let lyrics = g_config.downloadLyrics ? await this._getLyrics(track) : null;
-                if (lyrics) {
-                    msg.lyrics = this._convertLyricsToLRC(lyrics);
-                    msg.lyricsExt = lyrics.isSynced ? "lrc" : "txt";
-                    msg.metadata.lyrics = lyrics.lines.map(v => v.text).join('\n');
-                }
+            let lyrics = g_config.downloadLyrics ? await this._getLyrics(track) : null;
+            if (lyrics) {
+                data.lyrics = this._convertLyricsToLRC(lyrics);
+                data.lyricsExt = lyrics.isSynced ? "lrc" : "txt";
+                data.metadata.lyrics = lyrics.lines.map(v => v.text).join('\n');
             }
-            Log(`Track done: ${msg.metadata.title} save=${msg.save}`);
-            g_conn.sendMessage(Connection.TRACK_DONE, msg, coverData);
+            return { info: data, coverData: coverData };
         }
-        async _getTrackMetaProps(track, extraMeta)
+        async _getTrackMetaProps(track)
         {
             let meta = track.metadata;
+
+            let trackId = this._idToHex(track.uri.substring("spotify:track:".length));
+            let res = await SpotifyTransport
+                .build()
+                .withHost("https://spclient.wg.spotify.com/metadata/4")
+                .withPath(`/track/${trackId}`)
+                .withEndpointIdentifier("/track/{trackId}")
+                .send();
+            let extraMeta = res.body;
+
             //https://community.mp3tag.de/t/a-few-questions-about-the-disc-number-disc-total-columns/18698/8
             //https://help.mp3tag.de/main_tags.html
             //TODO: mp3 uses "track: x/n", totaltracks and totaldiscs is vorbis only
@@ -143,7 +117,7 @@
             
             return {
                 title:          meta.title,
-                album_artist:   meta.album_artist_name,
+                album_artist:   meta.artist_name,
                 album:          meta.album_title,
                 artist:         this._getMetadataList(meta, "artist_name").join("/"),
                 track:          meta.album_track_number,
@@ -160,13 +134,13 @@
         }
         async _getPodcastMetaProps(track)
         {
-            //TODO: get metadata from fetch hook
             let id = track.uri.substring("spotify:episode:".length);
             let meta = await CosmosAsync.get(`https://api.spotify.com/v1/episodes/${id}`);
 
             return {
                 title:      meta.name,
                 album:      meta.show.name,
+                album_artist: meta.show.publisher,
                 description: meta.description,
                 podcastdesc: meta.show.description,
                 podcasturl: meta.external_urls.spotify,
@@ -181,11 +155,11 @@
         _getPathVariables(meta)
         {
             return {
-                track_name: meta.title,
-                artist_name: meta.album_artist,
-                album_name: meta.album,
-                track_num: meta.track,
-                release_year: meta.date.split('-')[0],
+                track_name:     meta.title,
+                artist_name:    meta.album_artist,
+                album_name:     meta.album,
+                track_num:      meta.track,
+                release_year:   meta.date.split('-')[0],
                 multi_disc_path: meta.totaldiscs > 1 ? `/CD ${meta.disc}` : "",
                 multi_disc_paren: meta.totaldiscs > 1 ? ` CD ${meta.disc}` : ""
             };
@@ -217,8 +191,7 @@
                 let url = "https://i.scdn.co/image/" + id.substring("spotify:image:".length);
 
                 let resp = await fetch(url);
-                let data = await resp.arrayBuffer();
-                return data;
+                return await resp.arrayBuffer();
             }
             return null;
         }
@@ -230,9 +203,17 @@
             //xpui.js  withPath(`/track/${encodeURIComponent(n)}/image/${encodeURIComponent(t)}`)
             let trackId = track.uri.substring("spotify:track:".length);
             let coverUrl = encodeURIComponent(track.metadata.image_url);
-            let url = `https://spclient.wg.spotify.com/color-lyrics/v2/track/${trackId}/image/${coverUrl}?format=json&market=from_token`;
-            let data = await CosmosAsync.get(url);
-            let lyrics = data.lyrics;
+
+            let resp = await SpotifyTransport
+                .build()
+                .withHost("https://spclient.wg.spotify.com/color-lyrics/v2")
+                .withPath(`/track/${trackId}/image/${coverUrl}`)
+                .withQueryParameters({
+                    format: "json",
+                    vocalRemoval: false
+                }).withEndpointIdentifier("/track/{trackId}")
+                .send();
+            let lyrics = resp.body.lyrics;
 
             return {
                 lang: lyrics.language,
@@ -242,6 +223,32 @@
                     text: ln.words
                 }))
             };
+        }
+        /** Converts a hex string into a base62 spotify id */
+        _hexToId(str)
+        {
+            const alphabet = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+            let val = BigInt("0x" + str);
+            let digits = [];
+            while (digits.length < 22) {
+                let digit = Number(val % 62n);
+                val /= 62n;
+                digits.push(alphabet.charAt(digit));
+            }
+            return digits.reverse().join('');
+        }
+        /** Converts a base62 spotify id to a hex string */
+        _idToHex(str)
+        {
+            const alphabet = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+            let val = 0n;
+            for (let i = 0; i < str.length; i++) {
+                let digit = alphabet.indexOf(str.charAt(i));
+                val = (val * 62n) + BigInt(digit);
+            }
+            return val.toString(16).padStart(32, '0');
         }
         _convertLyricsToLRC(data)
         {
@@ -266,29 +273,18 @@
             let parts = id.split(':');
             return `https://open.spotify.com/${parts[1]}/${parts[2]}`;
         }
-
-        /**
-         * Converts a hex string into a base62 spotify id
-         * @param {string} str
-         */
-        _hexToId(str)
-        {
-            const alphabet = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
-
-            let val = BigInt("0x" + str);
-            let digits = [];
-            while (val != 0n) {
-                let digit = Number(val % 62n);
-                val /= 62n;
-                digits.push(alphabet.charAt(digit));
-            }
-            return digits.reverse().join('');
-        }
     }
+
+    //Message flow:
+    //SYNC_CONFIG is always sent by the server once connection is established;
+    //JS also sends changes through it (only the modified toplevel field is sent).
+    //The server always requests metadata for a track via the REQ_TRACK_META message,
+    //JS then sends the metadata using the TRACK_DONE message.
     class Connection
     {
-        static TRACK_DONE       = 1;  //C -> S
-        static SYNC_CONFIG      = 2;  //C <> S
+        static REQ_TRACK_META   = 1;  //S -> C
+        static TRACK_META       = 2;  //C -> S
+        static SYNC_CONFIG      = 3;  //C <> S
         static READY            = -1; //Internal
         static CLOSED           = -2; //Internal
         
@@ -717,7 +713,9 @@
     </div>
 </div>`;
             node.querySelector(".sgf-settings-elements").append(...elements);
+            //@ts-ignore
             node.querySelector(".sgf-settings-closeBtn").onclick = () => node.remove();
+            //@ts-ignore
             node.querySelector(".sgf-settings-overlay").onclick = (ev) => {
                 if (!node.querySelector(".sgf-settings-container").contains(ev.target)) {
                     node.remove();
@@ -793,7 +791,9 @@
 <input class="sgf-slider-label"></input>
 <input class="sgf-slider" type="range" min="${min}" max="${max}" step="${step}" value="${initialValue}">
 `;
+            /** @type {HTMLInputElement} */
             let slider = node.querySelector(".sgf-slider");
+            /** @type {HTMLInputElement} */
             let label = node.querySelector(".sgf-slider-label");
             label.value = formatter(initialValue);
             
@@ -850,6 +850,8 @@
         }
     }
 
+    g_playerTracker = new PlayerStateTracker();
+
     g_conn = new Connection((type, content, binaryContent) => {
         switch (type) {
             case Connection.READY: {
@@ -857,7 +859,15 @@
                 break;
             }
             case Connection.CLOSED: {
-                UI.setClickable(false);
+                if (!IS_DEBUG) {
+                    UI.setClickable(false);
+                }
+                break;
+            }
+            case Connection.REQ_TRACK_META: {
+                g_playerTracker.getPlaybackMetadata(content.playbackId).then(data => {
+                    g_conn.sendMessage(Connection.TRACK_META, data.info, data.coverData);
+                });
                 break;
             }
             case Connection.SYNC_CONFIG: {
@@ -870,5 +880,4 @@
     });
     
     UI.install();
-    new PlayerStateTracker();
 })();

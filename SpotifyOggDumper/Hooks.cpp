@@ -100,6 +100,7 @@ DETOUR_FUNC(__fastcall, void, CloseTrack, (
         if (strcmp(reason, "trackdone") != 0) {
             _stateMgr->DiscardTrack(playbackId);
         }
+        _stateMgr->OnTrackDone(playbackId);
     }
     CloseTrack_Orig(ecx, edx, param_2, param_3, reason, param_5, param_6);
 }
@@ -236,13 +237,18 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 #else
 
 #include "ControlServer.h"
+
 int main()
 {
     LogMinLevel = LOG_TRACE;
     ControlServer sv([](auto con, auto& msg) {
         LogInfo("Received message {}: {} (+{} bytes)", (int)msg.Type, msg.Content.dump(), msg.BinaryContent.size());
     });
-    sv.Run();
+    std::thread(&ControlServer::Run, &sv).detach();
+
+    LogInfo("Press any key to exit");
+    std::cin.get();
+    sv.Stop();
     return 0;
 }
 #endif
