@@ -144,7 +144,6 @@
   <ItemGroup>
     <ClCompile Include="Hooks.cpp" />
     <ClCompile Include="JsInjector.cpp" />
-    <ClCompile Include="Utils\PathTemplate.cpp" />
     <ClCompile Include="pch.cpp" />
     <ClCompile Include="ControlServer.cpp" />
     <ClCompile Include="Utils\Utils.cpp" />
