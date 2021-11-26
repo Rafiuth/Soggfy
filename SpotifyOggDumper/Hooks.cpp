@@ -30,7 +30,6 @@ DETOUR_FUNC(__fastcall, int, DecodeAudioData, (
     //struct PlayerDriver { 
     //    0x340  uint8_t playback_id[16]
     //}
-    //[[[ecx+3c]+294]+150]+0
     //The decoder->driver path can be found with CheatEngine:
     //1. Find the driver address with the track seek function
     //2. Find the parent decoder address (in caller of this function)
@@ -38,6 +37,8 @@ DETOUR_FUNC(__fastcall, int, DecodeAudioData, (
     //  1. Search for Addr: driver address
     //  2. BaseAddr range: <decoder addr> .. <decoder addr> + 1000
     //If things go well, you should endup with less than 1k results.
+    //It can be further refined by forcing the player driver addr to change
+    //(by changing tracks?), or restarting spotify and matching the results
     //4. Pick one and see if it works with the goto address thing (cheatengine works, but x32dbg shows the result in real time)
     
     //009E1086 | mov ecx,dword ptr ss:[ebp-2C]  ; we need to access this
@@ -52,8 +53,6 @@ DETOUR_FUNC(__fastcall, int, DecodeAudioData, (
     }
     //caller `ebp-2C` = ebp + 90;   `(ebp - 2C) - esp`    before prolog's `mov ebp, esp`
     //path = [[[[ebp+90]+3c]+294]+150]+0
-    char* playerPtr = TraversePointers<0x90, 0x3C, 0x294, 0x150>(_ebp);
-    std::string playbackIdStr = ToHex(playerPtr + 0x340, 16);
 
     auto buf = (char*)param_4[0];
     int bufLen = (int)param_4[1];
@@ -63,18 +62,24 @@ DETOUR_FUNC(__fastcall, int, DecodeAudioData, (
     int bytesRead = bufLen - (int)param_4[1];
 
     if (bytesRead != 0) {
+        char* playerPtr = TraversePointers<0x90, 0x3C, 0x294, 0x150>(_ebp);
+        std::string playbackIdStr = ToHex(playerPtr + 0x340, 16);
         _stateMgr->ReceiveAudioData(playbackIdStr, buf, bytesRead);
     }
     return ret;
 }
 
-DETOUR_FUNC(__fastcall, void, CreateTrackPlayer, (
-    void* ecx, void* edx, int param_2, int param_3, double speed, 
-    int param_5, int param_6, int param_7, int param_8, int param_9
+DETOUR_FUNC(__fastcall, void*, CreateTrackPlayer, (
+    void* ecx, void* edx, int param_1, int param_2, double speed,
+    int param_4, int param_5, int param_6, int param_7, int param_8
 ))
 {
+    std::string playbackId = ToHex((char*)(param_2 + 8), 16);
+    LogTrace("CreateTrack {}", playbackId);
+    _stateMgr->OnTrackCreated(playbackId);
     _stateMgr->OverridePlaybackSpeed(speed);
-    CreateTrackPlayer_Orig(ecx, edx, param_2, param_3, speed, param_5, param_6, param_7, param_8, param_9);
+
+    return CreateTrackPlayer_Orig(ecx, edx, param_1, param_2, speed, param_4, param_5, param_6, param_7, param_8);
 }
 DETOUR_FUNC(__fastcall, int64_t, SeekTrack, (
     void* ecx, void* edx, int64_t position
@@ -83,26 +88,37 @@ DETOUR_FUNC(__fastcall, int64_t, SeekTrack, (
     auto playerPtr = TraversePointers<0x15B4>(ecx);
     if (playerPtr) {
         std::string playbackId = ToHex(playerPtr + 0x340, 16);
-        LogDebug("SeekTrack playId={} position={}", playbackId, position);
-        _stateMgr->DiscardTrack(playbackId);
+        LogTrace("SeekTrack {}", playbackId);
+        _stateMgr->DiscardTrack(playbackId, "Track was seeked");
     }
     return SeekTrack_Orig(ecx, edx, position);
 }
+DETOUR_FUNC(__fastcall, void, OpenTrack, (
+    void* ecx, void* edx, int64_t position, int param_2, int param_3
+))
+{
+    if (position != 0) {
+        std::string playbackId = ToHex((char*)ecx + 0x340, 16);
+        LogTrace("OpenTrack {}", playbackId);
+        _stateMgr->DiscardTrack(playbackId, "Track didn't play from begin");
+    }
+    OpenTrack_Orig(ecx, edx, position, param_2, param_3);
+}
 DETOUR_FUNC(__fastcall, void, CloseTrack, (
-    void* ecx, void* edx, int param_2, int param_3, char* reason, int param_5, char param_6
+    void* ecx, void* edx, int param_1, void* param_2, char* reason, int param_4, char param_5
 ))
 {
     auto playerPtr = TraversePointers<0x15B4>(ecx);
     if (playerPtr) {
         std::string playbackId = ToHex(playerPtr + 0x340, 16);
-        LogDebug("CloseTrack playId={} reason={}", playbackId, reason);
+        LogTrace("CloseTrack {}, reason={}", playbackId, reason);
 
         if (strcmp(reason, "trackdone") != 0) {
-            _stateMgr->DiscardTrack(playbackId);
+            _stateMgr->DiscardTrack(playbackId, "Track was skipped");
         }
         _stateMgr->OnTrackDone(playbackId);
     }
-    CloseTrack_Orig(ecx, edx, param_2, param_3, reason, param_5, param_6);
+    CloseTrack_Orig(ecx, edx, param_1, param_2, reason, param_4, param_5);
 }
 
 static const HookInfo HookTargets[] =
@@ -132,6 +148,14 @@ static const HookInfo HookTargets[] =
         )
     ),
     HOOK_INFO(
+        OpenTrack,
+        Fingerprint(
+            L"Spotify.exe",
+            "\x55\x8B\xEC\x51\x51\x8B\x55\x0C\x56\x8B\xF1\x89\x55\xFC\x57\x8B\x7D\x08\x8B\x8E\x30\x03\x00\x00\x85\xC9\x74\x16\xFF\x75\x14\x8B\x01\xFF\x75\x10\x52\x8B\x40\x04\x57\xFF\xD0\x84\xC0",
+            "\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF"
+        )
+    ),
+    HOOK_INFO(
         CloseTrack,
         Fingerprint(
             L"Spotify.exe",
@@ -151,6 +175,7 @@ void InstallHooks()
         if (MH_CreateHook((LPVOID)addr, hook.Detour, hook.OrigFunc) != MH_OK) {
             throw std::runtime_error("Failed to create hook");
         }
+        LogDebug("Hook created: {} @ {}", hook.Name, (void*)addr);
     }
     auto enableResult = MH_EnableHook(MH_ALL_HOOKS);
     if (enableResult != MH_OK) {

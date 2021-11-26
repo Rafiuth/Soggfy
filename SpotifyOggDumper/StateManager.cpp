@@ -6,6 +6,7 @@
 #include "Utils/Log.h"
 #include "Utils/Http.h"
 #include "Utils/Utils.h"
+#include "Utils/PathTemplate.h"
 
 struct PlaybackInfo
 {
@@ -14,6 +15,7 @@ struct PlaybackInfo
     std::ofstream FileStream;
     std::string ActualExt;
     bool Discard = false;
+    bool ReadyToSave = false;
 };
 struct TrackMetadata
 {
@@ -80,7 +82,7 @@ struct StateManagerImpl : public StateManager
 
         switch (msg.Type) {
             case MessageType::SERVER_OPEN: {
-                LogInfo("Injecting JS into CEF...");
+                LogInfo("Injecting JS...");
                 std::ifstream srcJsFile(_dataDir / "Soggfy.js", std::ios::binary);
                 std::string srcJs(std::istreambuf_iterator<char>(srcJsFile), {});
 
@@ -100,9 +102,17 @@ struct StateManagerImpl : public StateManager
             case MessageType::BYE: {
                 break;
             }
+            case MessageType::SYNC_CONFIG: {
+                for (auto& [key, val] : content.items()) {
+                    _config[key] = val;
+                }
+                std::ofstream(_dataDir / "config.json") << _config.dump(4);
+                break;
+            }
             case MessageType::TRACK_META: {
                 std::string playbackId = content["playbackId"];
-                auto playback = GetPlayback(playbackId, false);
+                auto playback = GetPlayback(playbackId);
+                if (!playback || !playback->ReadyToSave) break;
 
                 TrackMetadata meta = {
                     .Type       = content["type"],
@@ -118,11 +128,31 @@ struct StateManagerImpl : public StateManager
                 RemovePlayback(playbackId);
                 break;
             }
-            case MessageType::SYNC_CONFIG: {
-                for (auto& [key, val] : content.items()) {
-                    _config[key] = val;
+            case MessageType::DOWNLOAD_STATUS: {
+                int64_t start = Utils::CurrentMillis();
+                
+                PathTemplateSearcher searcher(content["pathTemplate"]);
+                for (auto& track : content["tracks"]) {
+                    searcher.Add(track["uri"], track["vars"], track["unkVars"]);
                 }
-                std::ofstream(_dataDir / "config.json") << _config.dump(4);
+                json existingTracks = json::object();
+                for (auto& entry : searcher.FindExisting()) {
+                    existingTracks[entry.second] = {
+                        { "path", Utils::PathToUtf(entry.first) }
+                    };
+                }
+                json resp = {
+                    { "tracks", existingTracks }
+                };
+                
+                int64_t end = Utils::CurrentMillis();
+                LogDebug("DownloadStatusReq: {}ms", end - start);
+                
+                conn->Send({ MessageType::DOWNLOAD_STATUS, resp });
+                break;
+            }
+            case MessageType::OPEN_FOLDER: {
+                Utils::RevealInFileExplorer(content["path"]);
                 break;
             }
             default: {
@@ -133,10 +163,10 @@ struct StateManagerImpl : public StateManager
 
     void ReceiveAudioData(const std::string& playbackId, const char* data, int length)
     {
-        auto playback = GetPlayback(playbackId, true);
-        auto& fs = playback->FileStream;
+        auto playback = GetPlayback(playbackId);
+        if (!playback || playback->Discard) return;
 
-        if (playback->Discard) return;
+        auto& fs = playback->FileStream;
 
         if (!fs.is_open()) {
             LogWarn("Received audio data after playback ended (this shouldn't happen). Last track could've been truncated.");
@@ -161,12 +191,23 @@ struct StateManagerImpl : public StateManager
         }
         fs.write(data, length);
     }
+
+    void OnTrackCreated(const std::string& playbackId)
+    {
+        CreatePlayback(playbackId);
+    }
     void OnTrackDone(const std::string& playbackId)
     {
-        auto playback = GetPlayback(playbackId, false);
+        auto playback = GetPlayback(playbackId);
+        if (!playback) return;
+
         playback->FileStream.close();
+        playback->ReadyToSave = true;
 
         if (playback->Discard) {
+            std::error_code err;
+            fs::remove(playback->FileName, err);
+
             RemovePlayback(playbackId);
             return;
         }
@@ -177,12 +218,20 @@ struct StateManagerImpl : public StateManager
         json content = {
             { "playbackId", playbackId }
         };
-        _ctrlSv.Broadcast({ MessageType::REQ_TRACK_META, content });
+        _ctrlSv.Broadcast({ MessageType::TRACK_META, content });
     }
-    void DiscardTrack(const std::string& playbackId)
+    void DiscardTrack(const std::string& playbackId, const std::string& reason)
     {
-        auto playback = GetPlayback(playbackId, true);
+        auto playback = GetPlayback(playbackId);
+        if (!playback) return;
+
         playback->Discard = true;
+        
+        json content = {
+            { "playbackId", playbackId },
+            { "message", "Aborted: " + reason }
+        };
+        _ctrlSv.Broadcast({ MessageType::DOWNLOAD_STATUS, content });
     }
     bool OverridePlaybackSpeed(double& speed)
     {
@@ -208,8 +257,8 @@ struct StateManagerImpl : public StateManager
             LogInfo("Saving track {}", meta.GetName());
             LogDebug("  stream: {}", playback->FileName.filename().string());
 
-            fs::path trackPath = RenderTrackPath(_config["savePaths"][meta.Type]["audio"], meta);
-            fs::path coverPath = RenderTrackPath(_config["savePaths"][meta.Type]["cover"], meta);
+            fs::path trackPath = PathTemplate::Render(_config["savePaths"][meta.Type]["audio"], meta.PathVars);
+            fs::path coverPath = PathTemplate::Render(_config["savePaths"][meta.Type]["cover"], meta.PathVars);
             fs::path tmpCoverPath = MakeTempPath(meta.CoverArtId + ".jpg");
 
             //always cache cover art
@@ -350,32 +399,20 @@ struct StateManagerImpl : public StateManager
         }
         return {};
     }
-
-    fs::path RenderTrackPath(const std::string& format, const TrackMetadata& metadata)
-    {
-        std::unordered_map<std::string, std::string> vars;
-        vars.emplace("user_home", Utils::GetHomeDirectory());
-        for (auto& [k, v] : metadata.PathVars) {
-            vars.emplace(k, Utils::RemoveInvalidPathChars(v));
-        }
-        std::string path = Utils::RegexReplace(format, std::regex("\\{(.+?)\\}"), [&](auto& m) {
-            auto varName = m.str(1);
-            auto itr = vars.find(varName);
-            return itr != vars.end() ? itr->second : "_";
-        });
-        return fs::u8path(path);
-    }
     
-    std::shared_ptr<PlaybackInfo> GetPlayback(const std::string& id, int createIfNotFound)
+    std::shared_ptr<PlaybackInfo> GetPlayback(const std::string& id)
     {
         std::lock_guard<std::mutex> lock(_mutex);
 
         auto itr = _playbacks.find(id);
-        if (itr != _playbacks.end()) {
-            return itr->second;
-        }
-        if (!createIfNotFound) {
-            throw std::runtime_error("Unknown playback " + id);
+        return itr != _playbacks.end() ? itr->second : nullptr;
+    }
+    std::shared_ptr<PlaybackInfo> CreatePlayback(const std::string& id)
+    {
+        std::lock_guard<std::mutex> lock(_mutex);
+
+        if (_playbacks.contains(id)) {
+            throw std::runtime_error("Playback already exists");
         }
         auto filename = MakeTempPath("playback_" + id + ".dat");
         auto pb = std::make_shared<PlaybackInfo>();

@@ -7,9 +7,10 @@
 //Server=CPP Client=JS
 enum class MessageType
 {
-    REQ_TRACK_META  = 1,  //S -> C
-    TRACK_META      = 2,  //C -> S
-    SYNC_CONFIG     = 3,  //C <> S
+    SYNC_CONFIG     = 1,  //C <> S
+    TRACK_META      = 2,  //C <> S
+    DOWNLOAD_STATUS = 3,  //C <> S
+    OPEN_FOLDER     = 4,  //C -> S
 
     //Internal
     HELLO           = -1,   //Client connected

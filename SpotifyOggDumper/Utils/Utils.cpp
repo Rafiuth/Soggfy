@@ -179,6 +179,14 @@ namespace Utils
         CoTaskMemFree(pathW);
         return path;
     }
+    void RevealInFileExplorer(const fs::path& path)
+    {
+        //https://stackoverflow.com/a/54524363
+        PIDLIST_ABSOLUTE pidl;
+        SHParseDisplayName(path.c_str(), NULL, &pidl, 0, NULL);
+        SHOpenFolderAndSelectItems(pidl, 0, NULL, 0);
+        CoTaskMemFree(pidl);
+    }
 
     int64_t CurrentMillis()
     {

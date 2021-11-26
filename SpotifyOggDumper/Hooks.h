@@ -45,7 +45,6 @@ struct Fingerprint
 private:
     inline bool IsMatch(const char* data) const
     {
-        //check remaining bytes, if length is not a multiple of 4
         for (int i = 0; i < Length; i++) {
             if ((data[i] ^ Pattern[i]) & Mask[i]) {
                 return false;

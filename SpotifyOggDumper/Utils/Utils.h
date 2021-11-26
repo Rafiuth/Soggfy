@@ -29,6 +29,7 @@ namespace Utils
 
     std::string RemoveInvalidPathChars(const std::string& src);
     std::string GetHomeDirectory();
+    void RevealInFileExplorer(const fs::path& path);
 
     int64_t CurrentMillis();
 }
