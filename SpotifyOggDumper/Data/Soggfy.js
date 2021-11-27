@@ -6,7 +6,6 @@
     const Platform = document.querySelector("#main")?._reactRootContainer?._internalRoot?.current?.child?.child?.stateNode?.props?.children?.props?.children?.props?.children?.props?.platform;
     const Player = Platform?.getPlayerAPI();
     const CosmosAsync = Player?._cosmos;
-    const PlaylistAPI = Platform?.getPlaylistAPI();
     const WebAPI = Platform?.getAdManagers()?.hpto?.hptoApi?.webApi; //TODO: this api reports telemetry, is it a good idea to use it?
 
     if (!Platform) {
@@ -212,16 +211,20 @@
     }
 
     //Message flow:
+    //client = js, server = cpp
     //SYNC_CONFIG: {...}
     //  Always sent by the server after connection is established;
-    //  JS only sends changes of toplevel fields.
+    //  Client only sends toplevel fields changes.
     //TRACK_META:
     //  Sent by server when a track is done playing and ready to be saved, 
-    //  client responds with metadata and server then saves the track.
+    //  the client responds with all metadata required to save the track.
+    //  Note that the client will remove the playbackId from the tracking map.
     //DOWNLOAD_STATUS:
     //  Sent by client to populate playlist download status indicator
     //  Server responds with a list of { tracks: [path|null+reason]}.
     //  Server also sends it once a download is aborted or completed, with the respective playbackId.
+    //OPEN_FOLDER:
+    //  Sent by client to open a file explorer window with the specified file selected.
     class Connection
     {
         static SYNC_CONFIG      = 1;  //C <> S
@@ -346,7 +349,7 @@
         }
         /** 
          * Gets or sets a nested field specified by the path array
-         * Ex: objectPathIndexer(obj, ["track","metadata","name"]) -> obj.track.metadata.name
+         * Ex: accessObjectPath(obj, ["track","metadata","name"]) -> obj.track.metadata.name
          * @param {any} obj
          * @param {string[]} path
          * @param {any} newValue Value to set the final field
@@ -484,15 +487,12 @@
             let listDiv = listSection.querySelector('div[tabindex="0"]');
             let listDivRows = listDiv.querySelector('div[role="presentation"]:not([class])');
 
-            let rows = [];
-
             for (let rowWrapper of listDivRows.children) {
                 let row = rowWrapper.firstElementChild;
                 let info = this._getRowTrackInfo(row, listSection);
                 let status = tracks[info.trackUri];
                 if (!status) continue;
                 let ok = !!status.path;
-                //<path d="M14.354 2.353l-.708-.707L8 7.293 2.353 1.646l-.707.707L7.293 8l-5.647 5.646.707.708L8 8.707l5.646 5.647.708-.708L8.707 8z"/>
 
                 if (!row["__sgf_state_elem"]) {
                     let node = document.createElement("div");
@@ -518,8 +518,8 @@
         : `<path d="M14.354 2.353l-.708-.707L8 7.293 2.353 1.646l-.707.707L7.293 8l-5.647 5.646.707.708L8 8.707l5.646 5.647.708-.708L8.707 8z"></path>`
     }
 </svg>`;
-                    let sectionDiv = row.querySelector(".main-trackList-rowSectionEnd");
-                    sectionDiv.prepend(node);
+                    let infoColDiv = row.lastElementChild;
+                    infoColDiv.prepend(node);
 
                     /** @type HTMLDivElement */
                     let browseBtn = node.querySelector(".sgf-status-browse-button");
@@ -535,7 +535,6 @@
         _sendUpdateRequest(dirtyRows)
         {
             let tracks = [];
-
             let listSection = document.querySelector('section[data-testid="playlist-page"],[data-testid="album-page"]');
             
             for (let row of dirtyRows) {
@@ -564,31 +563,19 @@
         }
         _getRowTrackInfo(row, listSection)
         {
-            let state = this._getReactEventHandlers(row);
-            let info = {};
+            let albumName =
+                row.querySelector('a[href^="/album"]')?.innerText ??
+                listSection.querySelector('section[data-testid="album-page"] span h1').innerText;
             
-            //TODO: is there a better way to do this?
-            //it looks like this react state thingy is based on the dom structure, 
-            //so it could be abstracted through css selectors to make it less worse
-            if (row.children.length >= 5) { //playlist
-                info.trackName = state.children[1].props.children[1].props.children[0].props.children;
-                info.albumName = state.children[2].props.children.props.name;
-                info.artistName = state.children[6].props.children[3].props.menu.props.artists[0].name;
-                info.trackUri = state.children[6].props.children[3].props.menu.props.uri;
-            } else { //album
-                info.trackName = state.children[1].props.children.props.children[0].props.children;
-                info.albumName = this._getReactEventHandlers(listSection).children[1].props.children[0].props.children[1].props.text;
-                info.artistName = state.children[3].props.children[2].props.menu.props.artists[0].name;
-                info.trackUri = state.children[3].props.children[2].props.menu.props.uri;
-            }
-            return info;
-        }
-        
-        _getReactEventHandlers(elem)
-        {
-            let prop = Object.getOwnPropertyNames(elem)
-                             .find(s => s.includes("__reactEventHandlers$"));
-            return elem[prop];
+            let menuBtn = row.querySelector(UI.cssSelectors.rowMoreButton);
+            let extraProps = UI.getReactProps(row, menuBtn).menu.props;
+
+            return {
+                trackUri: extraProps.uri,
+                trackName: row.querySelector(UI.cssSelectors.rowTitle).innerText,
+                artistName: row.querySelector(UI.cssSelectors.rowSubTitle).firstChild.innerText,
+                albumName: albumName
+            };
         }
     }
     class UI
@@ -784,10 +771,11 @@
     transform: translateX(-50%);
     box-shadow: 2px 2px 6px 4px rgb(0 0 0 / 25%);
     opacity: 0;
-    transition: opacity 0.1s ease 0.5s;
+    transition: opacity 0.1s ease-out 0.5s;
 }
 .sgf-status-indicator:hover .sgf-status-indicator-card {
     opacity: 1;
+    height: auto;
 }
 .sgf-status-browse-button {
     background: transparent;
@@ -799,9 +787,13 @@
         
         static _styleElement;
         static _settingsButton;
-        
-        static install()
+        static cssSelectors;
+
+        static async install()
         {
+            this.cssSelectors = await this.extractCssMappings(
+                "rowTitle", "rowSubTitle", "rowSectionEnd", "trackListRow", "rowMoreButton"
+            );
             this._styleElement = document.createElement("style");
             this._styleElement.innerHTML = [this._settingsStyle, this._trackStatusStyle].join('\n');
             document.head.append(this._styleElement);
@@ -817,6 +809,71 @@
         static setClickable(val)
         {
             this._settingsButton.disabled = !val;
+        }
+
+        /** 
+         * Extracts the specified CSS class mappings from xpui.js.
+         * Note: This function is expansive and results should be cached.
+         */
+        static async extractCssMappings(...names)
+        {
+            let req = await fetch("/xpui.js");
+            let js = await req.text();
+
+            let pattern = `(${names.join('|')}):\\s*"(.+?)"`;
+            let regex = new RegExp(pattern, "g");
+            let results = {};
+            
+            let match;
+            while (match = regex.exec(js)) {
+                let key = match[1];
+                let val = match[2];
+                results[key] = "." + val;
+            }
+            return results;
+        }
+
+        /**
+         * Returns the properties from a react element.
+         * @param {Element} rootElem A react element that is the parent of the target.
+         * @param {Element} targetElem The child element to get properties for.
+         */
+        static getReactProps(rootElem, targetElem)
+        {
+            const keyof_ReactEventHandlers =
+                Object.keys(rootElem)
+                      .find(k => k.startsWith("__reactEventHandlers$"));
+            
+            //find the path from elem to target
+            let path = [];
+            let node = targetElem;
+            while (node !== rootElem) {
+                let parent = node.parentElement;
+                let index = 0;
+                for (let child of parent.children) {
+                    if (child[keyof_ReactEventHandlers]) index++;
+                    if (child === node) break;
+                }
+                path.push({ next: node, index: index });
+                node = parent;
+            }
+            //now find the react state
+            let state = node[keyof_ReactEventHandlers];
+            for (let i = path.length - 1; i >= 0; i--) {
+                let loc = path[i];
+                
+                //find the react state children, ignoring "non element" children
+                let childStateIndex = 0;
+                let childElemIndex = 0;
+                while (childStateIndex < state.children.length) {
+                    let isElem = state.children[childStateIndex] instanceof Object;
+                    if (isElem && ++childElemIndex === loc.index) break;
+                    childStateIndex++;
+                }
+                state = state.children[childStateIndex].props;
+                node = loc.next;
+            }
+            return state;
         }
         
         static createSettingsDialog()
