@@ -26,9 +26,11 @@ jobs:
     
     - name: Build Natives
       run: |
-        vcpkg install --triplet x86-windows-static-md
-        vcpkg integrate install
-        msbuild /p:Configuration=Release
+        New-Item ./build/Release/ -ItemType Directory
+    #  run: |
+    #    vcpkg install --triplet x86-windows-static-md
+    #    vcpkg integrate install
+    #    msbuild /p:Configuration=Release
     
     - name: Build TypeScript
       run: |
@@ -41,6 +43,7 @@ jobs:
         
     - name: Create dist zip
       run: |
+        Get-Location
         $ver = $Env:GITHUB_REF -replace "refs/.*/v", ""
         Rename-Item -Path ./build/Release -NewName Soggfy-$ver
         7z a "-x!*.lib" "-x!*.exp" "-x!*.pdb" build/Soggfy-$ver.zip ./build/Soggfy-$ver
