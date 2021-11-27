@@ -2,8 +2,8 @@ name: Release
 
 on:
   push:
-  #  tags:
-  #  - 'v*'
+    tags:
+    - 'v*'
   workflow_dispatch:
 
 jobs:
@@ -48,7 +48,7 @@ jobs:
         }
         echo $ver
         Rename-Item -Path ./build/Release -NewName Soggfy-$ver
-        7z a "-x!*.lib" "-x!*.exp" "-x!*.pdb" build/Soggfy-$ver.zip ./build/Soggfy-$ver
+        7z a "-xr!*.lib" "-xr!*.exp" "-xr!*.pdb" build/Soggfy-$ver.zip ./build/Soggfy-$ver
 
     - name: Upload binaries
       uses: softprops/action-gh-release@v1
