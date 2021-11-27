@@ -21,15 +21,6 @@ jobs:
     - name: Add msbuild to PATH
       uses: microsoft/setup-msbuild@v1.0.3
     
-    - name: Build TypeScript
-      run: |
-        cd Sprinkles/
-        npm install
-        npm run build
-        Copy-Item dist/bundle.js ../build/Release/Soggfy.js
-        Copy-Item dist/bundle.js.map ../build/Release/Soggfy.js.map
-        cd ../
-        
     - name: Fetch external dependencies
       run: ./fetch_external_deps.bat
     
@@ -38,6 +29,15 @@ jobs:
         vcpkg install --triplet x86-windows-static-md
         vcpkg integrate install
         msbuild /p:Configuration=Release
+    
+    - name: Build TypeScript
+      run: |
+        cd Sprinkles/
+        npm install
+        npm run build
+        Copy-Item dist/bundle.js ../build/Release/Soggfy.js
+        Copy-Item dist/bundle.js.map ../build/Release/Soggfy.js.map
+        cd ../
         
     - name: Create dist zip
       run: |
