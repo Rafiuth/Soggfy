@@ -114,6 +114,10 @@
             //https://help.mp3tag.de/main_tags.html
             //TODO: mp3 uses "track: x/n", totaltracks and totaldiscs is vorbis only
             let { year, month, day } = extraMeta.album.date;
+            let date = [year, month, day];
+            //Truncate date to available precision (year only sample: https://open.spotify.com/track/4VxaUj96W2jw9UOtKHu51p)
+            if (Number.isNaN(day)) date.pop();
+            if (Number.isNaN(month)) date.pop();
             
             return {
                 title:          meta.title,
@@ -124,7 +128,7 @@
                 totaltracks:    meta.album_track_count,
                 disc:           meta.album_disc_number,
                 totaldiscs:     meta.album_disc_count,
-                date:           [year, month, day].map(Utils.padInt2).join('-'), //YYYY-MM-DD
+                date:           date.map(Utils.padInt2).join('-'), //YYYY-MM-DD,
                 publisher:      extraMeta.album.label,
                 language:       extraMeta.language_of_performance[0],
                 isrc:           extraMeta.external_id.find(v => v.type === "isrc")?.id,
@@ -319,7 +323,7 @@
         }
         static padInt2(x, digits = 2)
         {
-            return Math.floor(x).toString().padStart(digits, '0');
+            return Math.floor(x).toString().padStart(digits ?? 2, '0');
         }
 
         /**
