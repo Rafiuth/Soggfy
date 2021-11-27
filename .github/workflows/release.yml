@@ -4,6 +4,7 @@ on:
   push:
     tags:
     - 'v*'
+  workflow_dispatch:
 
 jobs:
   build:
@@ -11,6 +12,10 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+    - uses: actions/setup-node@v2
+      with:
+        node-version: 16
+        cache: 'npm'
     
     - name: Add msbuild to PATH
       uses: microsoft/setup-msbuild@v1.0.3
@@ -18,12 +23,23 @@ jobs:
     - name: Fetch external dependencies
       run: fetch_external_deps.bat
     
-    - name: Build
+    - name: Build Natives
       run: |
         vcpkg install --triplet x86-windows-static-md
         vcpkg integrate install
         msbuild /p:Configuration=Release
         
+    - name: Build TypeScript
+      run: |
+        cd Sprinkles/
+        npm install
+        npm run build
+        copy dist/bundle.js ../build/Release/Soggfy.js
+        copy dist/bundle.js.map ../build/Release/Soggfy.js.map
+        cd ../
+        
+    - name: Create dist zip
+      run: |
         $ver = $Env:GITHUB_REF -replace "refs/.*/v", ""
         Rename-Item -Path ./build/Release -NewName Soggfy-$ver
         7z a "-x!*.lib" "-x!*.exp" "-x!*.pdb" build/Soggfy-$ver.zip ./build/Soggfy-$ver
