@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "outDir": "./dist/",
+    "sourceMap": true,
+    "target": "ES2021",
+    "module": "ESNext",
+    "lib": [ "ESNext", "DOM", "DOM.Iterable" ]
+  },
+  "include": [ "src/**/*" ]
+}
