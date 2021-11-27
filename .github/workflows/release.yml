@@ -43,7 +43,8 @@ jobs:
         
     - name: Create dist zip
       run: |
-        Get-Location
+        echo $Env:GITHUB_REF
+        echo $Env:GITHUB_REF_NAME
         $ver = $Env:GITHUB_REF -replace "refs/.*/v", ""
         Rename-Item -Path ./build/Release -NewName Soggfy-$ver
         7z a "-x!*.lib" "-x!*.exp" "-x!*.pdb" build/Soggfy-$ver.zip ./build/Soggfy-$ver
