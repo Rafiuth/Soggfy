@@ -21,16 +21,14 @@ jobs:
     - name: Add msbuild to PATH
       uses: microsoft/setup-msbuild@v1.0.3
     
-    # - name: Fetch external dependencies
-    #   run: ./fetch_external_deps.bat
+    - name: Fetch external dependencies
+      run: ./fetch_external_deps.bat
     
     - name: Build Natives
       run: |
-        New-Item ./build/Release/ -ItemType Directory
-    #  run: |
-    #    vcpkg install --triplet x86-windows-static-md
-    #    vcpkg integrate install
-    #    msbuild /p:Configuration=Release
+        vcpkg install --triplet x86-windows-static-md
+        vcpkg integrate install
+        msbuild /p:Configuration=Release
     
     - name: Build TypeScript
       run: |
@@ -64,5 +62,4 @@ jobs:
       uses: actions/upload-artifact@v2
       if: ${{ github.ref_type != 'tag' }}
       with:
-        name: binaries.zip
         path: build/*.zip
