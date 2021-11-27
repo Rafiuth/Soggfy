@@ -54,7 +54,15 @@ jobs:
 
     - name: Upload binaries
       uses: softprops/action-gh-release@v1
+      if: ${{ github.ref_type == 'tag' }}
       with:
         draft: false
         prerelease: ${{ endsWith(env.GITHUB_REF, '-pre') }}
         files: 'build/*.zip'
+        
+    - name: Upload artifacts
+      uses: actions/upload-artifact@v2
+      if: ${{ github.ref_type != 'tag' }}
+      with:
+        name: binaries.zip
+        path: build/*.zip
