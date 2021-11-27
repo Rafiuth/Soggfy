@@ -21,8 +21,8 @@ jobs:
     - name: Add msbuild to PATH
       uses: microsoft/setup-msbuild@v1.0.3
     
-    - name: Fetch external dependencies
-      run: ./fetch_external_deps.bat
+    # - name: Fetch external dependencies
+    #   run: ./fetch_external_deps.bat
     
     - name: Build Natives
       run: |
@@ -43,9 +43,12 @@ jobs:
         
     - name: Create dist zip
       run: |
-        echo $Env:GITHUB_REF
-        echo $Env:GITHUB_REF_NAME
-        $ver = $Env:GITHUB_REF -replace "refs/.*/v", ""
+        if ($Env:GITHUB_REF_TYPE -eq "tag") {
+            $ver = $Env:GITHUB_REF.Substring(1);
+        } else {
+            $ver = $Env:GITHUB_SHA.Substring(0, 8) + "-pre";
+        }
+        echo $ver
         Rename-Item -Path ./build/Release -NewName Soggfy-$ver
         7z a "-x!*.lib" "-x!*.exp" "-x!*.pdb" build/Soggfy-$ver.zip ./build/Soggfy-$ver
 
