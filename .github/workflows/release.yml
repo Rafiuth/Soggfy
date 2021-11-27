@@ -16,19 +16,14 @@ jobs:
       with:
         node-version: 16
         cache: 'npm'
-    
+        cache-dependency-path: Sprinkles/package-lock.json
+
     - name: Add msbuild to PATH
       uses: microsoft/setup-msbuild@v1.0.3
     
     - name: Fetch external dependencies
       run: fetch_external_deps.bat
     
-    - name: Build Natives
-      run: |
-        vcpkg install --triplet x86-windows-static-md
-        vcpkg integrate install
-        msbuild /p:Configuration=Release
-        
     - name: Build TypeScript
       run: |
         cd Sprinkles/
@@ -37,6 +32,12 @@ jobs:
         copy dist/bundle.js ../build/Release/Soggfy.js
         copy dist/bundle.js.map ../build/Release/Soggfy.js.map
         cd ../
+        
+    - name: Build Natives
+      run: |
+        vcpkg install --triplet x86-windows-static-md
+        vcpkg integrate install
+        msbuild /p:Configuration=Release
         
     - name: Create dist zip
       run: |
