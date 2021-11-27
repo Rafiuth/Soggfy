@@ -26,8 +26,8 @@ jobs:
         cd Sprinkles/
         npm install
         npm run build
-        copy dist/bundle.js ../build/Release/Soggfy.js
-        copy dist/bundle.js.map ../build/Release/Soggfy.js.map
+        Copy-Item dist/bundle.js ../build/Release/Soggfy.js
+        Copy-Item dist/bundle.js.map ../build/Release/Soggfy.js.map
         cd ../
         
     - name: Fetch external dependencies
