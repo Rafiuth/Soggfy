@@ -2,8 +2,7 @@ name: Release
 
 on:
   push:
-    tags:
-    - 'v*'
+    tags: [ 'v*' ]
   workflow_dispatch:
 
 jobs:
@@ -12,15 +11,13 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+    - uses: microsoft/setup-msbuild@v1.0.3
     - uses: actions/setup-node@v2
       with:
         node-version: 16
         cache: 'npm'
         cache-dependency-path: Sprinkles/package-lock.json
 
-    - name: Add msbuild to PATH
-      uses: microsoft/setup-msbuild@v1.0.3
-    
     - name: Fetch external dependencies
       run: ./fetch_external_deps.bat
     
@@ -39,18 +36,18 @@ jobs:
         Copy-Item dist/bundle.js.map ../build/Release/Soggfy.js.map
         cd ../
         
-    - name: Create dist zip
+    - name: Create Zip
       run: |
         if ($Env:GITHUB_REF_TYPE -eq "tag") {
-            $ver = $Env:GITHUB_REF.Substring(1);
+          $ver = $Env:GITHUB_REF.Substring(1);
         } else {
-            $ver = $Env:GITHUB_SHA.Substring(0, 8) + "-pre";
+          $ver = $Env:GITHUB_SHA.Substring(0, 8) + "-pre";
         }
         echo $ver
         Rename-Item -Path ./build/Release -NewName Soggfy-$ver
         7z a "-xr!*.lib" "-xr!*.exp" "-xr!*.pdb" build/Soggfy-$ver.zip ./build/Soggfy-$ver
 
-    - name: Upload binaries
+    - name: Upload Binaries
       uses: softprops/action-gh-release@v1
       if: ${{ github.ref_type == 'tag' }}
       with:
@@ -58,7 +55,7 @@ jobs:
         prerelease: ${{ endsWith(env.GITHUB_REF, '-pre') }}
         files: 'build/*.zip'
         
-    - name: Upload artifacts
+    - name: Upload Artifacts
       uses: actions/upload-artifact@v2
       if: ${{ github.ref_type != 'tag' }}
       with:
