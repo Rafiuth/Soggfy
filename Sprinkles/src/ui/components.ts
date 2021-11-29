@@ -44,7 +44,7 @@ export default class Components
         return node;
     }
     
-    static addTopbarButton(title, icon, callback)
+    static addTopbarButton(title: string, icon: string, callback: () => void)
     {
         let backButton = document.querySelector(".Root__top-bar").querySelector("button");
         let topbarContainer = backButton.parentElement;
@@ -58,7 +58,7 @@ export default class Components
         return button;
     }
 
-    static toggle(key, callback: ComponentValueCallback<boolean> = null)
+    static toggle(key: string, callback: ComponentValueCallback<boolean> = null)
     {
         let node = document.createElement("input");
         node.className = "sgf-toggle-switch";

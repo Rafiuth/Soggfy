@@ -7,7 +7,7 @@ interface DownloadStatusMap
 {
     [uri: string]: {
         path?: string;
-        errorMessage: string;
+        errorMessage?: string;
     }
 }
 

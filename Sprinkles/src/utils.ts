@@ -22,9 +22,9 @@ export default class Utils
             }
         }
     }
-    static padInt2(x: number, digits = 2)
+    static padInt(x: number, digits = 2)
     {
-        return Math.floor(x).toString().padStart(digits ?? 2, '0');
+        return Math.floor(x).toString().padStart(digits, '0');
     }
 
     /**
