@@ -182,8 +182,9 @@ namespace Utils
     void RevealInFileExplorer(const fs::path& path)
     {
         //https://stackoverflow.com/a/54524363
+        fs::path normPath = fs::absolute(path);
         PIDLIST_ABSOLUTE pidl;
-        SHParseDisplayName(path.c_str(), NULL, &pidl, 0, NULL);
+        SHParseDisplayName(normPath.c_str(), NULL, &pidl, 0, NULL);
         SHOpenFolderAndSelectItems(pidl, 0, NULL, 0);
         CoTaskMemFree(pidl);
     }
