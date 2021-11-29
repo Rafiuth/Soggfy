@@ -8,7 +8,7 @@ const IS_DEBUG = true;
 
 let conn = new Connection(messageHandler);
 
-let playerState = new PlayerStateTracker();
+let playbackTracker = new PlayerStateTracker();
 let ui = new UI(conn);
 let statusIndicator = new DownloadStatusHook(conn);
 ui.install();
@@ -33,25 +33,40 @@ function messageHandler(type: MessageType, payload: any)
             break;
         }
         case MessageType.TRACK_META: {
-            playerState.getPlaybackMetadata(payload.playbackId).then(data => {
-                conn.send(MessageType.TRACK_META, data.info, data.coverData);
-            });
+            playbackTracker.getMetadata(payload.playbackId)
+                .then(data => {
+                    conn.send(MessageType.TRACK_META, data.info, data.coverData);
+                })
+                .catch(ex => {
+                    conn.send(MessageType.TRACK_META, {
+                        playbackId: payload.playbackId,
+                        failed: true,
+                        errorMessage: ex.message
+                    });
+                    setPlaybackStatusInd(payload.playbackId, { errorMessage: ex.message });
+                })
+                .finally(() => {
+                    playbackTracker.remove(payload.playbackId);
+                });
             break;
         }
         case MessageType.DOWNLOAD_STATUS: {
             if (payload.playbackId) {
-                let info = playerState.getPlaybackTrack(payload.playbackId);
-                if (info) {
-                    statusIndicator.updateRows({
-                        [info.uri]: {
-                            errorMessage: payload.message
-                        }
-                    });
-                }
+                setPlaybackStatusInd(payload.playbackId, payload);
             } else {
                 statusIndicator.updateRows(payload.tracks);
             }
             break;
         }
     }
+}
+
+function setPlaybackStatusInd(playbackId: string, status: { path?: string, errorMessage?: string })
+{
+    let info = playbackTracker.getTrackInfo(playbackId);
+    if (!info) return;
+
+    statusIndicator.updateRows({
+        [info.uri]: status
+    });
 }

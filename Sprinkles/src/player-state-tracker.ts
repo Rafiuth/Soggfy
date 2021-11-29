@@ -23,45 +23,46 @@ class PlayerStateTracker
     }
 
     /** Returns limited track metadata for a given playbackId, or null. */
-    getPlaybackTrack(playbackId: string)
+    getTrackInfo(playbackId: string)
     {
         return this._playbacks.get(playbackId)?.item;
     }
-
-    async getPlaybackMetadata(playbackId: string, remove = true)
+    remove(playbackId: string)
+    {
+        return this._playbacks.delete(playbackId);
+    }
+    /** Returns complete metadata for a given playback id. */
+    async getMetadata(playbackId: string)
     {
         let playback = this._playbacks.get(playbackId);
-        if (remove) {
-            this._playbacks.delete(playbackId);
-        }
         let track = playback.item;
-        let type = this._getTrackType(track.uri);
+        let type = this.getTrackType(track.uri);
 
         let meta: any = type === "track"
-            ? await this._getTrackMetaProps(track)
-            : await this._getPodcastMetaProps(track);
+            ? await this.getTrackMetaProps(track)
+            : await this.getPodcastMetaProps(track);
         
         let data = {
             type: type,
             playbackId: playback.playbackId,
             trackUri: track.uri,
             metadata: meta,
-            pathVars: this._getPathVariables(meta),
+            pathVars: this.getPathVariables(meta),
             lyrics: "",
             lyricsExt: "",
             coverArtId: track.metadata.image_xlarge_url.replaceAll(":", "_")
         };
         let coverData = await Resources.getImageData(track.metadata.image_xlarge_url);
 
-        let lyrics = config.downloadLyrics ? await this._getLyrics(track) : null;
+        let lyrics = config.downloadLyrics ? await this.getLyrics(track) : null;
         if (lyrics) {
-            data.lyrics = this._convertLyricsToLRC(lyrics);
+            data.lyrics = this.convertLyricsToLRC(lyrics);
             data.lyricsExt = lyrics.isSynced ? "lrc" : "txt";
             data.metadata.lyrics = lyrics.lines.map(v => v.text).join('\n');
         }
         return { info: data, coverData: coverData };
     }
-    async _getTrackMetaProps(track: TrackInfo)
+    private async getTrackMetaProps(track: TrackInfo)
     {
         let meta = track.metadata;
         let extraMeta = await Resources.getTrackMetadataWG(track.uri);
@@ -72,8 +73,8 @@ class PlayerStateTracker
         let { year, month, day } = extraMeta.album.date;
         let date = [year, month, day];
         //Truncate date to available precision (year only sample: https://open.spotify.com/track/4VxaUj96W2jw9UOtKHu51p)
-        if (Number.isNaN(day)) date.pop();
-        if (Number.isNaN(month)) date.pop();
+        if (!day) date.pop();
+        if (!month) date.pop();
         
         return {
             title:          meta.title,
@@ -84,15 +85,15 @@ class PlayerStateTracker
             totaltracks:    meta.album_track_count,
             disc:           meta.album_disc_number,
             totaldiscs:     meta.album_disc_count,
-            date:           date.map(Utils.padInt2).join('-'), //YYYY-MM-DD,
+            date:           date.map(x => Utils.padInt(x, 2)).join('-'), //YYYY-MM-DD,
             publisher:      extraMeta.album.label,
-            language:       extraMeta.language_of_performance[0],
+            language:       extraMeta.language_of_performance?.[0],
             isrc:           extraMeta.external_id.find(v => v.type === "isrc")?.id,
             comment:        Resources.getOpenTrackURL(track.uri),
             ITUNESADVISORY: meta.is_explicit ? "1" : undefined
         };
     }
-    async _getPodcastMetaProps(track: TrackInfo)
+    private async getPodcastMetaProps(track: TrackInfo)
     {
         let meta = await Resources.getEpisodeMetadata(track.uri);
 
@@ -111,7 +112,7 @@ class PlayerStateTracker
             ITUNESADVISORY: meta.explicit ? "1" : undefined
         };
     }
-    _getPathVariables(meta: any)
+    private getPathVariables(meta: any)
     {
         return {
             track_name:     meta.title,
@@ -123,7 +124,7 @@ class PlayerStateTracker
             multi_disc_paren: meta.totaldiscs > 1 ? ` (CD ${meta.disc})` : ""
         };
     }
-    _getTrackType(uri: string): "track" | "podcast" | "unknown"
+    private getTrackType(uri: string): "track" | "podcast" | "unknown"
     {
         if (uri.startsWith("spotify:track:")) {
             return "track";
@@ -133,7 +134,7 @@ class PlayerStateTracker
         }
         return "unknown";
     }
-    async _getLyrics(track: TrackInfo)
+    private async getLyrics(track: TrackInfo)
     {
         if (track.metadata.has_lyrics !== "true") {
             return null;
@@ -150,7 +151,7 @@ class PlayerStateTracker
             }))
         };
     }
-    _convertLyricsToLRC(data)
+    private convertLyricsToLRC(data)
     {
         //https://en.wikipedia.org/wiki/LRC_(file_format)#Simple_format
         //https://github.com/FFmpeg/FFmpeg/blob/master/libavformat/lrcdec.c#L88
@@ -159,9 +160,9 @@ class PlayerStateTracker
         for (let line of data.lines) {
             if (data.isSynced) {
                 let time = line.time;
-                let mm = Utils.padInt2(time / 1000 / 60);
-                let ss = Utils.padInt2(time / 1000 % 60);
-                let cs = Utils.padInt2(time % 1000 / 10);
+                let mm = Utils.padInt(time / 1000 / 60, 2);
+                let ss = Utils.padInt(time / 1000 % 60, 2);
+                let cs = Utils.padInt(time % 1000 / 10, 2);
                 text += `[${mm}:${ss}.${cs}]`;
             }
             text += line.text + '\n';

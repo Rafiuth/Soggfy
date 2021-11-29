@@ -1,10 +1,10 @@
 #include "../pch.h"
 #include "Log.h"
 
-#ifdef _DEBUG
+#if _DEBUG
 LogLevel LogMinLevel = LOG_TRACE;
 #else
-LogLevel LogMinLevel = LOG_INFO;
+LogLevel LogMinLevel = LOG_DEBUG;
 #endif
 
 void InstallConsole()

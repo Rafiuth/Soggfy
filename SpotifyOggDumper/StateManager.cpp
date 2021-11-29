@@ -82,16 +82,14 @@ struct StateManagerImpl : public StateManager
 
         switch (msg.Type) {
             case MessageType::SERVER_OPEN: {
-                LogInfo("Injecting JS...");
                 std::ifstream srcJsFile(_dataDir / "Soggfy.js", std::ios::binary);
-                std::string srcJs(std::istreambuf_iterator<char>(srcJsFile), {});
 
-                Utils::Replace(srcJs, "ws://127.0.0.1:28653/sgf_ctrl", msg.Content["addr"]);
-                Utils::Replace(srcJs, "IS_INJECTED = false", "IS_INJECTED = true");
-#ifdef _DEBUG
-                Utils::Replace(srcJs, "IS_DEBUG = false", "IS_DEBUG = true");
-#endif
-                JsInjector::Inject(srcJs);
+                if (srcJsFile.good()) {
+                    LogInfo("Injecting JS...");
+                    std::string srcJs(std::istreambuf_iterator<char>(srcJsFile), {});
+                    Utils::Replace(srcJs, "ws://127.0.0.1:28653/sgf_ctrl", msg.Content["addr"]);
+                    JsInjector::Inject(srcJs);
+                }
                 LogInfo("Ready");
                 break;
             }
@@ -114,17 +112,21 @@ struct StateManagerImpl : public StateManager
                 auto playback = GetPlayback(playbackId);
                 if (!playback || !playback->ReadyToSave) break;
 
-                TrackMetadata meta = {
-                    .Type       = content["type"],
-                    .TrackUri   = content["trackUri"],
-                    .Props      = content["metadata"],
-                    .PathVars   = content["pathVars"],
-                    .Lyrics     = content["lyrics"],
-                    .LyricsExt  = content["lyricsExt"],
-                    .CoverArtId = content["coverArtId"],
-                    .CoverArtData = msg.BinaryContent
-                };
-                std::thread(&StateManagerImpl::SaveTrack, this, playback, meta).detach();
+                if (content.value("failed", false)) {
+                    LogWarn("Failed to save playback {}: {}", playbackId, content["errorMessage"]);
+                } else {
+                    TrackMetadata meta = {
+                        .Type       = content["type"],
+                        .TrackUri   = content["trackUri"],
+                        .Props      = content["metadata"],
+                        .PathVars   = content["pathVars"],
+                        .Lyrics     = content["lyrics"],
+                        .LyricsExt  = content["lyricsExt"],
+                        .CoverArtId = content["coverArtId"],
+                        .CoverArtData = msg.BinaryContent
+                    };
+                    std::thread(&StateManagerImpl::SaveTrack, this, playback, meta).detach();
+                }
                 RemovePlayback(playbackId);
                 break;
             }
@@ -144,11 +146,10 @@ struct StateManagerImpl : public StateManager
                 json resp = {
                     { "tracks", existingTracks }
                 };
+                conn->Send({ MessageType::DOWNLOAD_STATUS, resp });
                 
                 int64_t end = Utils::CurrentMillis();
-                LogDebug("DownloadStatusReq: {}ms", end - start);
-                
-                conn->Send({ MessageType::DOWNLOAD_STATUS, resp });
+                LogTrace("DownloadStatusReq: {}ms", end - start);
                 break;
             }
             case MessageType::OPEN_FOLDER: {
@@ -215,6 +216,7 @@ struct StateManagerImpl : public StateManager
             LogWarn("Unrecognized audio codec in playback {}, aborting download. This is a bug, please report.", playbackId);
             return;
         }
+        LogDebug("Requesting metadata for playback {}...", playbackId);
         json content = {
             { "playbackId", playbackId }
         };
@@ -229,7 +231,7 @@ struct StateManagerImpl : public StateManager
         
         json content = {
             { "playbackId", playbackId },
-            { "message", "Aborted: " + reason }
+            { "errorMessage", "Aborted: " + reason }
         };
         _ctrlSv.Broadcast({ MessageType::DOWNLOAD_STATUS, content });
     }
@@ -271,17 +273,15 @@ struct StateManagerImpl : public StateManager
                 fs::copy_file(tmpCoverPath, coverPath, fs::copy_options::skip_existing);
             }
             if (_ffmpegPath.empty()) {
-                fs::path outPath = trackPath;
-                outPath.replace_extension(playback->ActualExt);
-                fs::rename(playback->FileName, outPath);
+                trackPath.replace_extension(playback->ActualExt);
+                fs::rename(playback->FileName, trackPath);
             } else {
                 auto& fmt = _config["outputFormat"];
                 auto convExt = fmt["ext"].get<std::string>();
                 auto convArgs = fmt["args"].get<std::string>();
 
-                fs::path outPath = trackPath;
-                outPath.replace_extension(convExt.empty() ? playback->ActualExt : convExt);
-                InvokeFFmpeg(playback->FileName, tmpCoverPath, outPath, convArgs, meta);
+                trackPath.replace_extension(convExt.empty() ? playback->ActualExt : convExt);
+                InvokeFFmpeg(playback->FileName, tmpCoverPath, trackPath, convArgs, meta);
             }
             if (!meta.Lyrics.empty()) {
                 fs::path lrcPath = trackPath;
@@ -289,6 +289,15 @@ struct StateManagerImpl : public StateManager
                 std::ofstream(lrcPath, std::ios::binary) << meta.Lyrics;
             }
             fs::remove(playback->FileName);
+
+            json statusJson = {
+                { "tracks", json::object({
+                    { meta.TrackUri, json::object({
+                        { "path", trackPath.string() }
+                    })}
+                })}
+            };
+            _ctrlSv.Broadcast({MessageType::DOWNLOAD_STATUS, statusJson });
         } catch (std::exception& ex) {
             LogError("Failed to save track {}: {}", meta.GetName(), ex.what());
         }
@@ -297,7 +306,7 @@ struct StateManagerImpl : public StateManager
     {
         //TODO: fix 32k char command line limit for lyrics
         if (fs::exists(outPath)) {
-            LogDebug("File {} already exists. Skipping conversion.", outPath.filename().string());
+            LogInfo("File {} already exists. Skipping conversion.", outPath.filename().string());
             return;
         }
         ProcessBuilder proc;
@@ -332,7 +341,7 @@ struct StateManagerImpl : public StateManager
         proc.AddArg("-y");
 
         LogDebug("Converting {}...", meta.GetName());
-        LogDebug("  args: {}", proc.ToString());
+        LogTrace("  args: {}", proc.ToString());
 
         int exitCode = proc.Start(true);
         if (exitCode != 0) {
