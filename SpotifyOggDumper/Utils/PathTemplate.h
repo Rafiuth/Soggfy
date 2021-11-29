@@ -2,6 +2,7 @@
 #include <string>
 #include <filesystem>
 #include <unordered_map>
+#include <optional>
 #include <regex>
 #include "Utils.h"
 
@@ -16,11 +17,11 @@ public:
     {
         std::string path = Utils::RegexReplace(templt, std::regex("\\{(.+?)\\}"), [&](auto& m) {
             auto repl = GetReplacement(m.str(1), vars);
-            return !repl.empty() ? repl : m.str(0);
+            return repl ? *repl : m.str(0);
         });
         return fs::u8path(path);
     }
-    static std::string GetReplacement(const std::string& varName, const PathTemplateVars& vars)
+    static std::optional<std::string> GetReplacement(const std::string& varName, const PathTemplateVars& vars)
     {
         if (varName == "user_home") {
             return Utils::GetHomeDirectory();
@@ -29,7 +30,7 @@ public:
         if (itr != vars.end()) {
             return Utils::RemoveInvalidPathChars(itr->second);
         }
-        return "";
+        return {};
     }
     //Splits the specified path into directories. e.g.: "A/B/C" -> ["A", "B", "C"]
     static std::vector<std::string> Split(const std::string& str)
@@ -101,7 +102,7 @@ private:
                 hasUnkVar |= unkVars.contains(varName);
                 
                 auto repl = PathTemplate::GetReplacement(varName, vars);
-                return !repl.empty() ? repl : m.str(0);
+                return repl ? *repl : m.str(0);
             });
 
             IsLiteral = !hasUnkVar;
