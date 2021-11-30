@@ -94,7 +94,7 @@ struct StateManagerImpl : public StateManager
                 break;
             }
             case MessageType::HELLO: {
-                conn->Send({ MessageType::SYNC_CONFIG, _config });
+                conn->Send(MessageType::SYNC_CONFIG, _config);
                 break;
             }
             case MessageType::BYE: {
@@ -143,10 +143,7 @@ struct StateManagerImpl : public StateManager
                         { "path", Utils::PathToUtf(entry.first) }
                     };
                 }
-                json resp = {
-                    { "tracks", existingTracks }
-                };
-                conn->Send({ MessageType::DOWNLOAD_STATUS, resp });
+                conn->Send(MessageType::DOWNLOAD_STATUS, { { "tracks", existingTracks } });
                 
                 int64_t end = Utils::CurrentMillis();
                 LogTrace("DownloadStatusReq: {}ms", end - start);
@@ -217,10 +214,7 @@ struct StateManagerImpl : public StateManager
             return;
         }
         LogDebug("Requesting metadata for playback {}...", playbackId);
-        json content = {
-            { "playbackId", playbackId }
-        };
-        _ctrlSv.Broadcast({ MessageType::TRACK_META, content });
+        _ctrlSv.Broadcast(MessageType::TRACK_META, { { "playbackId", playbackId } });
     }
     void DiscardTrack(const std::string& playbackId, const std::string& reason)
     {
@@ -229,11 +223,10 @@ struct StateManagerImpl : public StateManager
 
         playback->Discard = true;
         
-        json content = {
+        _ctrlSv.Broadcast(MessageType::DOWNLOAD_STATUS, {
             { "playbackId", playbackId },
             { "errorMessage", "Aborted: " + reason }
-        };
-        _ctrlSv.Broadcast({ MessageType::DOWNLOAD_STATUS, content });
+        });
     }
     bool OverridePlaybackSpeed(double& speed)
     {
@@ -272,6 +265,7 @@ struct StateManagerImpl : public StateManager
             if (!coverPath.empty()) {
                 fs::copy_file(tmpCoverPath, coverPath, fs::copy_options::skip_existing);
             }
+
             if (_ffmpegPath.empty()) {
                 trackPath.replace_extension(playback->ActualExt);
                 fs::rename(playback->FileName, trackPath);
@@ -283,25 +277,28 @@ struct StateManagerImpl : public StateManager
                 trackPath.replace_extension(convExt.empty() ? playback->ActualExt : convExt);
                 InvokeFFmpeg(playback->FileName, tmpCoverPath, trackPath, convArgs, meta);
             }
+
             if (!meta.Lyrics.empty()) {
                 fs::path lrcPath = trackPath;
                 lrcPath.replace_extension(meta.LyricsExt);
                 std::ofstream(lrcPath, std::ios::binary) << meta.Lyrics;
             }
             fs::remove(playback->FileName);
-
-            json statusJson = {
-                { "tracks", json::object({
-                    { meta.TrackUri, json::object({
-                        { "path", trackPath.string() }
-                    })}
-                })}
-            };
-            _ctrlSv.Broadcast({MessageType::DOWNLOAD_STATUS, statusJson });
+            SendTrackStatus(meta.TrackUri, { { "path", Utils::PathToUtf(trackPath) } });
         } catch (std::exception& ex) {
             LogError("Failed to save track {}: {}", meta.GetName(), ex.what());
+            SendTrackStatus(meta.TrackUri, { { "errorMessage", ex.what() } });
         }
     }
+    void SendTrackStatus(const std::string& uri, const json& props)
+    {
+        _ctrlSv.Broadcast(MessageType::DOWNLOAD_STATUS, { 
+            { "tracks", {
+                { uri, props }
+            }}
+        });
+    }
+
     void InvokeFFmpeg(const fs::path& path, const fs::path& coverPath, const fs::path& outPath, const std::string& extraArgs, const TrackMetadata& meta)
     {
         //TODO: fix 32k char command line limit for lyrics

@@ -89,7 +89,6 @@ void ControlServer::Run()
 void ControlServer::Stop()
 {
     if (_socket) {
-        
         _loop->defer([&]() {
             //create a copy because the closeHandler fired by end() will invalidate the iterator
             auto clients = _clients;
@@ -107,7 +106,7 @@ void ControlServer::Stop()
 void SendData(WebSocket* socket, const std::string& data, uWS::OpCode opcode = uWS::BINARY)
 {
     if (socket->send(data, opcode) != WebSocket::SendStatus::SUCCESS) {
-        throw std::runtime_error("Failed to send message");
+        LogWarn("Failed to send message to {}", (void*)socket);
     }
 }
 

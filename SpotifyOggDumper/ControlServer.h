@@ -17,49 +17,6 @@ enum class MessageType
     BYE             = -2,   //Client disconnected
     SERVER_OPEN     = -128  //Server listen success, message: { addr: string }
 };
-struct Connection;
-struct Message;
-
-using WebSocket = uWS::WebSocket<false, true, Connection>;
-using MessageHandler = std::function<void(Connection*, const Message&)>;
-
-class ControlServer
-{
-public:
-    ControlServer(const MessageHandler& msgHandler) :
-        _msgHandler(msgHandler)
-    {
-    }
-    ~ControlServer()
-    {
-        Stop();
-    }
-
-    void Run();
-    void Stop();
-    
-    //Sends the specified message to all connected clients. Can be called from any thread.
-    void Broadcast(const Message& msg);
-    
-private:
-    std::unique_ptr<uWS::App> _app;
-    uWS::Loop* _loop = nullptr;
-    us_listen_socket_t* _socket = nullptr;
-    std::unordered_set<WebSocket*> _clients;
-
-    std::condition_variable _doneCond;
-    std::mutex _doneMutex;
-
-    int _port = 28653;
-    MessageHandler _msgHandler;
-};
-
-struct Connection
-{
-    WebSocket* Socket;
-
-    void Send(const Message& msg);
-};
 
 struct Message
 {
@@ -99,4 +56,49 @@ private:
     {
         return *(T*)&str[pos];
     }
+};
+
+struct Connection;
+
+using WebSocket = uWS::WebSocket<false, true, Connection>;
+using MessageHandler = std::function<void(Connection*, const Message&)>;
+
+class ControlServer
+{
+public:
+    ControlServer(const MessageHandler& msgHandler) :
+        _msgHandler(msgHandler)
+    {
+    }
+    ~ControlServer()
+    {
+        Stop();
+    }
+
+    void Run();
+    void Stop();
+    
+    //Sends the specified message to all connected clients. Can be called from any thread.
+    void Broadcast(const Message& msg);
+    void Broadcast(MessageType type, const json& content) { Broadcast({ type, content }); }
+    
+private:
+    std::unique_ptr<uWS::App> _app;
+    uWS::Loop* _loop = nullptr;
+    us_listen_socket_t* _socket = nullptr;
+    std::unordered_set<WebSocket*> _clients;
+
+    std::condition_variable _doneCond;
+    std::mutex _doneMutex;
+
+    int _port = 28653;
+    MessageHandler _msgHandler;
+};
+
+struct Connection
+{
+    WebSocket* Socket;
+
+    void Send(const Message& msg);
+    void Send(MessageType type, const json& content) { Send({ type, content }); }
 };
