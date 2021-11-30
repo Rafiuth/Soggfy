@@ -23,8 +23,7 @@ class PlayerStateTracker
         //Player stops sometimes when speed is too high (>= 30)
         Player._client.getError({}, err => {
             if (err.message === "playback_stuck" && err.data.playback_id === Player.getState().playbackId) {
-                Player.skipToNext();
-                Player.skipToPrevious();
+                SpotifyUtils.resetCurrentTrack(false);
             }
         });
     }

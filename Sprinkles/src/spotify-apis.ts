@@ -38,20 +38,41 @@ export {
     TrackInfo
 };
 
+export class SpotifyUtils
+{
+    /** Resets the current track (this method creates a new playback id) */
+    static async resetCurrentTrack(preservePosition = true)
+    {
+        let state = player.getState();
+        let position = (Date.now() - state.timestamp) * state.speed + state.positionAsOfTimestamp;
+
+        await player._queue.addToQueue([ { uri: state.item.uri } ]); //Player.addToQueue() will popup a notification
+        await player.skipToNext();
+        
+        if (preservePosition) {
+            await player.seekTo(position);
+        }
+    }
+}
+
 interface PlayerAPI
 {
     _cosmos: any;
     _events: any;
     _client: any;
+    _queue: any;
     
     getState(): PlayerState;
     skipToNext(): Promise<void>;
     skipToPrevious(): Promise<void>;
+    seekTo(position: number): Promise<void>;
 }
 interface PlayerState
 {
     playbackId: string;
     timestamp: number,
+    positionAsOfTimestamp: number,
+    speed: number,
     context: {
         uri: string;
         metadata: any;

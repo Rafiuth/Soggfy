@@ -2,6 +2,7 @@ import config from "../config";
 import { Connection, MessageType } from "../connection";
 import Utils from "../utils";
 import UIC from "./components";
+import { SpotifyUtils } from "../spotify-apis";
 
 import SettingsStyle from "./css/settings.css";
 import StatusIndicatorStyle from "./css/status-indicator.css";
@@ -103,7 +104,12 @@ class UI
                 customFormatSection,
                 UIC.row("Embed cover art",      UIC.toggle("embedCoverArt", onChange)),
                 UIC.row("Download lyrics",      UIC.toggle("downloadLyrics", onChange)),
-                UIC.row("Playback speed",       UIC.slider("playbackSpeed", { min: 1, max: 20, step: 1, formatter: val => val + "x" }, onChange))
+                UIC.row("Playback speed",       UIC.slider("playbackSpeed", { min: 1, max: 20, step: 1, formatter: val => val + "x" }, (key, newValue) => {
+                    if (newValue) {
+                        SpotifyUtils.resetCurrentTrack(false);
+                    }
+                    return onChange(key, newValue);
+                }))
             ),
             UIC.section("Download Paths",
                 UIC.rowSection("Songs",         UIC.textInput("savePaths.track.audio", onChange)),
