@@ -52,41 +52,41 @@ export default class DownloadStatus
             let status = tracks[info.trackUri];
             if (!status) continue;
             let ok = !!status.path;
-
-            if (!row["__sgf_state_elem"]) {
-                let node = document.createElement("div");
-                node.className = "sgf-status-indicator";
-                node.innerHTML = `
+            
+            let node = row["__sgf_status_ind"] ??= document.createElement("div");
+            if (!node.parentElement) {
+                let infoColDiv = row.lastElementChild;
+                infoColDiv.prepend(node);
+            }
+            
+            node.className = "sgf-status-indicator";
+            node.innerHTML = `
 <div class="sgf-status-indicator-card">
 ${ok
-    ? `
+? `
 <div class="sgf-status-browse-button">
 <svg width="24" height="24" viewBox="0 0 24 24" fill="#ddd">
-    <path xmlns="http://www.w3.org/2000/svg" d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z"></path>
+<path xmlns="http://www.w3.org/2000/svg" d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z"></path>
 </svg>
 <span style="padding-left: 4px; font-size: 16px; color: #ddd;">Open Folder</span>
 </div>`
-    : `
+: `
 <span style="font-size: 16px; color: #ddd;">${status.errorMessage}</span>
 `
 }
 </div>
 <svg role="img" height="16" width="16" viewBox="0 0 16 16" fill="${ok ? "#33ff33" : "#ff2424"}" style="margin-top: 2px;">
 ${ok 
-    ? `<path d="M13.985 2.383L5.127 12.754 1.388 8.375l-.658.77 4.397 5.149 9.618-11.262z"></path>`
-    : `<path d="M14.354 2.353l-.708-.707L8 7.293 2.353 1.646l-.707.707L7.293 8l-5.647 5.646.707.708L8 8.707l5.646 5.647.708-.708L8.707 8z"></path>`
+? `<path d="M13.985 2.383L5.127 12.754 1.388 8.375l-.658.77 4.397 5.149 9.618-11.262z"></path>`
+: `<path d="M14.354 2.353l-.708-.707L8 7.293 2.353 1.646l-.707.707L7.293 8l-5.647 5.646.707.708L8 8.707l5.646 5.647.708-.708L8.707 8z"></path>`
 }
 </svg>`;
-                let infoColDiv = row.lastElementChild;
-                infoColDiv.prepend(node);
 
-                let browseBtn: HTMLDivElement = node.querySelector(".sgf-status-browse-button");
-                if (browseBtn) {
-                    browseBtn.onclick = () => {
-                        this._conn.send(MessageType.OPEN_FOLDER, { path: status.path });
-                    };
-                }
-                row["__sgf_state_elem"] = node;
+            let browseBtn: HTMLDivElement = node.querySelector(".sgf-status-browse-button");
+            if (browseBtn) {
+                browseBtn.onclick = () => {
+                    this._conn.send(MessageType.OPEN_FOLDER, { path: status.path });
+                };
             }
         }
     }
