@@ -42,7 +42,11 @@ interface PlayerAPI
 {
     _cosmos: any;
     _events: any;
-    _state: PlayerState;
+    _client: any;
+    
+    getState(): PlayerState;
+    skipToNext(): Promise<void>;
+    skipToPrevious(): Promise<void>;
 }
 interface PlayerState
 {

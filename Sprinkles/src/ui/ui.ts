@@ -103,7 +103,7 @@ class UI
                 customFormatSection,
                 UIC.row("Embed cover art",      UIC.toggle("embedCoverArt", onChange)),
                 UIC.row("Download lyrics",      UIC.toggle("downloadLyrics", onChange)),
-                UIC.row("Playback speed",       UIC.slider("playbackSpeed", { min: 1, max: 30, step: 1, formatter: val => val + "x" }, onChange))
+                UIC.row("Playback speed",       UIC.slider("playbackSpeed", { min: 1, max: 20, step: 1, formatter: val => val + "x" }, onChange))
             ),
             UIC.section("Download Paths",
                 UIC.rowSection("Songs",         UIC.textInput("savePaths.track.audio", onChange)),
