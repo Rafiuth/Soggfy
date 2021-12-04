@@ -8,7 +8,7 @@ import SettingsStyle from "./css/settings.css";
 import StatusIndicatorStyle from "./css/status-indicator.css";
 const MergedStyles = SettingsStyle + "\n" + StatusIndicatorStyle; //TODO: find a better way to do this
 
-class UI
+export default class UI
 {
     private _styleElement: HTMLStyleElement;
     private _settingsButton: HTMLButtonElement;
@@ -82,21 +82,6 @@ class UI
             customFormatSection.style.display = name === "Custom" ? "block" : "none";
             return name;
         };
-        let updateCoverPath = (key: string, save?: boolean) => {
-            let newPath = undefined;
-            //`save` may also be `undefined`
-            if (save === true) {
-                //save cover art in the first directory containing the album_name variable
-                let path = onChange(key.replace(".cover", ".audio"));
-                let parts = path.split(/[\/\\\\]/);
-                let albumDirIdx = parts.findIndex(d => d.includes("{album_name}"));
-                let hasAlbumDir = albumDirIdx >= 0 && albumDirIdx + 1 < parts.length;
-                newPath = hasAlbumDir ? parts.slice(0, albumDirIdx + 1).join('/') + "/cover.jpg" : "";
-            } else if (save === false) {
-                newPath = "";
-            }
-            return onChange(key, newPath) !== "";
-        };
         
         return UIC.createSettingOverlay(
             UIC.section("General",
@@ -112,12 +97,9 @@ class UI
                 }))
             ),
             UIC.section("Download Paths",
-                UIC.rowSection("Songs",         UIC.textInput("savePaths.track.audio", onChange)),
-                UIC.rowSection("Podcasts",      UIC.textInput("savePaths.podcast.audio", onChange)),
-                UIC.row("Save cover art separately", UIC.toggle("saveCoverArt", (key, newValue) => {
-                    return updateCoverPath("savePaths.track.cover", newValue) || 
-                           updateCoverPath("savePaths.podcast.cover", newValue);
-                })),
+                UIC.rowSection("Songs",         UIC.textInput("savePaths.track", onChange)),
+                UIC.rowSection("Podcasts",      UIC.textInput("savePaths.episode", onChange)),
+                UIC.row("Save cover art in album folder", UIC.toggle("saveCoverArt", onChange)),
             )
         );
     }
@@ -149,8 +131,6 @@ let selectors = await extractSelectors(
     "trackListRow", "rowTitle", "rowSubTitle", "rowSectionEnd",
     "rowMoreButton"
 );
-
-export default UI;
 
 export {
     selectors as Selectors

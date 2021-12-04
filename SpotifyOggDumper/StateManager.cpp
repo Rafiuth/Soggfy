@@ -251,9 +251,10 @@ struct StateManagerImpl : public StateManager
         try {
             LogInfo("Saving track {}", meta.GetName());
             LogDebug("  stream: {}", playback->FileName.filename().string());
-
-            fs::path trackPath = PathTemplate::Render(_config["savePaths"][meta.Type]["audio"], meta.PathVars);
-            fs::path coverPath = PathTemplate::Render(_config["savePaths"][meta.Type]["cover"], meta.PathVars);
+            
+            std::string pathTemplate = _config["savePaths"][meta.Type];
+            fs::path trackPath = PathTemplate::Render(pathTemplate, meta.PathVars);
+            fs::path coverPath = RenderCoverPath(pathTemplate, meta.PathVars);
             fs::path tmpCoverPath = MakeTempPath(meta.CoverArtId + ".jpg");
 
             //always cache cover art
@@ -299,6 +300,23 @@ struct StateManagerImpl : public StateManager
         });
     }
 
+    fs::path RenderCoverPath(const std::string& templt, const PathTemplateVars& vars)
+    {
+        if (!_config["saveCoverArt"]) {
+            return {};
+        }
+        //Find the first directory containing {album_name}, and save cover.jpg in it
+        std::string coverTemplt = "";
+        for (auto& dir : PathTemplate::Split(templt)) {
+            if (!coverTemplt.empty()) coverTemplt += "/";
+            coverTemplt += dir;
+            
+            if (dir.find("{album_name}") != std::string::npos) {
+                return PathTemplate::Render(coverTemplt + "/cover.jpg", vars);
+            }
+        }
+        return {};
+    }
     void InvokeFFmpeg(const fs::path& path, const fs::path& coverPath, const fs::path& outPath, const std::string& extraArgs, const TrackMetadata& meta)
     {
         //TODO: fix 32k char command line limit for lyrics
