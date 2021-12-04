@@ -51,7 +51,12 @@ public:
     }
 };
 
-using PathSearchList = std::vector<std::pair<fs::path, std::string>>;
+struct PathSearchResult
+{
+    fs::path Path;
+    std::vector<std::string> Tokens;
+};
+using PathSearchList = std::vector<PathSearchResult>;
 
 //Overcomplicated class used to find tracks that have already been downloaded, given limited metadata
 class PathTemplateSearcher
@@ -74,8 +79,7 @@ public:
         for (auto& dir : _template) {
             node = node->FindOrAddChild(Directory(dir, vars, unkVars));
         }
-        assert(token.empty() || node->Token.empty());
-        node->Token = token;
+        node->Tokens.push_back(token);
     }
     PathSearchList FindExisting()
     {
@@ -122,7 +126,7 @@ private:
     };
     struct Node
     {
-        std::string Token;
+        std::vector<std::string> Tokens;
         Directory Dir;
         std::vector<Node> Children;
 
@@ -141,7 +145,7 @@ private:
         {
             if (!currPath.empty() && !(currPathExists || fs::exists(currPath))) return;
             if (Children.empty()) {
-                results.emplace_back(currPath, Token);
+                results.push_back({ currPath, Tokens });
                 return;
             }
             bool hasRegexChild = false;

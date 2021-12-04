@@ -1,13 +1,13 @@
 import Utils from "./utils";
-import { Player, PlayerState, TrackInfo } from "./spotify-apis";
+import { Player, PlayerState, TrackInfo, SpotifyUtils } from "./spotify-apis";
 import Resources from "./resources";
 import config from "./config";
 
-class PlayerStateTracker
+export default class PlayerStateTracker
 {
     private _playbacks: Map<string, PlayerState>;
 
-    constructor()
+    constructor(stateChanged?: (newState: PlayerState, oldState?: PlayerState) => void)
     {
         this._playbacks = new Map();
 
@@ -15,9 +15,11 @@ class PlayerStateTracker
             let eventType = args[0];
             let data = args[1];
             if (stage === "pre" && eventType === "update" && data?.playbackId) {
-                if (!this._playbacks.has(data.playbackId)) {
-                    this._playbacks.set(data.playbackId, data);
+                if (stateChanged) {
+                    let oldState = this._playbacks.get(data.playbackId);
+                    stateChanged?.(data, oldState);
                 }
+                this._playbacks.set(data.playbackId, data);
             }
         });
         //Player stops sometimes when speed is too high (>= 30)
@@ -42,7 +44,7 @@ class PlayerStateTracker
     {
         let playback = this._playbacks.get(playbackId);
         let track = playback.item;
-        let type = this.getTrackType(track.uri);
+        let type = Resources.getUriType(track.uri);
 
         let meta: any = type === "track"
             ? await this.getTrackMetaProps(track)
@@ -130,16 +132,6 @@ class PlayerStateTracker
             multi_disc_paren: meta.totaldiscs > 1 ? ` (CD ${meta.disc})` : ""
         };
     }
-    private getTrackType(uri: string): "track" | "podcast" | "unknown"
-    {
-        if (uri.startsWith("spotify:track:")) {
-            return "track";
-        }
-        if (uri.startsWith("spotify:episode:")) {
-            return "podcast";
-        }
-        return "unknown";
-    }
     private async getLyrics(track: TrackInfo)
     {
         if (track.metadata.has_lyrics !== "true") {
@@ -176,5 +168,3 @@ class PlayerStateTracker
         return text;
     }
 }
-
-export default PlayerStateTracker;

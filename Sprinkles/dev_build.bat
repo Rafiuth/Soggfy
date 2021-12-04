@@ -1,0 +1,1 @@
+npm run build & copy dist\bundle.js %appdata%\Spotify\Apps\xpui\extensions\Soggfy.js /y

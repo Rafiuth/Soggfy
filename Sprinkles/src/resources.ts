@@ -63,6 +63,10 @@ class Resources
         }
         return parts[2];
     }
+    static getUriType(uri: string)
+    {
+        return uri.split(':')[1];
+    }
 
     /** Converts a hex string into a base62 spotify id */
     static hexToId(str: string): string

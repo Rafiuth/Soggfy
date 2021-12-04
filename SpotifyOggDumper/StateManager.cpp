@@ -14,12 +14,13 @@ struct PlaybackInfo
     fs::path FileName;
     std::ofstream FileStream;
     std::string ActualExt;
+    std::pair<std::string, std::string> Status; //(Status, Message)
     bool Discard = false;
     bool ReadyToSave = false;
 };
 struct TrackMetadata
 {
-    std::string Type; //either "track" or "podcast"
+    std::string Type; //either "track" or "episode"
     std::string TrackUri;
     //Properties that can be passed directly to ffmpeg
     //https://wiki.multimedia.cx/index.php/FFmpeg_Metadata
@@ -112,9 +113,7 @@ struct StateManagerImpl : public StateManager
                 auto playback = GetPlayback(playbackId);
                 if (!playback || !playback->ReadyToSave) break;
 
-                if (content.value("failed", false)) {
-                    LogWarn("Failed to save playback {}: {}", playbackId, content["errorMessage"]);
-                } else {
+                if (!content.value("failed", false)) {
                     TrackMetadata meta = {
                         .Type       = content["type"],
                         .TrackUri   = content["trackUri"],
@@ -126,27 +125,44 @@ struct StateManagerImpl : public StateManager
                         .CoverArtData = msg.BinaryContent
                     };
                     std::thread(&StateManagerImpl::SaveTrack, this, playback, meta).detach();
+                } else {
+                    LogInfo("Discarding playback {}: {}", playbackId, content["message"]);
                 }
                 RemovePlayback(playbackId);
                 break;
             }
             case MessageType::DOWNLOAD_STATUS: {
-                int64_t start = Utils::CurrentMillis();
-                
-                PathTemplateSearcher searcher(content["pathTemplate"]);
-                for (auto& track : content["tracks"]) {
-                    searcher.Add(track["uri"], track["vars"], track["unkVars"]);
+                if (content.contains("playbackId")) {
+                    auto playback = GetPlayback(content["playbackId"]);
+                    if (!playback) break;
+
+                    conn->Send(MessageType::DOWNLOAD_STATUS, {
+                        { "playbackId", playback->Id },
+                        { "status", playback->Status.first },
+                        { "message", playback->Status.second }
+                    });
                 }
-                json existingTracks = json::object();
-                for (auto& entry : searcher.FindExisting()) {
-                    existingTracks[entry.second] = {
-                        { "path", Utils::PathToUtf(entry.first) }
-                    };
+                else if (content.contains("pathTemplate")) {
+                    PathTemplateSearcher searcher(content["pathTemplate"]);
+                    for (auto& track : content["tracks"]) {
+                        searcher.Add(track["uri"], track["vars"], track["unkVars"]);
+                    }
+                    json existingTracks = json::object();
+                    for (auto& entry : searcher.FindExisting()) {
+                        for (auto& uri : entry.Tokens) {
+                            json track = {
+                                { "status", "DONE" },
+                                { "path", Utils::PathToUtf(entry.Path) }
+                            };
+                            if (entry.Tokens.size() > 1) {
+                                track["status"] = "WARN";
+                                track["message"] = "Multiple tracks mapping to the same filename";
+                            }
+                            existingTracks[uri] = track;
+                        }
+                    }
+                    conn->Send(MessageType::DOWNLOAD_STATUS, { { "tracks", existingTracks } });
                 }
-                conn->Send(MessageType::DOWNLOAD_STATUS, { { "tracks", existingTracks } });
-                
-                int64_t end = Utils::CurrentMillis();
-                LogTrace("DownloadStatusReq: {}ms", end - start);
                 break;
             }
             case MessageType::OPEN_FOLDER: {
@@ -158,7 +174,23 @@ struct StateManagerImpl : public StateManager
             }
         }
     }
-
+    void SendTrackStatus(const std::string& uri, const std::string& status, const std::string& msg = "", const fs::path& path = "")
+    {
+        json obj = {
+            { "status", status },
+            { "message", msg },
+            { "path", Utils::PathToUtf(path) }
+        };
+        json content;
+        
+        if (uri.starts_with("spotify:")) {
+            content["tracks"] = { { uri, obj } };
+        } else {
+            content = obj;
+            content["playbackId"] = uri;
+        }
+        _ctrlSv.Broadcast(MessageType::DOWNLOAD_STATUS, content);
+    }
     void ReceiveAudioData(const std::string& playbackId, const char* data, int length)
     {
         auto playback = GetPlayback(playbackId);
@@ -221,12 +253,10 @@ struct StateManagerImpl : public StateManager
         auto playback = GetPlayback(playbackId);
         if (!playback) return;
 
+        auto status = std::make_pair("ERROR", "Canceled: " + reason);
         playback->Discard = true;
-        
-        _ctrlSv.Broadcast(MessageType::DOWNLOAD_STATUS, {
-            { "playbackId", playbackId },
-            { "errorMessage", "Aborted: " + reason }
-        });
+        playback->Status = status;
+        SendTrackStatus(playbackId, status.first, status.second);
     }
     bool OverridePlaybackSpeed(double& speed)
     {
@@ -249,6 +279,7 @@ struct StateManagerImpl : public StateManager
     void SaveTrack(std::shared_ptr<PlaybackInfo> playback, TrackMetadata meta)
     {
         try {
+            SendTrackStatus(meta.TrackUri, "CONVERTING", "Converting...");
             LogInfo("Saving track {}", meta.GetName());
             LogDebug("  stream: {}", playback->FileName.filename().string());
             
@@ -285,21 +316,12 @@ struct StateManagerImpl : public StateManager
                 std::ofstream(lrcPath, std::ios::binary) << meta.Lyrics;
             }
             fs::remove(playback->FileName);
-            SendTrackStatus(meta.TrackUri, { { "path", Utils::PathToUtf(trackPath) } });
+            SendTrackStatus(meta.TrackUri, "DONE", "", trackPath);
         } catch (std::exception& ex) {
             LogError("Failed to save track {}: {}", meta.GetName(), ex.what());
-            SendTrackStatus(meta.TrackUri, { { "errorMessage", ex.what() } });
+            SendTrackStatus(meta.TrackUri, "ERROR", ex.what());
         }
     }
-    void SendTrackStatus(const std::string& uri, const json& props)
-    {
-        _ctrlSv.Broadcast(MessageType::DOWNLOAD_STATUS, { 
-            { "tracks", {
-                { uri, props }
-            }}
-        });
-    }
-
     fs::path RenderCoverPath(const std::string& templt, const PathTemplateVars& vars)
     {
         if (!_config["saveCoverArt"]) {
@@ -443,6 +465,7 @@ struct StateManagerImpl : public StateManager
         pb->Id = id;
         pb->FileName = filename;
         pb->FileStream.open(filename, std::ios::binary);
+        pb->Status = std::make_pair("IN_PROGRESS", "Downloading...");
 
         _playbacks.emplace(id, pb);
         return pb;

@@ -1,19 +1,27 @@
 import { Connection, MessageType } from "./connection";
 import PlayerStateTracker from "./player-state-tracker";
-import DownloadStatusHook from "./ui/download-status";
+import { StatusIndicator, DownloadStatus, TrackStatus } from "./ui/status-indicator";
 import UI from "./ui/ui";
 import config from "./config";
+import { PlayerState } from "./spotify-apis";
 
 const IS_DEBUG = true;
 
-let conn = new Connection(messageHandler);
-
-let playbackTracker = new PlayerStateTracker();
+let conn = new Connection(onMessage);
+let playbackTracker = new PlayerStateTracker(onPlayerStateChanged);
 let ui = new UI(conn);
-let statusIndicator = new DownloadStatusHook(conn);
+let statusIndicator = new StatusIndicator(conn);
 ui.install();
 
-function messageHandler(type: MessageType, payload: any)
+window["_sgfMsgHandler"] = onMessage;
+
+function onPlayerStateChanged(newState: PlayerState, oldState?: PlayerState)
+{
+    if (newState.playbackId !== oldState?.playbackId) {
+        conn.send(MessageType.DOWNLOAD_STATUS, { playbackId: newState.playbackId });
+    }
+}
+function onMessage(type: MessageType, payload: any)
 {
     switch (type) {
         case MessageType.READY: {
@@ -41,9 +49,9 @@ function messageHandler(type: MessageType, payload: any)
                     conn.send(MessageType.TRACK_META, {
                         playbackId: payload.playbackId,
                         failed: true,
-                        errorMessage: ex.message
+                        message: ex.message
                     });
-                    setPlaybackStatusInd(payload.playbackId, { errorMessage: ex.message });
+                    setPlaybackStatusInd(payload.playbackId, { status: DownloadStatus.ERROR, message: ex.message });
                 })
                 .finally(() => {
                     playbackTracker.remove(payload.playbackId);
@@ -61,12 +69,10 @@ function messageHandler(type: MessageType, payload: any)
     }
 }
 
-function setPlaybackStatusInd(playbackId: string, status: { path?: string, errorMessage?: string })
+function setPlaybackStatusInd(playbackId: string, status: TrackStatus)
 {
     let info = playbackTracker.getTrackInfo(playbackId);
-    if (!info) return;
-
-    statusIndicator.updateRows({
-        [info.uri]: status
-    });
+    if (info) {
+        statusIndicator.updateRows({ [info.uri]: status });
+    }
 }
