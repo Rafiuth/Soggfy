@@ -64,9 +64,9 @@ export default class PlayerStateTracker
 
         let lyrics = config.downloadLyrics ? await this.getLyrics(track) : null;
         if (lyrics) {
-            data.lyrics = this.convertLyricsToLRC(lyrics);
+            data.lyrics = lyrics.text;
             data.lyricsExt = lyrics.isSynced ? "lrc" : "txt";
-            data.metadata.lyrics = lyrics.lines.map(v => v.text).join('\n');
+            data.metadata.lyrics = lyrics.text;
         }
         return { info: data, coverData: coverData };
     }
@@ -140,31 +140,26 @@ export default class PlayerStateTracker
         let resp = await Resources.getColorAndLyricsWG(track.uri, track.metadata.image_url);
         let lyrics = resp.lyrics;
 
-        return {
-            lang: lyrics.language,
-            isSynced: ["LINE_SYNCED", "SYLLABLE_SYNCED"].includes(lyrics.syncType),
-            lines: lyrics.lines.map(ln => ({
-                time: parseInt(ln.startTimeMs),
-                text: ln.words
-            }))
-        };
-    }
-    private convertLyricsToLRC(data)
-    {
-        //https://en.wikipedia.org/wiki/LRC_(file_format)#Simple_format
-        //https://github.com/FFmpeg/FFmpeg/blob/master/libavformat/lrcdec.c#L88
-        //(number of digits doesn't seem to matter)
+        let isSynced = ["LINE_SYNCED", "SYLLABLE_SYNCED"].includes(lyrics.syncType);
+
         let text = "";
-        for (let line of data.lines) {
-            if (data.isSynced) {
-                let time = line.time;
+        for (let line of lyrics.lines) {
+            //skip empty lines
+            if (!isSynced && /^(|♪)$/.test(line.words)) continue;
+
+            if (isSynced) {
+                //https://en.wikipedia.org/wiki/LRC_(file_format)#Simple_format
+                //https://github.com/FFmpeg/FFmpeg/blob/master/libavformat/lrcdec.c#L88
+                //(number of digits doesn't seem to matter)
+                let time = parseInt(line.startTimeMs);
                 let mm = Utils.padInt(time / 1000 / 60, 2);
                 let ss = Utils.padInt(time / 1000 % 60, 2);
                 let cs = Utils.padInt(time % 1000 / 10, 2);
                 text += `[${mm}:${ss}.${cs}]`;
             }
-            text += line.text + '\n';
+            text += line.words;
+            text += '\n';
         }
-        return text;
+        return { text: text, rawData: lyrics, isSynced: isSynced };
     }
 }

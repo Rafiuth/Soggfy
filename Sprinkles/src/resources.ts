@@ -19,7 +19,7 @@ class Resources
             .withPath(`/track/${this.getUriId(trackUri)}/image/${encodeURIComponent(coverUri)}`)
             .withQueryParameters({
                 format: "json",
-                vocalRemoval: false
+                vocalRemoval: true
             }).withEndpointIdentifier("/track/{trackId}")
             .send();
         return res.body as ColorAndLyricsWG;
