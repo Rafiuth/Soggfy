@@ -91,6 +91,7 @@
     border-radius: 24px;
     background-color: #535353;
     transition: all 0.1s ease;
+    cursor: pointer;
 }
 .sgf-toggle-switch:after {
     content: "";
@@ -123,6 +124,7 @@
     height: 32px;
     line-height: 20px;
     padding: 0 32px 0 12px;
+    cursor: pointer;
 }
 
 .sgf-text-input {
@@ -151,6 +153,7 @@
     border-radius: 4px;
     background: #535353;
     outline: none;
+    cursor: e-resize;
 }
 .sgf-slider::-webkit-slider-thumb {
     appearance: none;
@@ -171,4 +174,67 @@
     border: solid;
     border-width: 1px;
     border-color: #444;
+}
+/* TODO: this is all hacky af, there has to be a better way to do it. */
+.sgf-collapsible {
+    padding: 4px 4px 0;
+    margin-top: 8px;
+    background: #444;
+    border-radius: 4px;
+    overflow: hidden;
+    max-height: 33px;
+    transition: max-height 0.5s ease;
+}
+.sgf-collapsible[open] {
+    padding: 4px;
+    border-bottom: 0px;
+    max-height: 30rem;
+}
+.sgf-collapsible > summary {
+    border-radius: 4px;
+    margin: -4px -4px 0;
+    padding: 4px;
+    list-style: none;
+    background: #555;
+    font-weight: bold;
+    cursor: pointer;
+}
+.sgf-collapsible[open] > summary {
+    margin-bottom: 6px;
+    border-bottom-right-radius: 0px;
+    border-bottom-left-radius: 0px;
+}
+.sgf-collapsible > summary::before {
+    content: '';
+    display: inline-block;
+
+    border-top: 6px solid transparent;
+    border-bottom: 6px solid transparent;
+    border-left: 8px solid currentColor;
+
+    vertical-align: middle;
+    margin-left: 4px;
+    margin-right: 8px;
+
+    transform: translateY(-1px);
+    transition: transform .15s ease-in-out;
+}
+.sgf-collapsible[open] > summary::before {
+    transform: rotate(90deg);
+}
+
+.sgf-tag-button {
+    border-radius: 4px;
+    border: 0;
+    background-color: #555;
+    color: #ddd;
+    font-family: monospace;
+    font-size: 12px;
+    cursor: pointer;
+    padding: 4px;
+    margin: 2px;
+}
+.sgf-tag-button:hover {
+    background-color: #666;
+    box-shadow: 0px 0px 4px 2px rgb(0 0 0 / 15%);
 }

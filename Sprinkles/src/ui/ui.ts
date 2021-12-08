@@ -2,7 +2,7 @@ import config from "../config";
 import { Connection, MessageType } from "../connection";
 import Utils from "../utils";
 import UIC from "./components";
-import { SpotifyUtils } from "../spotify-apis";
+import { Platform, SpotifyUtils } from "../spotify-apis";
 
 import SettingsStyle from "./css/settings.css";
 import StatusIndicatorStyle from "./css/status-indicator.css";
@@ -63,9 +63,9 @@ export default class UI
             "Custom":           { ext: "mp3", args: "-c:a libmp3lame -b:a 320k -id3v2_version 3 -c:v copy" },
         };
         let customFormatSection = UIC.subSection(
-            UIC.rowSection("FFmpeg arguments",  UIC.textInput("outputFormat.args", onChange)),
+            UIC.rowSection("FFmpeg arguments", UIC.textInput("outputFormat.args", onChange)),
             //TODO: allow this to be editable
-            UIC.row("Extension",                UIC.select("outputFormat.ext", ["mp3","m4a","mp4","ogg","opus"], onChange))
+            UIC.row("Extension", UIC.select("outputFormat.ext", ["mp3", "m4a", "mp4", "ogg", "opus"], onChange))
         );
         customFormatSection.style.display = "none";
         
@@ -74,7 +74,7 @@ export default class UI
                 let currFormat = config.outputFormat;
                 let preset =
                     Object.entries(defaultFormats)
-                            .find(v => v[1].args === currFormat.args && v[1].ext === currFormat.ext);
+                        .find(v => v[1].args === currFormat.args && v[1].ext === currFormat.ext);
                 name = preset?.[0] ?? "Custom";
             } else {
                 onChange("outputFormat", defaultFormats[name]);
@@ -82,6 +82,25 @@ export default class UI
             customFormatSection.style.display = name === "Custom" ? "block" : "none";
             return name;
         };
+
+        const pathVars = {
+            track_name: "Track name",
+            artist_name: "Artist name",
+            album_name: "Album name",
+            track_num: "Album track number",
+            release_year: "Album release year",
+            multi_disc_path: "`/CD {disc number}` if the album has multiple discs, or empty.",
+            multi_disc_paren: "` (CD {disc number})` if the album has multiple discs, or empty."
+        };
+        let pathVarTags = [];
+        for (let varName in pathVars) {
+            let varText = "{" + varName + "}";
+            let tag = UIC.tagButton(varText, () => {
+                Platform.getClipboardAPI().copy(varText);
+            });
+            tag.title = pathVars[varName];
+            pathVarTags.push(tag);
+        }
         
         return UIC.createSettingOverlay(
             UIC.section("General",
@@ -99,6 +118,7 @@ export default class UI
             UIC.section("Download Paths",
                 UIC.rowSection("Songs",         UIC.textInput("savePaths.track", onChange)),
                 UIC.rowSection("Podcasts",      UIC.textInput("savePaths.episode", onChange)),
+                UIC.collapsible("Variables", ...pathVarTags),
                 UIC.row("Save cover art in album folder", UIC.toggle("saveCoverArt", onChange)),
             )
         );

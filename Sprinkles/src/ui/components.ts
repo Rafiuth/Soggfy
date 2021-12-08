@@ -133,6 +133,22 @@ export default class Components
         }
         return node;
     }
+    static collapsible(desc: string, ...elements: Node[])
+    {
+        let node = document.createElement("details");
+        node.className = "sgf-collapsible";
+        node.innerHTML = `<summary>${desc}</summary>`;
+        node.append(...elements);
+        return node;
+    }
+    static tagButton(text: string, callback?: { (): void; })
+    {
+        let node = document.createElement("button");
+        node.className = "sgf-tag-button";
+        node.innerText = text;
+        node.onclick = callback;
+        return node;
+    }
 
     static row(desc: string, action: any)
     {
