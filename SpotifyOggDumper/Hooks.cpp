@@ -28,16 +28,16 @@ DETOUR_FUNC(__fastcall, int, DecodeAudioData, (
 {
     //PlayerDriver can be found at ecx in seek function
     //struct PlayerDriver { 
-    //    0x340  uint8_t playback_id[16]
+    //    0x338  uint8_t playback_id[16]
     //}
-    //The decoder->driver path can be found with CheatEngine:
-    //1. Find the driver address with the track seek function
+    //The decoder->player path can be found with CheatEngine:
+    //1. Find the player address with the track seek function
     //2. Find the parent decoder address (in caller of this function)
     //3. Use the pointer scanner:
-    //  1. Search for Addr: driver address
+    //  1. Search for Addr: player address
     //  2. BaseAddr range: <decoder addr> .. <decoder addr> + 1000
     //If things go well, you should endup with less than 1k results.
-    //It can be further refined by forcing the player driver addr to change
+    //It can be further refined by forcing the player addr to change
     //(by changing tracks?), or restarting spotify and matching the results
     //4. Pick one and see if it works with the goto address thing (cheatengine works, but x32dbg shows the result in real time)
     
@@ -52,7 +52,7 @@ DETOUR_FUNC(__fastcall, int, DecodeAudioData, (
         mov _ebp, ebp
     }
     //caller `ebp-2C` = ebp + 90;   `(ebp - 2C) - esp`    before prolog's `mov ebp, esp`
-    //path = [[[[ebp+90]+3c]+294]+150]+0
+    //path = [[[[ebp+90]3c]+B8]+1E8]+150]+338
 
     auto buf = (char*)param_4[0];
     int bufLen = (int)param_4[1];
@@ -62,8 +62,8 @@ DETOUR_FUNC(__fastcall, int, DecodeAudioData, (
     int bytesRead = bufLen - (int)param_4[1];
 
     if (bytesRead != 0) {
-        char* playerPtr = TraversePointers<0x90, 0x3C, 0x294, 0x150>(_ebp);
-        std::string playbackIdStr = ToHex(playerPtr + 0x340, 16);
+        char* playerPtr = TraversePointers<0x90, 0x3C, 0xB8, 0x1E8, 0x150>(_ebp);
+        std::string playbackIdStr = ToHex(playerPtr + 0x338, 16);
         _stateMgr->ReceiveAudioData(playbackIdStr, buf, bytesRead);
     }
     return ret;
@@ -87,7 +87,7 @@ DETOUR_FUNC(__fastcall, int64_t, SeekTrack, (
 {
     auto playerPtr = TraversePointers<0x15B4>(ecx);
     if (playerPtr) {
-        std::string playbackId = ToHex(playerPtr + 0x340, 16);
+        std::string playbackId = ToHex(playerPtr + 0x338, 16);
         LogTrace("SeekTrack {}", playbackId);
         _stateMgr->DiscardTrack(playbackId, "Track was seeked");
     }
@@ -100,7 +100,7 @@ DETOUR_FUNC(__fastcall, void, OpenTrack, (
 {
     auto playerPtr = TraversePointers<0x15B4>(ecx);
     if (playerPtr && position != 0) {
-        std::string playbackId = ToHex(playerPtr + 0x340, 16);
+        std::string playbackId = ToHex(playerPtr + 0x338, 16);
         LogTrace("OpenTrack {}", playbackId);
         _stateMgr->DiscardTrack(playbackId, "Track didn't play from start");
     }
@@ -112,7 +112,7 @@ DETOUR_FUNC(__fastcall, void, CloseTrack, (
 {
     auto playerPtr = TraversePointers<0x15B4>(ecx);
     if (playerPtr) {
-        std::string playbackId = ToHex(playerPtr + 0x340, 16);
+        std::string playbackId = ToHex(playerPtr + 0x338, 16);
         LogTrace("CloseTrack {}, reason={}", playbackId, reason);
 
         if (strcmp(reason, "trackdone") != 0) {
