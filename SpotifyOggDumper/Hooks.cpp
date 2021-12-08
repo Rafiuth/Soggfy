@@ -23,9 +23,8 @@ DETOUR_FUNC(__fastcall, int, DecodeAudioData, (
 {
     //PlayerDriver can be found at ecx in seek function
     //struct PlayerDriver { 
-    //    0x340  uint8_t playback_id[16]
+    //    0x338  uint8_t playback_id[16]
     //}
-    //[[[ecx+3c]+294]+150]+0
     //The decoder->driver path can be found with CheatEngine:
     //1. Find the driver address with the track seek function
     //2. Find the parent decoder address (in caller of this function)
@@ -46,9 +45,9 @@ DETOUR_FUNC(__fastcall, int, DecodeAudioData, (
         mov _ebp, ebp
     }
     //caller `ebp-2C` = ebp + 90;   `(ebp - 2C) - esp`    before prolog's `mov ebp, esp`
-    //path = [[[[ebp+90]+3c]+294]+150]+0
-    void* playerPtr = TraversePointers<0x90, 0x3C, 0x294, 0x150>(_ebp);
-    auto playbackId = (uint8_t*)playerPtr + 0x340;
+    //path =  [[[[ebp+90]3c]+B8]+1E8]+150]+338
+    void* playerPtr = TraversePointers<0x90, 0x3C, 0xB8, 0x1E8, 0x150>(_ebp);
+    auto playbackId = (uint8_t*)playerPtr + 0x338;
 
     std::string playbackIdStr(32, '\0');
     for (int i = 0; i < 16; i++) {
@@ -275,7 +274,7 @@ DWORD WINAPI Init(LPVOID param)
         R"(     ____\_\  \ \_______\ \_______\ \_______\ \__\__/  / /    )" "\n"
         R"(    |\_________\|_______|\|_______|\|_______|\|__|\___/ /     )" "\n"
         R"(    \|_________|                                 \|___|/      )" "\n" COL_RESET
-        R"(                                                        v1.4.6)";
+        R"(                                                        v1.4.7)";
     LogInfo(label);
 
     try {
