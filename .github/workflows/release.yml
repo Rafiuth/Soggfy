@@ -52,7 +52,7 @@ jobs:
       if: ${{ github.ref_type == 'tag' }}
       with:
         draft: false
-        prerelease: ${{ endsWith(env.GITHUB_REF, '-pre') }}
+        prerelease: ${{ contains(env.GITHUB_REF, '-pre') }}
         files: 'build/*.zip'
         
     - name: Upload Artifacts
