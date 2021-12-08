@@ -38,9 +38,9 @@ jobs:
         
     - name: Create Zip
       run: |
-        echo $Env:GITHUB_REF;
+        echo $Env:GITHUB_REF_NAME;
         if ($Env:GITHUB_REF_TYPE -eq "tag") {
-          $ver = $Env:GITHUB_REF.Substring(10);
+          $ver = $Env:GITHUB_REF_NAME -replace "^v", "";
         } else {
           $ver = $Env:GITHUB_SHA.Substring(0, 8) + "-pre";
         }
@@ -52,7 +52,7 @@ jobs:
       if: ${{ github.ref_type == 'tag' }}
       with:
         draft: false
-        prerelease: ${{ contains(env.GITHUB_REF, '-pre') }}
+        prerelease: ${{ contains(github.ref_name, '-pre') }}
         files: 'build/*.zip'
         
     - name: Upload Artifacts
