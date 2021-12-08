@@ -68,19 +68,30 @@ export default class PlayerStateTracker
             data.lyricsExt = lyrics.isSynced ? "lrc" : "txt";
             data.metadata.lyrics = lyrics.text;
         }
+        this.fixMetadata(data.metadata, config.outputFormat.ext || "ogg");
         return { info: data, coverData: coverData };
+    }
+    private fixMetadata(meta: any, format: string): any
+    {
+        //https://wiki.multimedia.cx/index.php?title=FFmpeg_Metadata
+        //https://help.mp3tag.de/main_tags.html
+        //https://github.com/yarrm80s/orpheusdl/blob/fed108e978083f92d96efcacdf09fe2dc8082bc3/orpheus/tagging.py
+
+        if (["mp3", "mp4", "m4a"].includes(format)) {
+            meta.track = `${meta.track}/${meta.totaltracks}`;
+            meta.disc = `${meta.disc}/${meta.totaldiscs}`;
+            delete meta.totaltracks;
+            delete meta.totaldiscs;
+        }
     }
     private async getTrackMetaProps(track: TrackInfo)
     {
         let meta = track.metadata;
         let extraMeta = await Resources.getTrackMetadataWG(track.uri);
 
-        //https://community.mp3tag.de/t/a-few-questions-about-the-disc-number-disc-total-columns/18698/8
-        //https://help.mp3tag.de/main_tags.html
-        //TODO: mp3 uses "track: x/n", totaltracks and totaldiscs is vorbis only
         let { year, month, day } = extraMeta.album.date;
         let date = [year, month, day];
-        //Truncate date to available precision (year only sample: https://open.spotify.com/track/4VxaUj96W2jw9UOtKHu51p)
+        //Truncate date to available precision
         if (!day) date.pop();
         if (!month) date.pop();
         
@@ -98,7 +109,7 @@ export default class PlayerStateTracker
             language:       extraMeta.language_of_performance?.[0],
             isrc:           extraMeta.external_id.find(v => v.type === "isrc")?.id,
             comment:        Resources.getOpenTrackURL(track.uri),
-            ITUNESADVISORY: meta.is_explicit ? "1" : undefined
+            explicit:       meta.is_explicit ? "1" : undefined
         };
     }
     private async getPodcastMetaProps(track: TrackInfo)
@@ -117,7 +128,7 @@ export default class PlayerStateTracker
             language:       meta.language,
             comment:        Resources.getOpenTrackURL(track.uri),
             podcast:        "1",
-            ITUNESADVISORY: meta.explicit ? "1" : undefined
+            explicit:       meta.explicit ? "1" : undefined
         };
     }
     private getPathVariables(meta: any)

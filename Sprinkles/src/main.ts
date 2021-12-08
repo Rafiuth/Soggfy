@@ -13,8 +13,6 @@ let ui = new UI(conn);
 let statusIndicator = new StatusIndicator(conn);
 ui.install();
 
-window["_sgfMsgHandler"] = onMessage;
-
 function onPlayerStateChanged(newState: PlayerState, oldState?: PlayerState)
 {
     if (newState.playbackId !== oldState?.playbackId) {
