@@ -38,12 +38,12 @@ jobs:
         
     - name: Create Zip
       run: |
+        echo $Env:GITHUB_REF;
         if ($Env:GITHUB_REF_TYPE -eq "tag") {
-          $ver = $Env:GITHUB_REF.Substring(1);
+          $ver = $Env:GITHUB_REF.Substring(10);
         } else {
           $ver = $Env:GITHUB_SHA.Substring(0, 8) + "-pre";
         }
-        echo $ver
         Rename-Item -Path ./build/Release -NewName Soggfy-$ver
         7z a "-xr!*.lib" "-xr!*.exp" "-xr!*.pdb" build/Soggfy-$ver.zip ./build/Soggfy-$ver
 
