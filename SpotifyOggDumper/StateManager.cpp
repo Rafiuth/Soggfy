@@ -126,7 +126,7 @@ struct StateManagerImpl : public StateManager
                     };
                     std::thread(&StateManagerImpl::SaveTrack, this, playback, meta).detach();
                 } else {
-                    LogInfo("Discarding playback {}: {}", playbackId, content["message"]);
+                    LogInfo("Discarding playback {}: {}", playbackId, content.value("message", "null"));
                 }
                 RemovePlayback(playbackId);
                 break;
@@ -166,7 +166,8 @@ struct StateManagerImpl : public StateManager
                 break;
             }
             case MessageType::OPEN_FOLDER: {
-                Utils::RevealInFileExplorer(content["path"]);
+                std::string path = content["path"];
+                Utils::RevealInFileExplorer(fs::u8path(path));
                 break;
             }
             default: {
