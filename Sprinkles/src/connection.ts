@@ -34,6 +34,7 @@ class Connection
     private _textEnc = new TextEncoder();
     private _textDec = new TextDecoder();
     private _msgHandler: MessageHandler;
+    private _connAttempts = 0;
     
     get isConnected()
     {
@@ -75,13 +76,18 @@ class Connection
         this._ws.onmessage = this.onMessage.bind(this);
         this._ws.onopen = () => {
             this._msgHandler(MessageType.READY, {});
+            this._connAttempts = 0;
         };
         this._ws.onclose = (ev) => {
             this._msgHandler(MessageType.CLOSED, {
                 code: ev.code,
                 reason: ev.reason
             });
-            setTimeout(this.reconnect.bind(this), 15000);
+            //stop trying to reconnect after a few attempts to prevent
+            //spamming the console with errors, because its annoying af
+            if (this._connAttempts++ < 3) {
+                setTimeout(this.reconnect.bind(this), 15000);
+            }
         };
     }
     private onMessage(ev: MessageEvent<ArrayBuffer>)

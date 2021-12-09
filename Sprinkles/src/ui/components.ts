@@ -35,9 +35,23 @@ export default class Components
         node.querySelector(".sgf-settings-elements").append(...elements);
         //@ts-ignore
         node.querySelector(".sgf-settings-closeBtn").onclick = () => node.remove();
-        //@ts-ignore
-        node.querySelector(".sgf-settings-overlay").onclick = (ev) => {
-            if (!node.querySelector(".sgf-settings-container").contains(ev.target)) {
+
+        let overlay: HTMLElement = node.querySelector(".sgf-settings-overlay");
+        let container: HTMLElement = node.querySelector(".sgf-settings-container");
+
+        //fix for an annoying behavior in onclick():
+        //onclick() is fired if we click on the container and then release with the cursor in the overlay.
+        //container.onclick = (ev) => ev.stopPropagation(); (doesn't do shit)
+        //(I keep wondering if libraries like react deal with things like these painlessly lol)
+        let clickedOut = false;
+
+        overlay.onmousedown = (ev) => {
+            if (!container.contains(ev.target as Node)) {
+                clickedOut = true;
+            }
+        };
+        overlay.onmouseup = (ev) => {
+            if (!container.contains(ev.target as Node) && clickedOut) {
                 node.remove();
             }
         };
