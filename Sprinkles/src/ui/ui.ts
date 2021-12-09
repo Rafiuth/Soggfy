@@ -4,9 +4,10 @@ import Utils from "../utils";
 import UIC from "./components";
 import { Platform, SpotifyUtils } from "../spotify-apis";
 
+import ComponentsStyle from "./css/components.css";
 import SettingsStyle from "./css/settings.css";
 import StatusIndicatorStyle from "./css/status-indicator.css";
-const MergedStyles = SettingsStyle + "\n" + StatusIndicatorStyle; //TODO: find a better way to do this
+const MergedStyles = [ComponentsStyle, SettingsStyle, StatusIndicatorStyle].join('\n'); //TODO: find a better way to do this
 
 export default class UI
 {
@@ -97,6 +98,7 @@ export default class UI
             let varText = "{" + varName + "}";
             let tag = UIC.tagButton(varText, () => {
                 Platform.getClipboardAPI().copy(varText);
+                UIC.notification("Copied", tag, 1);
             });
             tag.title = pathVars[varName];
             pathVarTags.push(tag);

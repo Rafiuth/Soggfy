@@ -185,4 +185,22 @@ export default class Components
         node.append(...elements);
         return node;
     }
+    static notification(text: string, anchor: Element, fadeDelay = 5, fadeDur = 0.2)
+    {
+        let node = document.createElement("span");
+        node.className = "sgf-notification-bubble";
+        node.innerText = text;
+        node.style.setProperty("--fade-delay", fadeDelay + "s");
+        node.style.setProperty("--fade-dur", fadeDur + "s");
+
+        anchor.parentElement.appendChild(node);
+
+        let rect = node.getBoundingClientRect();
+        let anchorRect = anchor.getBoundingClientRect();
+        node.style.top = (anchorRect.top - rect.height - 6) + "px";
+        node.style.left = (anchorRect.left + (anchorRect.width - rect.width) / 2) + "px";
+        node.onanimationend = () => node.remove();
+
+        return node;
+    }
 }

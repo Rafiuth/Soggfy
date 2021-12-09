@@ -1,0 +1,184 @@
+.sgf-toggle-switch {
+    appearance: none;
+    display: inline-block;
+    position: relative;
+    width: 42px;
+    height: 24px;
+    border-radius: 24px;
+    background-color: #535353;
+    transition: all 0.1s ease;
+    cursor: pointer;
+}
+.sgf-toggle-switch:after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 0 4px rgb(0 0 0 / 20%);
+    transition: all 0.1s ease;
+}
+.sgf-toggle-switch:checked {
+    background-color: #1db954;
+}
+.sgf-toggle-switch:checked:after {
+    transform: translatex(18px)
+}
+
+.sgf-select {
+    width: 100%;
+    border-radius: 4px;
+    border: 0;
+    background-color: #555;
+    color: #ddd;
+    font-family: arial;
+    font-size: 14px;
+    font-weight: 400;
+    height: 32px;
+    line-height: 20px;
+    padding: 0 32px 0 12px;
+    cursor: pointer;
+}
+
+.sgf-text-input {
+    width: 100%;
+    height: 32px;
+    padding: 0 5px;
+    border-radius: 3px;
+    border: 0;
+    background-color: #555;
+    color: #ddd;
+    font-family: arial;
+    font-size: 14px;
+    font-weight: 400;
+}
+
+.sgf-slider-wrapper {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+}
+.sgf-slider {
+    appearance: none;
+    position: relative;
+    width: 100%;
+    height: 8px;
+    border-radius: 4px;
+    background: #535353;
+    outline: none;
+    cursor: e-resize;
+}
+.sgf-slider::-webkit-slider-thumb {
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: #1db954;
+}
+.sgf-slider-label {
+    width: 64px;
+    margin-right: 4px;
+    text-align: right;
+    font-size: 11px;
+    background: #333;
+    border: none;
+}
+.sgf-slider-label:hover, .sgf-slider-label:focus {
+    border: solid;
+    border-width: 1px;
+    border-color: #444;
+}
+/* TODO: this is all hacky af, there has to be a better way to do it. */
+.sgf-collapsible {
+    padding: 4px 4px 0;
+    margin-top: 8px;
+    background: #444;
+    border-radius: 4px;
+    overflow: hidden;
+    max-height: 33px;
+    transition: max-height 0.5s ease;
+}
+.sgf-collapsible[open] {
+    padding: 4px;
+    border-bottom: 0px;
+    max-height: 30rem;
+}
+.sgf-collapsible > summary {
+    border-radius: 4px;
+    margin: -4px -4px 0;
+    padding: 4px;
+    list-style: none;
+    background: #555;
+    color: #ddd;
+    cursor: pointer;
+}
+.sgf-collapsible[open] > summary {
+    margin-bottom: 4px;
+    border-bottom-right-radius: 0px;
+    border-bottom-left-radius: 0px;
+}
+.sgf-collapsible > summary::before {
+    content: '';
+    display: inline-block;
+    vertical-align: middle;
+    margin-left: 6px;
+    margin-right: 8px;
+    transform: translateY(-2px) rotate(-45deg);
+    transition: transform 0.15s ease-in-out;
+    border: solid;
+    border-width: 0 2px 2px 0;
+    padding: 3px;
+}
+.sgf-collapsible[open] > summary::before {
+    transform: translateY(-4px) rotate(45deg);
+}
+
+.sgf-tag-button {
+    border-radius: 4px;
+    border: 0;
+    background-color: #555;
+    color: #ddd;
+    font-family: monospace;
+    font-size: 12px;
+    cursor: pointer;
+    padding: 4px;
+    margin: 2px;
+}
+.sgf-tag-button:hover {
+    background-color: #666;
+    box-shadow: 0px 0px 4px 2px rgb(0 0 0 / 15%);
+}
+
+.sgf-notification-bubble {
+    display: flex;
+    position: absolute;
+    background: #222;
+    padding: 2px 4px;
+    border-radius: 4px;
+    pointer-events: none;
+    box-shadow: 1px 1px 4px rgb(0 0 0 / 30%);
+
+    animation-name: sgf-fade-out;
+    animation-delay: var(--fade-delay);
+    animation-duration: var(--fade-dur);
+}
+.sgf-notification-bubble::before {
+    content: '';
+    width: 0;
+    height: 0;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-bottom: 8px solid transparent;
+    border-top: 6px solid #222;
+
+    position: absolute;
+    top: 100%;
+    left: calc(50% - 8px);
+}
+@keyframes sgf-fade-out {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
