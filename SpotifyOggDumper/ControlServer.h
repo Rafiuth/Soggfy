@@ -11,6 +11,7 @@ enum class MessageType
     TRACK_META      = 2,  //C <> S
     DOWNLOAD_STATUS = 3,  //C <> S
     OPEN_FOLDER     = 4,  //C -> S
+    BROWSE_FOLDER   = 5,  //C <> S
 
     //Internal
     HELLO           = -1,   //Client connected

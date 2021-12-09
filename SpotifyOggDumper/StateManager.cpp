@@ -170,6 +170,19 @@ struct StateManagerImpl : public StateManager
                 Utils::RevealInFileExplorer(fs::u8path(path));
                 break;
             }
+            case MessageType::BROWSE_FOLDER: {
+                std::thread([this, ct = std::move(content)]() {
+                    auto initialPath = ct["initialPath"].get<std::string>();
+
+                    Utils::OpenFolderPicker(fs::u8path(initialPath), [&](auto path) {
+                        _ctrlSv.Broadcast(MessageType::BROWSE_FOLDER, {
+                            { "reqId", ct["reqId"] },
+                            { "path", Utils::PathToUtf(path) },
+                        });
+                    });
+                }).detach();
+                break;
+            }
             default: {
                 throw std::runtime_error("Unexpected message (type=" + std::to_string((int)msg.Type) + ")");
             }

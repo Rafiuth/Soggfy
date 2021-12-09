@@ -188,6 +188,41 @@ namespace Utils
         SHOpenFolderAndSelectItems(pidl, 0, NULL, 0);
         CoTaskMemFree(pidl);
     }
+    void OpenFolderPicker(const fs::path& initialPath, std::function<void(const fs::path&)> callback)
+    {
+        #define HR_TRY(hr) if (FAILED(hr)) { goto cleanUp; }
+
+        IFileDialog* fd = NULL;
+        IFileDialogEvents* de = NULL;
+
+        HR_TRY(CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&fd)));
+
+        fd->SetOptions(FOS_FORCEFILESYSTEM | FOS_PICKFOLDERS);
+        if (!initialPath.empty()) {
+            fs::path normPath = fs::absolute(initialPath);
+            IShellItem* item;
+            if (SUCCEEDED(SHCreateItemFromParsingName(normPath.c_str(), NULL, IID_PPV_ARGS(&item)))) {
+                fd->SetDefaultFolder(item);
+                item->Release();
+            }
+        }
+        fd->Show(NULL);
+
+        IShellItem* result;
+        if (SUCCEEDED(fd->GetResult(&result))) {
+            PWSTR resultPath = NULL;
+            if (SUCCEEDED(result->GetDisplayName(SIGDN_FILESYSPATH, &resultPath))) {
+                callback(fs::path(resultPath));
+                CoTaskMemFree(resultPath);
+            }
+            result->Release();
+        }
+    cleanUp:
+        if (fd) fd->Release();
+        if (de) de->Release();
+
+        #undef HR_TRY
+    }
 
     int64_t CurrentMillis()
     {
