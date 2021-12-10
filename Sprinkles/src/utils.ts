@@ -107,3 +107,58 @@ export default class Utils
         return state;
     }
 }
+
+export class DeferredPromise<T> extends Promise<T>
+{
+    onresolve?: (self: this) => void;
+
+    private _resolve: (value?: T) => void;
+    private _reject: (reason?: any) => void;
+    private _timeout: any;
+
+    /**
+     * @param timeoutMs Time (in milliseconds, up to INT_MAX) to wait before failing the promise. Will be disabled if `<= 0`.
+     */
+    constructor(onresolve?: (self: DeferredPromise<T>) => void, timeoutMs?: number)
+    {
+        let tmpResolve, tmpReject; //can't access this from inside the callback
+        super((resolve, reject) => {
+            tmpResolve = resolve;
+            tmpReject = reject;
+        });
+        this._resolve = tmpResolve;
+        this._reject = tmpReject;
+        this.onresolve = onresolve;
+        if (timeoutMs > 0) {
+            this._timeout = setTimeout(() => this._reject("Timeout"), timeoutMs);
+        }
+    }
+
+    public resolve(result?: T)
+    {
+        this.cleanup();
+        this._resolve(result);
+    }
+    public reject(reason?: any)
+    {
+        this.cleanup();
+        this._reject(reason);
+    }
+
+    private cleanup()
+    {
+        if (this._timeout) {
+            clearTimeout(this._timeout);
+        }
+    }
+
+    //https://stackoverflow.com/a/65669070
+    get [Symbol.toStringTag]()
+    {
+        return "DeferredPromise";
+    }
+    static get [Symbol.species]()
+    {
+        return Promise;
+    }
+}

@@ -31,7 +31,7 @@ namespace Utils
     std::string GetHomeDirectory();
     void RevealInFileExplorer(const fs::path& path);
 
-    void OpenFolderPicker(const fs::path& initialPath, std::function<void(const fs::path&)> callback);
+    void OpenFolderPicker(const fs::path& initialPath, std::function<void(const fs::path& path, bool canceled)> callback);
 
     int64_t CurrentMillis();
 }

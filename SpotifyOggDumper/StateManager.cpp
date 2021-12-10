@@ -172,9 +172,9 @@ struct StateManagerImpl : public StateManager
             }
             case MessageType::BROWSE_FOLDER: {
                 std::thread([this, ct = std::move(content)]() {
-                    auto initialPath = ct["initialPath"].get<std::string>();
+                    auto initialPath = fs::u8path(ct["initialPath"].get<std::string>());
 
-                    Utils::OpenFolderPicker(fs::u8path(initialPath), [&](auto path) {
+                    Utils::OpenFolderPicker(initialPath, [&](auto path, bool canceled) {
                         _ctrlSv.Broadcast(MessageType::BROWSE_FOLDER, {
                             { "reqId", ct["reqId"] },
                             { "path", Utils::PathToUtf(path) },

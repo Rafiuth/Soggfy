@@ -1,3 +1,5 @@
+import { DeferredPromise } from "./utils";
+
 //Client: JS, Server: C++
 enum MessageType
 {
@@ -33,6 +35,17 @@ enum MessageType
 }
 type MessageHandler = (type: MessageType, payload: any, payloadPayload?: ArrayBuffer) => void;
 
+type Message = {
+    type: MessageType,
+    payload: any,
+    binaryPayload?: Uint8Array
+};
+
+type RequestInfo = {
+    id: number;
+    promise?: DeferredPromise<Message>;
+}
+
 class Connection
 {
     private _ws: WebSocket;
@@ -40,6 +53,9 @@ class Connection
     private _textDec = new TextDecoder();
     private _msgHandler: MessageHandler;
     private _connAttempts = 0;
+
+    private _pendingReqs: RequestInfo[] = [];
+    private _nextReqId = 1;
     
     get isConnected()
     {
@@ -74,27 +90,39 @@ class Connection
         this._ws.send(data);
     }
 
-    private reconnect()
+    /**
+     * Sends an message with an "reqId" field and waits for the response.
+     * @param payload The message to send. Will be mutated with the "reqId" field.
+     * @param timeoutMs How long to wait before failing the promise. Values <= 0 indicate infinite.
+     */
+    async request(type: MessageType, payload: any, binaryPayload?: ArrayBuffer, timeoutMs = 15000)
     {
-        this._ws = new WebSocket("ws://127.0.0.1:28653/sgf_ctrl");
-        this._ws.binaryType = "arraybuffer";
-        this._ws.onmessage = this.onMessage.bind(this);
-        this._ws.onopen = () => {
-            this._msgHandler(MessageType.READY, {});
-            this._connAttempts = 0;
+        let info: RequestInfo = {
+            id: this._nextReqId++
         };
-        this._ws.onclose = (ev) => {
-            this._msgHandler(MessageType.CLOSED, {
-                code: ev.code,
-                reason: ev.reason
-            });
-            //stop trying to reconnect after a few attempts to prevent
-            //spamming the console with errors, because its annoying af
-            if (this._connAttempts++ < 3) {
-                setTimeout(this.reconnect.bind(this), 15000);
-            }
-        };
+        let index = this._pendingReqs.push(info);
+        info.promise = new DeferredPromise<Message>(() => {
+            this._pendingReqs.splice(index);
+        }, timeoutMs);
+
+        payload.reqId = info.id;
+        this.send(type, payload, binaryPayload);
+
+        return info.promise;
     }
+    private handleResponse(id: number, msg: Message)
+    {
+        let reqs = this._pendingReqs;
+        for (let i = 0; i < reqs.length; i++) {
+            if (reqs[i].id === id) {
+                reqs[i].promise.resolve(msg);
+                reqs.splice(i);
+                return;
+            }
+        }
+        console.warn(`Response for unknown request '${id}'`, msg.type, msg.payload);
+    }
+
     private onMessage(ev: MessageEvent<ArrayBuffer>)
     {
         let view = new DataView(ev.data);
@@ -106,7 +134,43 @@ class Connection
         let payloadStr = this._textDec.decode(payloadData);
         let payload = JSON.parse(payloadStr);
 
+        let reqId = payload["reqId"];
+        if (reqId) {
+            this.handleResponse(reqId, {
+                type: type,
+                payload: payload,
+                binaryPayload: binaryPayload
+            });
+            return;
+        }
         this._msgHandler(type, payload, binaryPayload);
+    }
+
+    private reconnect()
+    {
+        this._ws = new WebSocket("ws://127.0.0.1:28653/sgf_ctrl");
+        this._ws.binaryType = "arraybuffer";
+        this._ws.onmessage = this.onMessage.bind(this);
+        this._ws.onopen = () => {
+            this._msgHandler(MessageType.READY, {});
+            this._connAttempts = 0;
+        };
+        this._ws.onclose = (ev) => {
+            for (let req of this._pendingReqs) {
+                req.promise.reject("Connection lost");
+            }
+            this._pendingReqs = [];
+
+            this._msgHandler(MessageType.CLOSED, {
+                code: ev.code,
+                reason: ev.reason
+            });
+            //stop trying to reconnect after a few attempts to prevent
+            //spamming the console with errors, because its annoying af
+            if (this._connAttempts++ < 3) {
+                setTimeout(this.reconnect.bind(this), 15000);
+            }
+        };
     }
 }
 

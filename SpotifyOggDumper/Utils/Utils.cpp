@@ -188,15 +188,15 @@ namespace Utils
         SHOpenFolderAndSelectItems(pidl, 0, NULL, 0);
         CoTaskMemFree(pidl);
     }
-    void OpenFolderPicker(const fs::path& initialPath, std::function<void(const fs::path&)> callback)
+    void OpenFolderPicker(const fs::path& initialPath, std::function<void(const fs::path&, bool)> callback)
     {
-        #define HR_TRY(hr) if (FAILED(hr)) { goto cleanUp; }
-
         IFileDialog* fd = NULL;
-        IFileDialogEvents* de = NULL;
+        bool callbackCalled = false;
 
-        HR_TRY(CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&fd)));
-
+        if (FAILED(CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&fd)))) {
+            callback(initialPath, true);
+            return;
+        }
         fd->SetOptions(FOS_FORCEFILESYSTEM | FOS_PICKFOLDERS);
         if (!initialPath.empty()) {
             fs::path normPath = fs::absolute(initialPath);
@@ -212,16 +212,16 @@ namespace Utils
         if (SUCCEEDED(fd->GetResult(&result))) {
             PWSTR resultPath = NULL;
             if (SUCCEEDED(result->GetDisplayName(SIGDN_FILESYSPATH, &resultPath))) {
-                callback(fs::path(resultPath));
+                callback(fs::path(resultPath), false);
+                callbackCalled = true;
                 CoTaskMemFree(resultPath);
             }
             result->Release();
         }
-    cleanUp:
-        if (fd) fd->Release();
-        if (de) de->Release();
-
-        #undef HR_TRY
+        if (!callbackCalled) {
+            callback(initialPath, true);
+        }
+        fd->Release();
     }
 
     int64_t CurrentMillis()

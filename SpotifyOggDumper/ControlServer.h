@@ -4,6 +4,8 @@
 #include <uwebsockets/App.h>
 #include "StateManager.h"
 
+//TODO: Redesign for "request" messages
+
 //Server=CPP Client=JS
 enum class MessageType
 {
