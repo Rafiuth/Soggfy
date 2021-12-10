@@ -52,7 +52,7 @@ DETOUR_FUNC(__fastcall, int, DecodeAudioData, (
         mov _ebp, ebp
     }
     //caller `ebp-2C` = ebp + 90;   `(ebp - 2C) - esp`    before prolog's `mov ebp, esp`
-    //path = [[[[ebp+90]3c]+B8]+1E8]+150]+338
+    //path = [[[[ebp+90]+3C]+B8]+1E8]+150]+338
 
     auto buf = (char*)param_4[0];
     int bufLen = (int)param_4[1];

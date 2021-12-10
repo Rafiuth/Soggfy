@@ -295,7 +295,7 @@ struct StateManagerImpl : public StateManager
         try {
             SendTrackStatus(meta.TrackUri, "CONVERTING", "Converting...");
             LogInfo("Saving track {}", meta.GetName());
-            LogDebug("  stream: {}", playback->FileName.filename().string());
+            LogDebug("  stream: {}", Utils::PathToUtf(playback->FileName.filename()));
             
             std::string pathTemplate = _config["savePaths"][meta.Type];
             fs::path trackPath = PathTemplate::Render(pathTemplate, meta.PathVars);
@@ -357,7 +357,7 @@ struct StateManagerImpl : public StateManager
     {
         //TODO: fix 32k char command line limit for lyrics
         if (fs::exists(outPath)) {
-            LogInfo("File {} already exists. Skipping conversion.", outPath.filename().string());
+            LogInfo("File {} already exists. Skipping conversion.", Utils::PathToUtf(outPath.filename()));
             return;
         }
         ProcessBuilder proc;
