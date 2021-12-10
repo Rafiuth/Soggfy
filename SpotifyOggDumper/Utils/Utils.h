@@ -17,6 +17,8 @@ namespace Utils
     std::string StrWideToUtf(std::wstring_view str);
     std::wstring StrUtfToWide(std::string_view str);
 
+    std::string PathToUtf(const fs::path& path);
+
     //Call WINAPI ExpandEnvironmentStrings(), assuming str is UTF8.
     std::string ExpandEnvVars(const std::string& str);
 

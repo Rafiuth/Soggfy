@@ -200,7 +200,7 @@ struct StateManagerImpl : public StateManager
 
             LogInfo("Saving track {}", trackId);
             LogInfo("  title: {}", meta.GetName());
-            LogDebug("  stream: {}", playback->FileName.filename().string());
+            LogDebug("  stream: {}", Utils::PathToUtf(playback->FileName));
             LogDebug("  meta: {}", meta.RawData.dump());
 
             auto trackPath = RenderTrackPath(meta.Type + "_path_fmt", meta);
@@ -248,7 +248,7 @@ struct StateManagerImpl : public StateManager
     void InvokeFFmpeg(const fs::path& path, const fs::path& coverPath, const fs::path& outPath, const std::string& extraArgs, const TrackMetadata& meta)
     {
         if (fs::exists(outPath)) {
-            LogDebug("File {} already exists. Skipping conversion.", outPath.filename().string());
+            LogDebug("File {} already exists. Skipping conversion.", Utils::PathToUtf(outPath));
             return;
         }
         std::vector<std::wstring> args;

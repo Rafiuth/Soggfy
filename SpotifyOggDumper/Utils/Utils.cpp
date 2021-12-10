@@ -56,6 +56,12 @@ namespace Utils
         return conv.from_bytes(str.data(), str.data() + str.size());
     }
 
+    std::string PathToUtf(const fs::path& path)
+    {
+        auto utf = path.u8string();
+        return std::string((char*)utf.data(), utf.size());
+    }
+
     std::string ExpandEnvVars(const std::string& str)
     {
         std::wstring srcW = StrUtfToWide(str);
