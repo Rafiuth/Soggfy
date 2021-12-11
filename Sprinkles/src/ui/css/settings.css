@@ -21,7 +21,7 @@
     height: 90%;
     display: block;
 }
-.sgf-settings-container {
+.sgf-settings-container, .sgf-quick-settings-popup {
     background-color: #333;
     border-radius: 10px;
     box-shadow: 0px 0px 8px 4px rgb(0, 0, 0, 0.15);
@@ -29,6 +29,16 @@
     display: flex;
     flex-direction: column;
 }
+.sgf-quick-settings-popup {
+    position: absolute;
+    width: 380px;
+    height: auto;
+    padding: 4px 8px 8px 8px;
+}
+.sgf-quick-settings-popup .sgf-setting-row {
+    min-height: 0;
+}
+
 .sgf-settings-header {
     display: flex;
     align-items: baseline;
@@ -78,7 +88,11 @@
     text-align: right;
 }
 
-.sgf-setting-col-table {
+.sgf-setting-rows {
+    display: flex;
+    flex-direction: column;
+}
+.sgf-setting-cols {
     display: flex;
     flex-direction: row;
     align-items: center;

@@ -6,6 +6,7 @@ type SliderOptions = {
     step?: number;
     formatter?: (x: number) => string;
 }
+type SwitchButton = HTMLButtonElement & { index: number };
 
 export default class Components
 {
@@ -72,7 +73,7 @@ export default class Components
         return button;
     }
 
-    static toggle(key: string, callback: ComponentValueCallback<boolean> = null)
+    static toggle(key: string, callback: ComponentValueCallback<boolean>)
     {
         let node = document.createElement("input");
         node.className = "sgf-toggle-switch";
@@ -84,7 +85,7 @@ export default class Components
         }
         return node;
     }
-    static select(key: string, options: string[], callback: ComponentValueCallback<string> = null)
+    static select(key: string, options: string[], callback: ComponentValueCallback<string>)
     {
         let node = document.createElement("select");
         node.className = "sgf-select";
@@ -103,7 +104,7 @@ export default class Components
         }
         return node;
     }
-    static textInput(key: string, callback: ComponentValueCallback<string> = null)
+    static textInput(key: string, callback: ComponentValueCallback<string>)
     {
         let node = document.createElement("input");
         node.className = "sgf-text-input";
@@ -115,10 +116,10 @@ export default class Components
         return node;
     }
 
-    static slider(key: string, opts: SliderOptions, callback: ComponentValueCallback<number> = null)
+    static slider(key: string, opts: SliderOptions, callback: ComponentValueCallback<number>)
     {
         let initialValue = callback(key);
-        let formatter = opts?.formatter ?? Number.prototype.toString;
+        let formatter = opts?.formatter ?? (x => x.toString());
         
         let node = document.createElement("div");
         node.className = "sgf-slider-wrapper";
@@ -163,40 +164,51 @@ export default class Components
         node.onclick = callback;
         return node;
     }
+    static button(text: string = null, child: string = null, callback: { (): void; })
+    {
+        let node = document.createElement("button");
+        node.className = "sgf-button";
+        if (child) node.appendChild(this.parse(child));
+        if (text) node.appendChild(new Text(text));
+        node.onclick = callback;
+        
+        return node;
+    }
 
-    static row(desc: string, action: any)
+    static switchField(key: string, options: (string | Node | DocumentFragment)[], callback: ComponentValueCallback<number>)
     {
         let node = document.createElement("div");
-        node.className = "sgf-setting-row";
-        node.innerHTML = `
-<label class="col description">${desc}</label>
-<div class="col action"></div>`;
-        node.querySelector(".action").appendChild(action);
-        return node;
-    }
-    static rowSection(desc: string, ...elements: Node[])
-    {
-        let node = document.createElement("div");
-        node.className = "sgf-setting-row-table";
-        node.innerHTML = `
-<label class="col description">${desc}</label>`;
-        node.append(...elements);
-        return node;
-    }
-    static section(desc: string, ...elements: Node[])
-    {
-        let node = document.createElement("div");
-        node.className = "sgf-setting-section";
-        node.innerHTML = `<h2>${desc}</h2>`;
-        node.append(...elements);
-        return node;
-    }
-    static subSection(...elements: Node[])
-    {
-        let node = document.createElement("div");
-        node.className = "sgf-setting-section";
-        node.style.marginLeft = "20px";
-        node.append(...elements);
+        node.className = "sgf-switch-field";
+
+        let activeIndex = callback(key, undefined);
+
+        let onButtonClick = (button: SwitchButton) => {
+            if (button.index === activeIndex) return;
+            activeIndex = button.index;
+
+            for (let btn of node.children) {
+                btn.removeAttribute("active");
+            }
+            button.setAttribute("active", "");
+
+            callback(key, button.index);
+        };
+        for (let i = 0; i < options.length; i++) {
+            let button = document.createElement("button") as SwitchButton;
+            button.style.width = (100.0 / options.length) + "%";
+            button.index = i;
+            button.onclick = () => onButtonClick(button);
+
+            let opt = options[i];
+            button.appendChild(
+                opt instanceof String
+                    ? document.createTextNode(opt as string)
+                    : opt as Node
+            );
+            node.appendChild(button);
+        }
+        node.children[activeIndex].setAttribute("active", "");
+
         return node;
     }
     static notification(text: string, anchor: Element, fadeDelay = 5, fadeDur = 0.2)
@@ -216,5 +228,60 @@ export default class Components
         node.onanimationend = () => node.remove();
 
         return node;
+    }
+
+    static row(desc: string, action: any)
+    {
+        let node = document.createElement("div");
+        node.className = "sgf-setting-row";
+        node.innerHTML = `
+<label class="col description">${desc}</label>
+<div class="col action"></div>`;
+        node.querySelector(".action").appendChild(action);
+        return node;
+    }
+    static rows(...elements: (string | Node)[])
+    {
+        let node = document.createElement("div");
+        node.className = "sgf-setting-rows";
+        node.append(...elements);
+        return node;
+    }
+    static colDesc(text: string)
+    {
+        let node = document.createElement("label");
+        node.classList.add("col", "description");
+        node.innerText = text;
+        return node;
+    }
+    static colSection(...elements: Node[])
+    {
+        let node = document.createElement("div");
+        node.className = "sgf-setting-cols";
+        node.append(...elements);
+        return node;
+    }
+    static section(desc: string, ...elements: Node[])
+    {
+        let node = document.createElement("div");
+        node.className = "sgf-setting-section";
+        node.innerHTML = `<h2>${desc}</h2>`;
+        node.append(...elements);
+        return node;
+    }
+    static subSection(...elements: Node[])
+    {
+        let node = document.createElement("div");
+        node.className = "sgf-setting-section";
+        node.style.marginLeft = "20px";
+        node.append(...elements);
+        return node;
+    }
+
+    static parse(html: string): DocumentFragment | Node
+    {
+        var template = document.createElement("template");
+        template.innerHTML = html.trim(); //trim(): Never return a text node of whitespace as the result
+        return template.content.childElementCount > 1 ? template.content : template.content.firstChild;
     }
 }

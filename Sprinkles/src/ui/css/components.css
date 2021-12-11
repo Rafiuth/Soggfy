@@ -1,3 +1,14 @@
+:root {
+    --sgf-green: #1db954;
+    --sgf-active: #444;
+    --sgf-inactive: #555;
+    --sgf-hover: #666;
+    --sgf-container-background: #333;
+    --sgf-text: #ddd;
+    --sgf-text-active: #fff;
+}
+
+
 .sgf-toggle-switch {
     appearance: none;
     display: inline-block;
@@ -5,7 +16,7 @@
     width: 42px;
     height: 24px;
     border-radius: 24px;
-    background-color: #535353;
+    background-color: var(--sgf-inactive);
     transition: all 0.1s ease;
     cursor: pointer;
 }
@@ -22,7 +33,7 @@
     transition: all 0.1s ease;
 }
 .sgf-toggle-switch:checked {
-    background-color: #1db954;
+    background-color: var(--sgf-green);
 }
 .sgf-toggle-switch:checked:after {
     transform: translatex(18px)
@@ -32,8 +43,8 @@
     width: 100%;
     border-radius: 4px;
     border: 0;
-    background-color: #555;
-    color: #ddd;
+    background-color: var(--sgf-inactive);
+    color: var(--sgf-text);
     font-family: arial;
     font-size: 14px;
     font-weight: 400;
@@ -49,8 +60,8 @@
     padding: 0 5px;
     border-radius: 3px;
     border: 0;
-    background-color: #555;
-    color: #ddd;
+    background-color: var(--sgf-inactive);
+    color: var(--sgf-text);
     font-family: arial;
     font-size: 14px;
     font-weight: 400;
@@ -67,7 +78,7 @@
     width: 100%;
     height: 8px;
     border-radius: 4px;
-    background: #535353;
+    background: var(--sgf-inactive);
     outline: none;
     cursor: e-resize;
 }
@@ -76,26 +87,26 @@
     width: 16px;
     height: 16px;
     border-radius: 50%;
-    background: #1db954;
+    background: var(--sgf-green);
 }
 .sgf-slider-label {
     width: 64px;
     margin-right: 4px;
     text-align: right;
     font-size: 11px;
-    background: #333;
+    background: var(--sgf-container-background);
     border: none;
 }
 .sgf-slider-label:hover, .sgf-slider-label:focus {
     border: solid;
     border-width: 1px;
-    border-color: #444;
+    border-color: var(--sgf-active);
 }
 /* TODO: this is all hacky af, there has to be a better way to do it. */
 .sgf-collapsible {
     padding: 4px 4px 0;
     margin-top: 8px;
-    background: #444;
+    background: var(--sgf-active);
     border-radius: 4px;
     overflow: hidden;
     max-height: 33px;
@@ -111,8 +122,8 @@
     margin: -4px -4px 0;
     padding: 4px;
     list-style: none;
-    background: #555;
-    color: #ddd;
+    background: var(--sgf-inactive);
+    color: var(--sgf-text);
     cursor: pointer;
 }
 .sgf-collapsible[open] > summary {
@@ -139,8 +150,8 @@
 .sgf-tag-button {
     border-radius: 4px;
     border: 0;
-    background-color: #555;
-    color: #ddd;
+    background-color: var(--sgf-inactive);
+    color: var(--sgf-text);
     font-family: monospace;
     font-size: 12px;
     cursor: pointer;
@@ -148,7 +159,7 @@
     margin: 2px;
 }
 .sgf-tag-button:hover {
-    background-color: #666;
+    background-color: var(--sgf-hover);
     box-shadow: 0px 0px 4px 2px rgb(0 0 0 / 15%);
 }
 
@@ -181,4 +192,54 @@
 @keyframes sgf-fade-out {
     from { opacity: 1; }
     to { opacity: 0; }
+}
+
+.sgf-switch-field {
+    display: flex;
+    overflow: hidden;
+}
+.sgf-switch-field button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    background-color: var(--sgf-inactive);
+    color: var(--sgf-text);
+    font-size: 14px;
+    padding: 4px 8px;
+    border: 1px solid rgba(0, 0, 0, 0.2);
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px rgba(255, 255, 255, 0.1);
+    transition: all 0.1s ease-in-out;
+}
+.sgf-switch-field button[active] {
+    background-color: var(--sgf-green);
+    color: var(--sgf-text-active);
+    box-shadow: none;
+}
+.sgf-switch-field button:not([active]):hover {
+    background-color: var(--sgf-hover);
+    cursor: pointer;
+}
+.sgf-switch-field button:first-of-type {
+    border-radius: 4px 0 0 4px;
+}
+.sgf-switch-field button:last-of-type {
+    border-radius: 0 4px 4px 0;
+}
+
+.sgf-button {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    border: none;
+    border-radius: 4px;
+    background-color: var(--sgf-inactive);
+    color: var(--sgf-text);
+    gap: 4px;
+    padding: 2px 8px;
+    font-size: 14px;
+    transition: background-color 0.1s ease-in-out;
+}
+.sgf-button:hover {
+    background-color: var(--sgf-hover);
 }
