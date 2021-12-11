@@ -2,6 +2,7 @@ import Utils from "./utils";
 import { Player, PlayerState, TrackInfo, SpotifyUtils } from "./spotify-apis";
 import Resources from "./resources";
 import config from "./config";
+import { getPathVars } from "./metadata";
 
 export default class PlayerStateTracker
 {
@@ -55,7 +56,7 @@ export default class PlayerStateTracker
             playbackId: playback.playbackId,
             trackUri: track.uri,
             metadata: meta,
-            pathVars: this.getPathVariables(meta),
+            pathVars: getPathVars(meta),
             lyrics: "",
             lyricsExt: "",
             coverArtId: track.metadata.image_xlarge_url.replaceAll(":", "_")
@@ -129,18 +130,6 @@ export default class PlayerStateTracker
             comment:        Resources.getOpenTrackURL(track.uri),
             podcast:        "1",
             explicit:       meta.explicit ? "1" : undefined
-        };
-    }
-    private getPathVariables(meta: any)
-    {
-        return {
-            track_name:     meta.title,
-            artist_name:    meta.album_artist,
-            album_name:     meta.album,
-            track_num:      meta.track,
-            release_year:   meta.date.split('-')[0],
-            multi_disc_path: meta.totaldiscs > 1 ? `/CD ${meta.disc}` : "",
-            multi_disc_paren: meta.totaldiscs > 1 ? ` (CD ${meta.disc})` : ""
         };
     }
     private async getLyrics(track: TrackInfo)

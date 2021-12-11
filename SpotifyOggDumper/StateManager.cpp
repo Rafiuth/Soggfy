@@ -144,8 +144,9 @@ struct StateManagerImpl : public StateManager
                 }
                 else if (content.contains("pathTemplate")) {
                     PathTemplateSearcher searcher(content["pathTemplate"]);
+                    PathTemplateVars unkVars = content["unkVars"];
                     for (auto& track : content["tracks"]) {
-                        searcher.Add(track["uri"], track["vars"], track["unkVars"]);
+                        searcher.Add(track["uri"], track["vars"], unkVars);
                     }
                     json existingTracks = json::object();
                     for (auto& entry : searcher.FindExisting()) {

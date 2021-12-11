@@ -97,6 +97,8 @@ class Connection
      */
     async request(type: MessageType, payload: any, binaryPayload?: ArrayBuffer, timeoutMs = 15000)
     {
+        if (!this.isConnected) throw Error("Can't send request in disconnected state.");
+
         let info: RequestInfo = {
             id: this._nextReqId++
         };

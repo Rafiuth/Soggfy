@@ -7,6 +7,7 @@ import { Platform, SpotifyUtils } from "../spotify-apis";
 import ComponentsStyle from "./css/components.css";
 import SettingsStyle from "./css/settings.css";
 import StatusIndicatorStyle from "./css/status-indicator.css";
+import { PathVars } from "../metadata";
 const MergedStyles = [ComponentsStyle, SettingsStyle, StatusIndicatorStyle].join('\n'); //TODO: find a better way to do this
 
 const Icons = {
@@ -49,57 +50,57 @@ export default class UI
 
     private openQuickSettingsPopup()
     {
-        let anchorRect = this._settingsButton.getBoundingClientRect();
-        let container = UIC.parse(`
-<div class="sgf-quick-settings-popup" style="left: ${anchorRect.left}px; top: ${anchorRect.bottom}px" tabindex="-1"
-></div>`) as HTMLDivElement;
-
         let pathTemplates = [
             UIC.parse(`${Icons.Apps}<span>Single</span>`),
             UIC.parse(`${Icons.Album}<span>Album</span>`),
             UIC.parse(`${Icons.List}<span>Playlist</span>`),
             UIC.parse(`${Icons.MagicWand}<span>Auto</span>`)
         ];
-        container.append(
+        let popup = this.openPopup(
+            "sgf-quick-settings-popup", this._settingsButton,
             UIC.rows(
                 UIC.colDesc("Path template"),
                 UIC.switchField("activePathTemplate", pathTemplates, (key, newIndex) => { console.log(key, newIndex); return 0; }),
-                UIC.row("Playback speed", UIC.slider("playbackSpeed", { min: 1, max: 20, step: 1, formatter: val => val + "x" }, (k, v) => 1)),
+                UIC.row("Playback speed", this.createSpeedSlider()),
                 UIC.button("More settings...", Icons.Sliders, () => {
-                    container.remove();
+                    popup.remove();
                     document.body.append(this.createSettingsDialog());
                 })
             )
         );
+    }
 
-        container.addEventListener("focusout", ev => {
-            if (ev.relatedTarget ? !container.contains(ev.relatedTarget as Element) : ev.target === container) {
-                container.remove();
+    private openPopup(className: string, anchor: Element, content: Node)
+    {
+        let anchorRect = anchor.getBoundingClientRect();
+        let popup = UIC.parse(`
+<div class="${className}" 
+        style="left: ${anchorRect.left}px; top: ${anchorRect.bottom}px"
+        tabindex="-1">
+</div>`) as HTMLDivElement;
+
+        popup.appendChild(content);
+
+        popup.addEventListener("focusout", ev => {
+            if (ev.relatedTarget ? !popup.contains(ev.relatedTarget as Element) : ev.target === popup) {
+                popup.remove();
             }
         });
-        container.addEventListener("keydown", ev => {
+        popup.addEventListener("keydown", ev => {
             if (ev.key === "Escape") {
-                container.remove();
+                popup.remove();
             }
         });
-        document.body.appendChild(container);
-        container.focus();
+        document.body.appendChild(popup);
+        popup.focus();
+
+        return popup;
     }
 
     private createSettingsDialog()
     {
-        let onChange = (key: string, newValue?: any) => {
-            let finalValue = Utils.accessObjectPath(config, key.split('.'), newValue);
+        let onChange = this.configAccessor;
 
-            if (newValue !== undefined) {
-                let delta = {};
-                let field = key.split('.')[0]; //sync only supports topmost field
-                delta[field] = config[field];
-                this._conn.send(MessageType.SYNC_CONFIG, delta);
-            }
-            return finalValue;
-        };
-        
         let defaultFormats = {
             "Original OGG":     { ext: "",    args: "-c copy" },
             "MP3 320K":         { ext: "mp3", args: "-c:a libmp3lame -b:a 320k -id3v2_version 3 -c:v copy" },
@@ -140,24 +141,14 @@ export default class UI
             onChange("savePaths.basePath", resp.payload.path);
         };
 
-        const pathVars = {
-            track_name: "Track name / Episode name",
-            artist_name: "Artist name / Publisher name",
-            album_name: "Album name / Podcast name",
-            track_num: "Album track number",
-            release_year: "Release year",
-            release_date: "Release date in YYYY-MM-DD format",
-            multi_disc_path: "`/CD {disc number}` if the album has multiple discs, or empty.",
-            multi_disc_paren: "` (CD {disc number})` if the album has multiple discs, or empty."
-        };
         let pathVarTags = [];
-        for (let varName in pathVars) {
-            let varText = "{" + varName + "}";
-            let tag = UIC.tagButton(varText, () => {
-                Platform.getClipboardAPI().copy(varText);
+        for (let pv of PathVars) {
+            let name = `{${pv.name}}`;
+            let tag = UIC.tagButton(name, () => {
+                Platform.getClipboardAPI().copy(name);
                 UIC.notification("Copied", tag, 1);
             });
-            tag.title = pathVars[varName];
+            tag.title = pv.desc;
             pathVarTags.push(tag);
         }
         
@@ -167,12 +158,7 @@ export default class UI
                 customFormatSection,
                 UIC.row("Embed cover art",      UIC.toggle("embedCoverArt", onChange)),
                 UIC.row("Download lyrics",      UIC.toggle("downloadLyrics", onChange)),
-                UIC.row("Playback speed",       UIC.slider("playbackSpeed", { min: 1, max: 20, step: 1, formatter: val => val + "x" }, (key, newValue) => {
-                    if (newValue) {
-                        SpotifyUtils.resetCurrentTrack(false);
-                    }
-                    return onChange(key, newValue);
-                }))
+                UIC.row("Playback speed",       this.createSpeedSlider())
             ),
             UIC.section("Download Paths",
                 UIC.rows("Base Path",       UIC.colSection(basePathTextInput, UIC.button(null, Icons.Folder, browseBasePath))),
@@ -181,9 +167,36 @@ export default class UI
                 UIC.rows("Playlists",       UIC.textInput("savePaths.playlist", onChange)),
                 UIC.rows("Podcasts",        UIC.textInput("savePaths.podcast", onChange)),
                 UIC.row("Save cover art",   UIC.toggle("saveCoverArt", onChange)),
-                UIC.collapsible("Variables", ...pathVarTags),
+                UIC.rows(UIC.collapsible("Variables", ...pathVarTags)),
             )
         );
+    }
+
+    private createSpeedSlider()
+    {
+        return UIC.slider(
+            "playbackSpeed",
+            { min: 1, max: 20, step: 1, formatter: val => val + "x" },
+            (key, newValue) => {
+                if (newValue) {
+                    SpotifyUtils.resetCurrentTrack(false);
+                }
+                return this.configAccessor(key, newValue);
+            }
+        );
+    }
+
+    private configAccessor(key: string, newValue?: any)
+    {
+        let finalValue = Utils.accessObjectPath(config, key.split('.'), newValue);
+
+        if (newValue !== undefined) {
+            let delta = {};
+            let field = key.split('.')[0]; //sync only supports topmost field
+            delta[field] = config[field];
+            this._conn.send(MessageType.SYNC_CONFIG, delta);
+        }
+        return finalValue;
     }
 }
 
