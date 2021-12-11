@@ -46,7 +46,15 @@ export class SpotifyUtils
         let state = player.getState();
         let position = (Date.now() - state.timestamp) * state.speed + state.positionAsOfTimestamp;
 
-        await player._queue.addToQueue([ { uri: state.item.uri } ]); //Player.addToQueue() will popup a notification
+        let queue = player._queue;
+        let queuedTracks = queue.getQueue().queued;
+
+        let tracks = [{ uri: state.item.uri }];
+        if (queuedTracks.length > 0) {
+            await queue.insertIntoQueue(tracks, { before: queuedTracks[0] }); 
+        } else {
+            await queue.addToQueue(tracks);
+        }
         await player.skipToNext();
         
         if (preservePosition) {
