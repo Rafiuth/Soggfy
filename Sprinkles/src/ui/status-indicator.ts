@@ -2,7 +2,7 @@ import config from "../config"
 import { Connection, MessageType } from "../connection";
 import { Selectors } from "./ui";
 import Utils from "../utils";
-import { PathVars } from "../metadata";
+import { PathTemplate } from "../metadata";
 
 export enum DownloadStatus
 {
@@ -120,7 +120,7 @@ ${icons[info.status]}`;
         let unkVars: any = {
             _ext: `\\.(mp3|m4a|mp4|ogg|opus)$`
         };
-        for (let pv of PathVars) {
+        for (let pv of PathTemplate.Vars) {
             unkVars[pv.name] = pv.pattern;
         }
         this._conn.send(MessageType.DOWNLOAD_STATUS, {

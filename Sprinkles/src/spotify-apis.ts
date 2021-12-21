@@ -26,7 +26,8 @@ let platform = await getPlatform();
 let player: PlayerAPI = platform.getPlayerAPI();
 let cosmos = player._cosmos;
 let webApi = platform?.getAdManagers()?.hpto?.hptoApi?.webApi; //TODO: this api reports telemetry, is it a good idea to use it?
-    
+let user = platform.getUserAPI().getUser();
+
 export {
     platform as Platform,
     player as Player,
@@ -61,6 +62,13 @@ export class SpotifyUtils
             await player.seekTo(position);
         }
     }
+    static getLocalStorageItem(key: string, prependUsername = true)
+    {
+        if (prependUsername) {
+            key = `${user.username}:${key}`;
+        }
+        return JSON.parse(localStorage.getItem(key));
+    }
 }
 
 interface PlayerAPI
@@ -86,10 +94,15 @@ interface PlayerState
         metadata: any;
     },
     item: TrackInfo;
+    index: {
+        pageURI?: any,
+        pageIndex?: number,
+        itemIndex?: number;
+    }
 }
 interface TrackInfo
 {
-    type: string,
+    type: "track" | "episode",
     uri: string,
     isLocal: boolean,
     isExplicit: boolean,

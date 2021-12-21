@@ -231,6 +231,7 @@
     display: flex;
     justify-content: center;
     align-items: center;
+    height: 32px;
     border: none;
     border-radius: 4px;
     background-color: var(--sgf-inactive);

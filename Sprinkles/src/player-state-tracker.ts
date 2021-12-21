@@ -2,7 +2,7 @@ import Utils from "./utils";
 import { Player, PlayerState, TrackInfo, SpotifyUtils } from "./spotify-apis";
 import Resources from "./resources";
 import config from "./config";
-import { getPathVars } from "./metadata";
+import { PathTemplate, PathTemplateVars } from "./metadata";
 
 export default class PlayerStateTracker
 {
@@ -50,15 +50,17 @@ export default class PlayerStateTracker
         let meta: any = type === "track"
             ? await this.getTrackMetaProps(track)
             : await this.getPodcastMetaProps(track);
+        let paths = this.getSavePaths(type, meta);
         
         let data = {
             type: type,
             playbackId: playback.playbackId,
             trackUri: track.uri,
             metadata: meta,
-            pathVars: getPathVars(meta),
-            lyrics: "",
-            lyricsExt: "",
+            trackPath: paths.track,
+            coverPath: paths.cover,
+            lyrics: undefined,
+            lyricsExt: undefined,
             coverArtId: track.metadata.image_xlarge_url.replaceAll(":", "_")
         };
         let coverData = await Resources.getImageData(track.metadata.image_xlarge_url);
@@ -71,6 +73,32 @@ export default class PlayerStateTracker
         }
         this.fixMetadata(data.metadata, config.outputFormat.ext || "ogg");
         return { info: data, coverData: coverData };
+    }
+    private getSavePaths(type: string, meta: any)
+    {
+        let template = config.savePaths[type] as string;
+        if (!template) throw Error("Unknown track type " + type);
+
+        let path = config.savePaths.basePath;
+        if (!/[\/\\]$/.test(path)) path += '/';
+
+        let vars = PathTemplate.getVarsFromMetadata(meta);
+
+        let coverPath = "";
+        if (config.saveCoverArt) {
+            let parts = template.split(/[\/\\]/);
+            let albumDirIdx = parts.findIndex(d => d.includes("{album_name}"));
+            let hasAlbumDir = albumDirIdx >= 0 && albumDirIdx + 1 < parts.length;
+
+            if (hasAlbumDir) {
+                let coverTemplate = parts.slice(0, albumDirIdx + 1).join('/') + "/cover.jpg";
+                coverPath = path + PathTemplate.render(coverTemplate, vars);
+            }
+        }
+        return {
+            track: path + PathTemplate.render(template, vars),
+            cover: coverPath
+        };
     }
     private fixMetadata(meta: any, format: string): any
     {

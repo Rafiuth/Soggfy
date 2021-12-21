@@ -7,7 +7,8 @@ import { Platform, SpotifyUtils } from "../spotify-apis";
 import ComponentsStyle from "./css/components.css";
 import SettingsStyle from "./css/settings.css";
 import StatusIndicatorStyle from "./css/status-indicator.css";
-import { PathVars } from "../metadata";
+import { PathTemplate } from "../metadata";
+
 const MergedStyles = [ComponentsStyle, SettingsStyle, StatusIndicatorStyle].join('\n'); //TODO: find a better way to do this
 
 const Icons = {
@@ -40,7 +41,7 @@ export default class UI
             //TODO: design a icon for this
             //https://fonts.google.com/icons?selected=Material+Icons:settings&icon.query=down
             `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M18,15v3H6v-3H4v3c0,1.1,0.9,2,2,2h12c1.1,0,2-0.9,2-2v-3H18z M17,11l-1.41-1.41L13,12.17V4h-2v8.17L8.41,9.59L7,11l5,5 L17,11z"></path></svg>`,
-            () => this.openQuickSettingsPopup()
+            () => document.body.append(this.createSettingsDialog())
         );
     }
     setEnabled(enabled: boolean)
@@ -48,59 +49,21 @@ export default class UI
         this._settingsButton.disabled = !enabled;
     }
 
-    private openQuickSettingsPopup()
-    {
-        let pathTemplates = [
-            UIC.parse(`${Icons.Apps}<span>Single</span>`),
-            UIC.parse(`${Icons.Album}<span>Album</span>`),
-            UIC.parse(`${Icons.List}<span>Playlist</span>`),
-            UIC.parse(`${Icons.MagicWand}<span>Auto</span>`)
-        ];
-        let popup = this.openPopup(
-            "sgf-quick-settings-popup", this._settingsButton,
-            UIC.rows(
-                UIC.colDesc("Path template"),
-                UIC.switchField("activePathTemplate", pathTemplates, (key, newIndex) => { console.log(key, newIndex); return 0; }),
-                UIC.row("Playback speed", this.createSpeedSlider()),
-                UIC.button("More settings...", Icons.Sliders, () => {
-                    popup.remove();
-                    document.body.append(this.createSettingsDialog());
-                })
-            )
-        );
-    }
-
-    private openPopup(className: string, anchor: Element, content: Node)
-    {
-        let anchorRect = anchor.getBoundingClientRect();
-        let popup = UIC.parse(`
-<div class="${className}" 
-        style="left: ${anchorRect.left}px; top: ${anchorRect.bottom}px"
-        tabindex="-1">
-</div>`) as HTMLDivElement;
-
-        popup.appendChild(content);
-
-        popup.addEventListener("focusout", ev => {
-            if (ev.relatedTarget ? !popup.contains(ev.relatedTarget as Element) : ev.target === popup) {
-                popup.remove();
-            }
-        });
-        popup.addEventListener("keydown", ev => {
-            if (ev.key === "Escape") {
-                popup.remove();
-            }
-        });
-        document.body.appendChild(popup);
-        popup.focus();
-
-        return popup;
-    }
-
     private createSettingsDialog()
     {
-        let onChange = this.configAccessor;
+        //TODO: refactor
+        let onChange = this.configAccessor.bind(this);
 
+        let speedSlider = UIC.slider(
+            "playbackSpeed",
+            { min: 1, max: 20, step: 1, formatter: val => val + "x" },
+            (key, newValue) => {
+                if (newValue) {
+                    SpotifyUtils.resetCurrentTrack(false);
+                }
+                return onChange(key, newValue);
+            }
+        );
         let defaultFormats = {
             "Original OGG":     { ext: "",    args: "-c copy" },
             "MP3 320K":         { ext: "mp3", args: "-c:a libmp3lame -b:a 320k -id3v2_version 3 -c:v copy" },
@@ -142,7 +105,8 @@ export default class UI
         };
 
         let pathVarTags = [];
-        for (let pv of PathVars) {
+        
+        for (let pv of PathTemplate.Vars) {
             let name = `{${pv.name}}`;
             let tag = UIC.tagButton(name, () => {
                 Platform.getClipboardAPI().copy(name);
@@ -151,38 +115,30 @@ export default class UI
             tag.title = pv.desc;
             pathVarTags.push(tag);
         }
-        
+
+        let playlistM3UPathRow = UIC.rows("Playlist M3U", UIC.textInput("savePaths.playlistM3U", onChange));
+
         return UIC.createSettingOverlay(
             UIC.section("General",
                 UIC.row("Output format",        UIC.select("outputFormat", Object.getOwnPropertyNames(defaultFormats), onFormatChange)),
                 customFormatSection,
                 UIC.row("Embed cover art",      UIC.toggle("embedCoverArt", onChange)),
                 UIC.row("Download lyrics",      UIC.toggle("downloadLyrics", onChange)),
-                UIC.row("Playback speed",       this.createSpeedSlider())
+                UIC.row("Playback speed",       speedSlider)
             ),
             UIC.section("Download Paths",
-                UIC.rows("Base Path",       UIC.colSection(basePathTextInput, UIC.button(null, Icons.Folder, browseBasePath))),
-                UIC.rows("Singles",         UIC.textInput("savePaths.track", onChange)),
-                UIC.rows("Albums",          UIC.textInput("savePaths.album", onChange)),
-                UIC.rows("Playlists",       UIC.textInput("savePaths.playlist", onChange)),
-                UIC.rows("Podcasts",        UIC.textInput("savePaths.podcast", onChange)),
-                UIC.row("Save cover art",   UIC.toggle("saveCoverArt", onChange)),
+                UIC.rows("Base Path",           UIC.colSection(basePathTextInput, UIC.button(null, Icons.Folder, browseBasePath))),
+                UIC.rows("Song template",       UIC.textInput("savePaths.track", onChange)),
+                UIC.rows("Podcast template",    UIC.textInput("savePaths.episode", onChange)),
+                playlistM3UPathRow,
                 UIC.rows(UIC.collapsible("Variables", ...pathVarTags)),
+                UIC.row("Generate M3U for playlists", UIC.toggle("generatePlaylistM3U", (k, v) => {
+                    v = onChange(k, v);
+                    playlistM3UPathRow.style.display = v ? "block" : "none";
+                    return v;
+                })),
+                UIC.row("Save cover art in album folder",   UIC.toggle("saveCoverArt", onChange)),
             )
-        );
-    }
-
-    private createSpeedSlider()
-    {
-        return UIC.slider(
-            "playbackSpeed",
-            { min: 1, max: 20, step: 1, formatter: val => val + "x" },
-            (key, newValue) => {
-                if (newValue) {
-                    SpotifyUtils.resetCurrentTrack(false);
-                }
-                return this.configAccessor(key, newValue);
-            }
         );
     }
 

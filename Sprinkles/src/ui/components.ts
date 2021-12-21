@@ -201,7 +201,7 @@ export default class Components
 
             let opt = options[i];
             button.appendChild(
-                opt instanceof String
+                typeof opt === "string"
                     ? document.createTextNode(opt as string)
                     : opt as Node
             );
@@ -227,6 +227,13 @@ export default class Components
         node.style.left = (anchorRect.left + (anchorRect.width - rect.width) / 2) + "px";
         node.onanimationend = () => node.remove();
 
+        return node;
+    }
+
+    static title(text: string, tagName: "h1" | "h2" | "h3" = "h2")
+    {
+        let node = document.createElement(tagName);
+        node.innerText = text;
         return node;
     }
 

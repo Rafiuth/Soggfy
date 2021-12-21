@@ -18,7 +18,7 @@ struct PlaybackInfo
     bool Discard = false;
     bool ReadyToSave = false;
 };
-struct TrackMetadata
+/*struct TrackMetadata
 {
     std::string Type; //either "track" or "episode"
     std::string TrackUri;
@@ -35,7 +35,7 @@ struct TrackMetadata
     {
         return Props.at("album_artist") + " - " + Props.at("title");
     }
-};
+};*/
 
 struct StateManagerImpl : public StateManager
 {
@@ -113,18 +113,11 @@ struct StateManagerImpl : public StateManager
                 auto playback = GetPlayback(playbackId);
                 if (!playback || !playback->ReadyToSave) break;
 
+                //delay closing the file to avoid truncating the track
+                playback->FileStream.close();
+
                 if (!content.value("failed", false)) {
-                    TrackMetadata meta = {
-                        .Type       = content["type"],
-                        .TrackUri   = content["trackUri"],
-                        .Props      = content["metadata"],
-                        .PathVars   = content["pathVars"],
-                        .Lyrics     = content["lyrics"],
-                        .LyricsExt  = content["lyricsExt"],
-                        .CoverArtId = content["coverArtId"],
-                        .CoverArtData = msg.BinaryContent
-                    };
-                    std::thread(&StateManagerImpl::SaveTrack, this, playback, meta).detach();
+                    std::thread(&StateManagerImpl::SaveTrack, this, playback, msg).detach();
                 } else {
                     LogInfo("Discarding playback {}: {}", playbackId, content.value("message", "null"));
                 }
@@ -214,7 +207,8 @@ struct StateManagerImpl : public StateManager
         auto& fs = playback->FileStream;
 
         if (!fs.is_open()) {
-            LogWarn("Received audio data after playback ended (this shouldn't happen). Last track could've been truncated.");
+            LogWarn("Received audio data after playback ended (this should never happen).");
+            DiscardTrack(playbackId, "Stream truncated");
             return;
         }
         if (fs.tellp() == 0) {
@@ -246,7 +240,6 @@ struct StateManagerImpl : public StateManager
         auto playback = GetPlayback(playbackId);
         if (!playback) return;
 
-        playback->FileStream.close();
         playback->ReadyToSave = true;
 
         if (playback->Discard) {
@@ -266,7 +259,7 @@ struct StateManagerImpl : public StateManager
     void DiscardTrack(const std::string& playbackId, const std::string& reason)
     {
         auto playback = GetPlayback(playbackId);
-        if (!playback) return;
+        if (!playback || playback->Discard) return;
 
         auto status = std::make_pair("ERROR", "Canceled: " + reason);
         playback->Discard = true;
@@ -291,21 +284,25 @@ struct StateManagerImpl : public StateManager
         _ctrlSv.Stop();
     }
     
-    void SaveTrack(std::shared_ptr<PlaybackInfo> playback, TrackMetadata meta)
+    void SaveTrack(std::shared_ptr<PlaybackInfo> playback, Message msg)
     {
+        json& ct = msg.Content;
+        json& meta = ct["metadata"];
+        std::string trackUri = ct.value("trackUri", "null");
+        std::string trackName = meta.value("album_artist", "null") + " - " + meta.value("title", "null");
+
         try {
-            SendTrackStatus(meta.TrackUri, "CONVERTING", "Converting...");
-            LogInfo("Saving track {}", meta.GetName());
+            SendTrackStatus(trackUri, "CONVERTING", "Converting...");
+            LogInfo("Saving track {}", trackName);
             LogDebug("  stream: {}", Utils::PathToUtf(playback->FileName.filename()));
             
-            std::string pathTemplate = _config["savePaths"][meta.Type];
-            fs::path trackPath = PathTemplate::Render(pathTemplate, meta.PathVars);
-            fs::path coverPath = RenderCoverPath(pathTemplate, meta.PathVars);
-            fs::path tmpCoverPath = MakeTempPath(meta.CoverArtId + ".jpg");
+            fs::path trackPath = fs::u8path(ct["trackPath"].get<std::string>());
+            fs::path coverPath = fs::u8path(ct["coverPath"].get<std::string>());
+            fs::path tmpCoverPath = MakeTempPath(ct["coverArtId"] + ".jpg");
 
             //always cache cover art
             if (!fs::exists(tmpCoverPath)) {
-                std::ofstream(tmpCoverPath, std::ios::binary) << meta.CoverArtData;
+                std::ofstream(tmpCoverPath, std::ios::binary) << msg.BinaryContent;
             }
             fs::create_directories(trackPath.parent_path());
 
@@ -324,37 +321,20 @@ struct StateManagerImpl : public StateManager
                 trackPath.replace_extension(convExt.empty() ? playback->ActualExt : convExt);
                 InvokeFFmpeg(playback->FileName, tmpCoverPath, trackPath, convArgs, meta);
             }
-
-            if (!meta.Lyrics.empty()) {
+            if (ct.contains("lyrics")) {
                 fs::path lrcPath = trackPath;
-                lrcPath.replace_extension(meta.LyricsExt);
-                std::ofstream(lrcPath, std::ios::binary) << meta.Lyrics;
+                lrcPath.replace_extension(ct["lyricsExt"]);
+                std::ofstream(lrcPath, std::ios::binary) << ct["lyrics"];
             }
             fs::remove(playback->FileName);
-            SendTrackStatus(meta.TrackUri, "DONE", "", trackPath);
+            SendTrackStatus(trackUri, "DONE", "", trackPath);
+            LogInfo("Done saving track {}", trackName);
         } catch (std::exception& ex) {
-            LogError("Failed to save track {}: {}", meta.GetName(), ex.what());
-            SendTrackStatus(meta.TrackUri, "ERROR", ex.what());
+            LogError("Failed to save track {}: {}", trackName, ex.what());
+            SendTrackStatus(trackUri, "ERROR", ex.what());
         }
     }
-    fs::path RenderCoverPath(const std::string& templt, const PathTemplateVars& vars)
-    {
-        if (!_config["saveCoverArt"]) {
-            return {};
-        }
-        //Find the first directory containing {album_name}, and save cover.jpg in it
-        std::string coverTemplt = "";
-        for (auto& dir : PathTemplate::Split(templt)) {
-            if (!coverTemplt.empty()) coverTemplt += "/";
-            coverTemplt += dir;
-            
-            if (dir.find("{album_name}") != std::string::npos) {
-                return PathTemplate::Render(coverTemplt + "/cover.jpg", vars);
-            }
-        }
-        return {};
-    }
-    void InvokeFFmpeg(const fs::path& path, const fs::path& coverPath, const fs::path& outPath, const std::string& extraArgs, const TrackMetadata& meta)
+    void InvokeFFmpeg(const fs::path& path, const fs::path& coverPath, const fs::path& outPath, const std::string& extraArgs, const json& meta)
     {
         //TODO: fix 32k char command line limit for lyrics
         if (fs::exists(outPath)) {
@@ -385,21 +365,18 @@ struct StateManagerImpl : public StateManager
         if (!extraArgs.empty()) {
             proc.AddArgs(extraArgs);
         }
-        for (auto& [k, v] : meta.Props) {
+        for (auto& [k, v] : meta.items()) {
             proc.AddArg("-metadata");
-            proc.AddArg(k + "=" + v);
-        };
+            proc.AddArg(k + "=" + v.get<std::string>());
+        }
         proc.AddArgPath(outPath);
         proc.AddArg("-y");
 
-        LogDebug("Converting {}...", meta.GetName());
-        LogTrace("  args: {}", proc.ToString());
-
+        LogTrace("  ffmpeg args: {}", proc.ToString());
         int exitCode = proc.Start(true);
         if (exitCode != 0) {
             throw std::runtime_error("Conversion failed. (ffmpeg returned " + std::to_string(exitCode) + ")");
         }
-        LogInfo("Done converting {}.", meta.GetName());
     }
     fs::path CreateCoverMetaBlock(const fs::path& coverPath)
     {
