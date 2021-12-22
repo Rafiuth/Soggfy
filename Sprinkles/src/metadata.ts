@@ -91,8 +91,8 @@ export class PathTemplate
 
     static render(template: string, vars: PathTemplateVars)
     {
-        return template.replace(/{(.+)}/g, (g0, g1) => {
-            return vars[g1] ?? g0;
+        return template.replace(/{(.+?)}/g, (g0, g1) => {
+            return vars[g1]?.replace(/[\x00-\x1f\/\\:*?"<>|]/g, "") ?? g0;
         });
     }
 }
