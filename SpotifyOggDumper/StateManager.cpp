@@ -298,7 +298,7 @@ struct StateManagerImpl : public StateManager
             
             fs::path trackPath = fs::u8path(ct["trackPath"].get<std::string>());
             fs::path coverPath = fs::u8path(ct["coverPath"].get<std::string>());
-            fs::path tmpCoverPath = MakeTempPath(ct["coverArtId"] + ".jpg");
+            fs::path tmpCoverPath = MakeTempPath(ct["coverTempPath"]);
 
             //always cache cover art
             if (!fs::exists(tmpCoverPath)) {
@@ -324,7 +324,7 @@ struct StateManagerImpl : public StateManager
             if (ct.contains("lyrics")) {
                 fs::path lrcPath = trackPath;
                 lrcPath.replace_extension(ct["lyricsExt"]);
-                std::ofstream(lrcPath, std::ios::binary) << ct["lyrics"];
+                std::ofstream(lrcPath, std::ios::binary) << ct["lyrics"].get<std::string>();
             }
             fs::remove(playback->FileName);
             SendTrackStatus(trackUri, "DONE", "", trackPath);

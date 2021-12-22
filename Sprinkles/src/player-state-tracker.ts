@@ -61,7 +61,7 @@ export default class PlayerStateTracker
             coverPath: paths.cover,
             lyrics: undefined,
             lyricsExt: undefined,
-            coverArtId: track.metadata.image_xlarge_url.replaceAll(":", "_")
+            coverTempPath: track.metadata.image_xlarge_url.replaceAll(":", "_")
         };
         let coverData = await Resources.getImageData(track.metadata.image_xlarge_url);
 
