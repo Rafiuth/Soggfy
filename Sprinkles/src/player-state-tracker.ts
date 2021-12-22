@@ -50,7 +50,7 @@ export default class PlayerStateTracker
         let meta: any = type === "track"
             ? await this.getTrackMetaProps(track)
             : await this.getPodcastMetaProps(track);
-        let paths = this.getSavePaths(type, meta);
+        let paths = this.getSavePaths(type, meta, playback);
         
         let data = {
             type: type,
@@ -74,7 +74,7 @@ export default class PlayerStateTracker
         this.fixMetadata(data.metadata, config.outputFormat.ext || "ogg");
         return { info: data, coverData: coverData };
     }
-    private getSavePaths(type: string, meta: any)
+    private getSavePaths(type: string, meta: any, playback: PlayerState)
     {
         let template = config.savePaths[type] as string;
         if (!template) throw Error("Unknown track type " + type);
@@ -82,7 +82,7 @@ export default class PlayerStateTracker
         let path = config.savePaths.basePath;
         if (!/[\/\\]$/.test(path)) path += '/';
 
-        let vars = PathTemplate.getVarsFromMetadata(meta);
+        let vars = PathTemplate.getVarsFromMetadata(meta, playback);
 
         let coverPath = "";
         if (config.saveCoverArt) {

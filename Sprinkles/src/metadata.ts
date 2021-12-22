@@ -1,8 +1,10 @@
+import { PlayerState } from "./spotify-apis";
+
 type PathVar = {
     name: string;
     desc: string;
     pattern: string;
-    getValue: (meta) => string;
+    getValue: (meta: any, playback: PlayerState) => string;
 };
 
 export type PathTemplateVars = { [key: string]: string };
@@ -48,23 +50,41 @@ export class PathTemplate
         },
         {
             name: "multi_disc_path",
-            desc: "`/CD {disc number}` if the album has multiple discs, or empty.",
+            desc: "'/CD {disc number}' if the album has multiple discs, or empty.",
             pattern: `(\\/CD \\d+)?`,
             getValue: m => m.totaldiscs > 1 ? `/CD ${m.disc}` : ""
         },
         {
             name: "multi_disc_paren",
-            desc: "` (CD {disc number})` if the album has multiple discs, or empty.",
+            desc: "' (CD {disc number})' if the album has multiple discs, or empty.",
             pattern: `( \\(CD \\d+\\))?`,
             getValue: m => m.totaldiscs > 1 ? ` (CD ${m.disc})` : ""
+        },
+        {
+            name: "playlist_name",
+            desc: "Playlist name or 'unknown' if the track playback didn't originate from a playlist.",
+            pattern: `.+`,
+            getValue: (m, s) => {
+                return s.context.uri.startsWith("spotify:playlist:")
+                    ? s.context.metadata.context_description
+                    : "unknown";
+            }
+        },
+        {
+            name: "context_name",
+            desc: "Context name or 'unknown' - Similar to {playlist_name}, but includes albums.",
+            pattern: `.+`,
+            getValue: (m, s) => {
+                return s.context.metadata.context_description ?? "unknown";
+            }
         }
     ];
 
-    static getVarsFromMetadata(meta)
+    static getVarsFromMetadata(meta: any, playback: PlayerState)
     {
         let vals: PathTemplateVars = {};
         for (let pv of PathTemplate.Vars) {
-            vals[pv.name] = pv.getValue(meta);
+            vals[pv.name] = pv.getValue(meta, playback);
         }
         return vals;
     }
