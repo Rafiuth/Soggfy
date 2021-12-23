@@ -1,28 +1,23 @@
-import { WebAPI } from "./spotify-apis";
+import { SpotifyUtils, WebAPI } from "./spotify-apis";
 
 class Resources
 {
-    static async getTrackMetadataWG(uri: string)
+    static getTrackMetadataWG(uri: string): Promise<TrackMetadataWG>
     {
         let trackId = this.idToHex(this.getUriId(uri, "track"));
-        let res = await WebAPI.spotifyTransport.build()
-            .withHost("https://spclient.wg.spotify.com/metadata/4")
-            .withPath(`/track/${trackId}`)
-            .withEndpointIdentifier("/track/{trackId}")
-            .send();
-        return res.body as TrackMetadataWG;
+        return SpotifyUtils.fetchAuthed({
+            url: `https://spclient.wg.spotify.com/metadata/4/track/${trackId}`
+        });
     }
-    static async getColorAndLyricsWG(trackUri: string, coverUri: string)
+    static getColorAndLyricsWG(trackUri: string, coverUri: string): Promise<ColorAndLyricsWG>
     {
-        let res = await WebAPI.spotifyTransport.build()
-            .withHost("https://spclient.wg.spotify.com/color-lyrics/v2")
-            .withPath(`/track/${this.getUriId(trackUri)}/image/${encodeURIComponent(coverUri)}`)
-            .withQueryParameters({
+        return SpotifyUtils.fetchAuthed({
+            url: `https://spclient.wg.spotify.com/color-lyrics/v2/track/${this.getUriId(trackUri)}/image/${encodeURIComponent(coverUri)}`,
+            params: {
                 format: "json",
                 vocalRemoval: true
-            }).withEndpointIdentifier("/track/{trackId}")
-            .send();
-        return res.body as ColorAndLyricsWG;
+            }
+        });
     }
     static async getEpisodeMetadata(uri: string)
     {
