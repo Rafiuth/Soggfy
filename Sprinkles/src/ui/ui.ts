@@ -116,19 +116,20 @@ export default class UI
             pathVarTags.push(tag);
         }
 
-        let playlistM3UPathRow = UIC.rows("Playlist M3U", UIC.textInput("savePaths.playlistM3U", onChange));
+        let playlistM3UPathRow = UIC.rows("Playlist template (M3U)", UIC.textInput("savePaths.playlistM3U", onChange));
 
         return UIC.createSettingOverlay(
             UIC.section("General",
+                UIC.row("Playback speed",       speedSlider),
                 UIC.row("Output format",        UIC.select("outputFormat", Object.getOwnPropertyNames(defaultFormats), onFormatChange)),
                 customFormatSection,
                 UIC.row("Embed cover art",      UIC.toggle("embedCoverArt", onChange)),
-                UIC.row("Download lyrics",      UIC.toggle("downloadLyrics", onChange)),
-                UIC.row("Playback speed",       speedSlider)
+                UIC.row("Embed lyrics",         UIC.toggle("embedLyrics", onChange)),
+                UIC.row("Save lyrics as .lrc/.txt",UIC.toggle("saveLyrics", onChange)),
             ),
-            UIC.section("Download Paths",
+            UIC.section("Paths",
                 UIC.rows("Base Path",           UIC.colSection(basePathTextInput, UIC.button(null, Icons.Folder, browseBasePath))),
-                UIC.rows("Song template",       UIC.textInput("savePaths.track", onChange)),
+                UIC.rows("Track template",      UIC.textInput("savePaths.track", onChange)),
                 UIC.rows("Podcast template",    UIC.textInput("savePaths.episode", onChange)),
                 playlistM3UPathRow,
                 UIC.rows(UIC.collapsible("Variables", ...pathVarTags)),

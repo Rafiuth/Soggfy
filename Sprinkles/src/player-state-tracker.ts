@@ -65,11 +65,22 @@ export default class PlayerStateTracker
         };
         let coverData = await Resources.getImageData(track.metadata.image_xlarge_url);
 
-        let lyrics = config.downloadLyrics ? await this.getLyrics(track) : null;
-        if (lyrics) {
-            data.lyrics = lyrics.text;
-            data.lyricsExt = lyrics.isSynced ? "lrc" : "txt";
-            data.metadata.lyrics = lyrics.text;
+        if (config.saveLyrics || config.embedLyrics) {
+            let lyrics = await this.getLyrics(track);
+
+            if (lyrics && config.embedLyrics) {
+                let text = lyrics.text;
+                //workaround for the 32k command line limit
+                //TODO: the proper solution is to use that FFMETADATA file with the lyrics
+                if (text.length > 25000) {
+                    text = text.substring(0, 25000);
+                }
+                data.metadata.lyrics = text;
+            }
+            if (lyrics && config.saveLyrics) {
+                data.lyrics = lyrics.text;
+                data.lyricsExt = lyrics.isSynced ? "lrc" : "txt";
+            }
         }
         this.fixMetadata(data.metadata, config.outputFormat.ext || "ogg");
         return { info: data, coverData: coverData };
