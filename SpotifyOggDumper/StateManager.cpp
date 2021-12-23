@@ -17,24 +17,6 @@ struct PlaybackInfo
     bool Discard = false;
     bool ReadyToSave = false;
 };
-/*struct TrackMetadata
-{
-    std::string Type; //either "track" or "episode"
-    std::string TrackUri;
-    //Properties that can be passed directly to ffmpeg
-    //https://wiki.multimedia.cx/index.php/FFmpeg_Metadata
-    std::unordered_map<std::string, std::string> Props;
-    std::unordered_map<std::string, std::string> PathVars;
-    std::string Lyrics; //Raw LRC bytes
-    std::string LyricsExt; //either "lrc" or "txt"
-    std::string CoverArtId;
-    std::string CoverArtData; //Raw jpg bytes
-
-    std::string GetName() const
-    {
-        return Props.at("album_artist") + " - " + Props.at("title");
-    }
-};*/
 
 struct StateManagerImpl : public StateManager
 {
@@ -58,6 +40,9 @@ struct StateManagerImpl : public StateManager
         std::ifstream configFile(dataDir / "config.json");
         if (configFile.good()) {
             _config = json::parse(configFile, nullptr, true, true);
+        }
+        if (!fs::exists(fs::u8path(_config["savePaths"]["basePath"].get<std::string>()))) {
+            _config["savePaths"]["basePath"] = Utils::GetMusicFolder();
         }
         //delete old temp files
         std::error_code deleteError;
@@ -152,14 +137,15 @@ struct StateManagerImpl : public StateManager
                 break;
             }
             case MessageType::BROWSE_FOLDER: {
-                std::thread([this, ct = std::move(content)]() {
+                std::thread([this, ct = content]() {
                     auto initialPath = fs::u8path(ct["initialPath"].get<std::string>());
-
-                    Utils::OpenFolderPicker(initialPath, [&](auto path, bool canceled) {
-                        _ctrlSv.Broadcast(MessageType::BROWSE_FOLDER, {
-                            { "reqId", ct["reqId"] },
-                            { "path", Utils::PathToUtf(path) },
-                        });
+                    auto selectedPath = Utils::OpenFolderPicker(initialPath);
+                    if (selectedPath.empty()) {
+                        selectedPath = initialPath;
+                    }
+                    _ctrlSv.Broadcast(MessageType::BROWSE_FOLDER, {
+                        { "reqId", ct["reqId"] },
+                        { "path", Utils::PathToUtf(selectedPath) },
                     });
                 }).detach();
                 break;
@@ -495,7 +481,7 @@ struct StateManagerImpl : public StateManager
     fs::path MakeTempPath(const std::string& filename)
     {
         fs::create_directories(_dataDir / "temp");
-        return _dataDir / "temp" / Utils::RemoveInvalidPathChars(filename);
+        return _dataDir / "temp" / filename;
     }
 };
 

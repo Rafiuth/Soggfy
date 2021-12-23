@@ -156,7 +156,6 @@
     <ClInclude Include="ControlServer.h" />
     <ClInclude Include="Hooks.h" />
     <ClInclude Include="JsInjector.h" />
-    <ClInclude Include="Utils\PathTemplate.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="Utils\Utils.h" />
     <ClInclude Include="Utils\Http.h" />

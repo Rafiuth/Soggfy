@@ -157,24 +157,10 @@ namespace Utils
         return WideToUtf(dstW);
     }
 
-    std::string RemoveInvalidPathChars(const std::string& src)
-    {
-        std::string dst;
-        dst.reserve(src.length());
-
-        for (char ch : src) {
-            if ((ch >= 0x00 && ch < 0x20) || strchr("\\/:*?\"<>|", ch)) {
-                continue;
-            }
-            dst += ch;
-        }
-        return dst;
-    }
-
-    std::string GetHomeDirectory()
+    std::string GetMusicFolder()
     {
         PWSTR pathW;
-        SHGetKnownFolderPath(FOLDERID_Profile, 0, NULL, &pathW);
+        SHGetKnownFolderPath(FOLDERID_Music, 0, NULL, &pathW);
         auto path = WideToUtf(pathW);
         CoTaskMemFree(pathW);
         return path;
@@ -188,14 +174,13 @@ namespace Utils
         SHOpenFolderAndSelectItems(pidl, 0, NULL, 0);
         CoTaskMemFree(pidl);
     }
-    void OpenFolderPicker(const fs::path& initialPath, std::function<void(const fs::path&, bool)> callback)
+    fs::path OpenFolderPicker(const fs::path& initialPath)
     {
         IFileDialog* fd = NULL;
-        bool callbackCalled = false;
+        fs::path result;
 
         if (FAILED(CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&fd)))) {
-            callback(initialPath, true);
-            return;
+            return result;
         }
         fd->SetOptions(FOS_FORCEFILESYSTEM | FOS_PICKFOLDERS);
         if (!initialPath.empty()) {
@@ -208,20 +193,18 @@ namespace Utils
         }
         fd->Show(NULL);
 
-        IShellItem* result;
-        if (SUCCEEDED(fd->GetResult(&result))) {
+        IShellItem* resultItem;
+        if (SUCCEEDED(fd->GetResult(&resultItem))) {
             PWSTR resultPath = NULL;
-            if (SUCCEEDED(result->GetDisplayName(SIGDN_FILESYSPATH, &resultPath))) {
-                callback(fs::path(resultPath), false);
-                callbackCalled = true;
+            if (SUCCEEDED(resultItem->GetDisplayName(SIGDN_FILESYSPATH, &resultPath))) {
+                result = fs::path(resultPath);
                 CoTaskMemFree(resultPath);
             }
-            result->Release();
-        }
-        if (!callbackCalled) {
-            callback(initialPath, true);
+            resultItem->Release();
         }
         fd->Release();
+
+        return result;
     }
 
     int64_t CurrentMillis()

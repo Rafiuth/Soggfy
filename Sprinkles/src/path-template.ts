@@ -102,7 +102,7 @@ export class PathTemplate
     {
         return template.replace(/{(.+?)}/g, (g0, g1) => {
             let val = vars[g1];
-            return val ? this.replaceInvalidPathChars(val) : g0;
+            return val !== undefined ? this.replaceInvalidPathChars(val) : g0;
         });
     }
     private static replaceInvalidPathChars(str: string)
@@ -166,11 +166,11 @@ export class TemplatedSearchTree
                 });
             }
             node = this.findOrAddChild(node, pattern, literal);
-            if (node.id && node.id !== id) {
-                throw Error(`Node with same path already exists: ${node.id} (trying to add ${id})`);
-            }
-            node.id = id;
         }
+        if (node.id && node.id !== id) {
+            throw Error(`Node with same path already exists: ${node.id} (trying to add ${id})`);
+        }
+        node.id = id;
     }
     
     private findOrAddChild(node: TemplateNode, pattern: string, isLiteral: boolean)
