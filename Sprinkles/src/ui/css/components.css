@@ -122,7 +122,7 @@
     margin: -4px -4px 0;
     padding: 4px;
     list-style: none;
-    background: var(--sgf-inactive);
+    background-color: var(--sgf-inactive);
     color: var(--sgf-text);
     cursor: pointer;
 }
@@ -153,7 +153,7 @@
     background-color: var(--sgf-inactive);
     color: var(--sgf-text);
     font-family: monospace;
-    font-size: 12px;
+    font-size: 11px;
     cursor: pointer;
     padding: 4px;
     margin: 2px;
@@ -239,8 +239,15 @@
     gap: 4px;
     padding: 2px 8px;
     font-size: 14px;
+}
+
+/* Hover effects */
+.sgf-select, .sgf-text-input, .sgf-button, .sgf-collapsible > summary {
     transition: background-color 0.1s ease-in-out;
 }
-.sgf-button:hover {
+.sgf-select:hover, .sgf-text-input:hover, .sgf-button:hover, .sgf-collapsible > summary:hover {
     background-color: var(--sgf-hover);
+}
+.sgf-text-input:focus {
+    box-shadow: 0 0 8px 4px rgb(0 0 0 / 15%);
 }
