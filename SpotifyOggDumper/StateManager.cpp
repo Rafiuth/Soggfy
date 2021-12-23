@@ -216,7 +216,7 @@ struct StateManagerImpl : public StateManager
         json content;
         
         if (uri.starts_with("spotify:")) {
-            content["tracks"] = { { uri, obj } };
+            content["results"] = { { uri, obj } };
         } else {
             content = obj;
             content["playbackId"] = uri;
