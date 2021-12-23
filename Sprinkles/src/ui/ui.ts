@@ -131,13 +131,13 @@ export default class UI
                 UIC.rows("Base Path",           UIC.colSection(basePathTextInput, UIC.button(null, Icons.Folder, browseBasePath))),
                 UIC.rows("Track template",      UIC.textInput("savePaths.track", onChange)),
                 UIC.rows("Podcast template",    UIC.textInput("savePaths.episode", onChange)),
-                playlistM3UPathRow,
+                //playlistM3UPathRow,
                 UIC.rows(UIC.collapsible("Variables", ...pathVarTags)),
-                UIC.row("Generate M3U for playlists", UIC.toggle("generatePlaylistM3U", (k, v) => {
+                /*UIC.row("Generate M3U for playlists", UIC.toggle("generatePlaylistM3U", (k, v) => {
                     v = onChange(k, v);
                     playlistM3UPathRow.style.display = v ? "block" : "none";
                     return v;
-                })),
+                })),*/
                 UIC.row("Save cover art in album folder",   UIC.toggle("saveCoverArt", onChange)),
             )
         );
