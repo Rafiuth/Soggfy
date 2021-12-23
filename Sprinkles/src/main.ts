@@ -5,8 +5,6 @@ import UI from "./ui/ui";
 import config from "./config";
 import { PlayerState } from "./spotify-apis";
 
-const IS_DEBUG = true;
-
 let conn = new Connection(onMessage);
 let playbackTracker = new PlayerStateTracker(onPlayerStateChanged);
 let ui = new UI(conn);
@@ -27,7 +25,7 @@ function onMessage(type: MessageType, payload: any)
             break;
         }
         case MessageType.CLOSED: {
-            if (!IS_DEBUG) {
+            if (PRODUCTION) {
                 ui.setEnabled(false);
             }
             break;

@@ -30,6 +30,9 @@ jobs:
     - name: Build TypeScript
       run: |
         cd Sprinkles/
+        $Env:NODE_ENV = "production"
+        $Env:VERSION_INFO = $Env:GITHUB_REF_NAME + "-" + $Env:GITHUB_SHA.Substring(0, 8);
+        
         npm install
         npm run build
         Copy-Item dist/bundle.js ../build/Release/Soggfy.js
