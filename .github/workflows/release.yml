@@ -30,8 +30,11 @@ jobs:
     - name: Build TypeScript
       run: |
         cd Sprinkles/
+        echo $Env:NODE_PATH
+        
         $Env:NODE_ENV = "production"
         $Env:VERSION_INFO = $Env:GITHUB_REF_NAME + "-" + $Env:GITHUB_SHA.Substring(0, 8);
+        $Env:NODE_PATH = Get-Location
         
         npm install
         npm run build
