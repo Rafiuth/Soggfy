@@ -101,8 +101,32 @@ export class PathTemplate
     static render(template: string, vars: PathTemplateVars)
     {
         return template.replace(/{(.+?)}/g, (g0, g1) => {
-            return vars[g1]?.replace(/[\x00-\x1f\/\\:*?"<>|]/g, "") ?? g0;
+            let val = vars[g1];
+            return val ? this.replaceInvalidPathChars(val) : g0;
         });
+    }
+    private static replaceInvalidPathChars(str: string)
+    {
+        const ReplacementChars = {
+            '\\': '＼',
+            '/': '／',
+            ':': '：',
+            '*': '＊',
+            '?': '？',
+            '"': '＂',
+            '<': '＜',
+            '>': '＞',
+            '|': '￤',
+        };
+        //invalid characters -> similar characters
+        str = str.replace(/[\x00-\x1f\/\\:*?"<>|]/g, v => ReplacementChars[v] ?? " ");
+        //leading/trailling spaces -> "\u2002 En Space"
+        str = str.replace(/(^ +| +$)/g, " ");
+        //trailling dots -> "\uFF0E Fullwidth Stop"
+        //also handles ".."
+        str = str.replace(/\.+$/g, v => "．".repeat(v.length));
+
+        return str;
     }
 }
 
