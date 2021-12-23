@@ -10,7 +10,7 @@
   "keywords": [],
   "author": "",
   "license": "ISC",
-  "devDependencies": {
+  "dependencies": {
     "css-loader": "^6.5.1",
     "ts-loader": "^9.2.6",
     "typescript": "^4.5.2",
