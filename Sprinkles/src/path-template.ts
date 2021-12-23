@@ -1,17 +1,26 @@
 import { PlayerState } from "./spotify-apis";
 
-type PathVar = {
+interface PathVar
+{
     name: string;
     desc: string;
     pattern: string;
     getValue: (meta: any, playback: PlayerState) => string;
 };
 
-export type PathTemplateVars = { [key: string]: string };
+export type PathTemplateVars = Record<string, string>;
+
+function createVarMap(vars: PathVar[])
+{
+    for (let entry of vars) {
+        vars[entry.name] = entry;
+    }
+    return vars as PathVar[] & Record<string, PathVar>;
+}
 
 export class PathTemplate
 {
-    static readonly Vars: PathVar[] = [
+    static readonly Vars = createVarMap([
         {
             name: "track_name",
             desc: "Track name / Episode name",
@@ -78,7 +87,7 @@ export class PathTemplate
                 return s.context.metadata.context_description ?? "unknown";
             }
         }
-    ];
+    ]);
 
     static getVarsFromMetadata(meta: any, playback: PlayerState)
     {
@@ -94,5 +103,65 @@ export class PathTemplate
         return template.replace(/{(.+?)}/g, (g0, g1) => {
             return vars[g1]?.replace(/[\x00-\x1f\/\\:*?"<>|]/g, "") ?? g0;
         });
+    }
+}
+
+interface TemplateNode
+{
+    children: TemplateNode[];
+    pattern: string;
+    literal: boolean;
+    id?: string;
+}
+export class TemplatedSearchTree
+{
+    root: TemplateNode = {
+        children: [],
+        pattern: "",
+        literal: true
+    };
+    private _collator = new Intl.Collator(undefined, { sensitivity: "accent", usage: "search" });
+    private _template: string[];
+
+    constructor(template: string)
+    {
+        this._template = template.split(/[\/\\]/);
+    }
+
+    add(id: string, vars: PathTemplateVars)
+    {
+        let node = this.root;
+        for (let part of this._template) {
+            let pattern = PathTemplate.render(part, vars);
+            let literal = !/{(.+?)}/.test(pattern);
+            if (!literal) { //placeholder is keept for unknown variables
+                pattern = pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+                pattern = pattern.replace(/\\{(.+?)\\}/g, (g0, g1) => {
+                    if (g1 === "_ext") return "\\.(mp3|m4a|mp4|ogg|opus)$";
+                    return PathTemplate.Vars[g1]?.pattern ?? g0;
+                });
+            }
+            node = this.findOrAddChild(node, pattern, literal);
+            if (node.id && node.id !== id) {
+                throw Error(`Node with same path already exists: ${node.id} (trying to add ${id})`);
+            }
+            node.id = id;
+        }
+    }
+    
+    private findOrAddChild(node: TemplateNode, pattern: string, isLiteral: boolean)
+    {
+        for (let child of node.children) {
+            if (child.literal === isLiteral && this._collator.compare(child.pattern, pattern) === 0) {
+                return child;
+            }
+        }
+        let child = {
+            children: [],
+            pattern: pattern,
+            literal: isLiteral
+        };
+        node.children.push(child);
+        return child;
     }
 }

@@ -2,7 +2,7 @@ import config from "../config"
 import { Connection, MessageType } from "../connection";
 import { Selectors } from "./ui";
 import Utils from "../utils";
-import { PathTemplate } from "../metadata";
+import { PathTemplate, TemplatedSearchTree } from "../path-template";
 
 export enum DownloadStatus
 {
@@ -101,32 +101,21 @@ ${icons[info.status]}`;
     }
     private sendUpdateRequest(dirtyRows: HTMLDivElement[])
     {
-        let tracks = [];
         let listSection = document.querySelector('section[data-testid="playlist-page"],[data-testid="album-page"]');
-        
+        let tree = new TemplatedSearchTree(config.savePaths.track + "{_ext}");
+
         for (let row of dirtyRows) {
             let trackInfo = this.getRowTrackInfo(row, listSection);
-
-            tracks.push({
-                uri: trackInfo.uri,
-                vars: {
-                    track_name: trackInfo.name,
-                    artist_name: trackInfo.artistName,
-                    album_name: trackInfo.albumName,
-                }
+            tree.add(trackInfo.uri, {
+                track_name: trackInfo.name,
+                artist_name: trackInfo.artistName,
+                album_name: trackInfo.albumName,
             });
         }
-
-        let unkVars: any = {
-            _ext: `\\.(mp3|m4a|mp4|ogg|opus)$`
-        };
-        for (let pv of PathTemplate.Vars) {
-            unkVars[pv.name] = pv.pattern;
-        }
         this._conn.send(MessageType.DOWNLOAD_STATUS, {
-            pathTemplate: config.savePaths.track.replace(/\.\w+$/, "{_ext}"),
-            tracks,
-            unkVars
+            reqId: 0,
+            searchTree: tree.root,
+            basePath: config.savePaths.basePath
         });
     }
     private getRowTrackInfo(row: Element, listSection: Element)

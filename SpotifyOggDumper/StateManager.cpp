@@ -6,7 +6,6 @@
 #include "Utils/Log.h"
 #include "Utils/Http.h"
 #include "Utils/Utils.h"
-#include "Utils/PathTemplate.h"
 
 struct PlaybackInfo
 {
@@ -135,27 +134,15 @@ struct StateManagerImpl : public StateManager
                         { "message", playback->Status.second }
                     });
                 }
-                else if (content.contains("pathTemplate")) {
-                    PathTemplateSearcher searcher(content["pathTemplate"]);
-                    PathTemplateVars unkVars = content["unkVars"];
-                    for (auto& track : content["tracks"]) {
-                        searcher.Add(track["uri"], track["vars"], unkVars);
-                    }
-                    json existingTracks = json::object();
-                    for (auto& entry : searcher.FindExisting()) {
-                        for (auto& uri : entry.Tokens) {
-                            json track = {
-                                { "status", "DONE" },
-                                { "path", Utils::PathToUtf(entry.Path) }
-                            };
-                            if (entry.Tokens.size() > 1) {
-                                track["status"] = "WARN";
-                                track["message"] = "Multiple tracks mapping to the same filename";
-                            }
-                            existingTracks[uri] = track;
-                        }
-                    }
-                    conn->Send(MessageType::DOWNLOAD_STATUS, { { "tracks", existingTracks } });
+                else if (content.contains("searchTree")) {
+                    json results = json::object();
+                    std::string basePath = content["basePath"];
+                    SearchTemplatedTree(results, content["searchTree"], fs::u8path(basePath));
+
+                    conn->Send(MessageType::DOWNLOAD_STATUS, { 
+                        { "reqId", content["reqId"] },
+                        { "results", results }
+                    });
                 }
                 break;
             }
@@ -182,6 +169,43 @@ struct StateManagerImpl : public StateManager
             }
         }
     }
+    void SearchTemplatedTree(json& results, const json& node, const fs::path& currPath = {}, bool currPathExists = false)
+    {
+        if (!currPath.empty() && !(currPathExists || fs::exists(currPath))) return;
+
+        auto& children = node["children"];
+        if (children.empty()) {
+            results[node["id"].get<std::string>()] = {
+                { "path", Utils::PathToUtf(currPath) },
+                { "status", "DONE" }
+            };
+            return;
+        }
+        std::vector<std::pair<const json*, std::regex>> regexChildren;
+
+        for (auto& child : children) {
+            std::string pattern = child["pattern"];
+            if (child.value("literal", false)) {
+                SearchTemplatedTree(results, node, currPath / fs::u8path(pattern));
+            } else {
+                std::regex regex(pattern, std::regex::ECMAScript | std::regex::icase);
+                regexChildren.emplace_back(&child, regex);
+            }
+        }
+        if (regexChildren.empty()) return;
+
+        for (auto& entry : fs::directory_iterator(currPath)) {
+            auto& path = entry.path();
+            auto pathUtf = Utils::PathToUtf(path.filename());
+
+            for (auto& child : regexChildren) {
+                if (std::regex_match(pathUtf, child.second)) {
+                    SearchTemplatedTree(results, *child.first, path, true);
+                }
+            }
+        }
+    }
+    
     void SendTrackStatus(const std::string& uri, const std::string& status, const std::string& msg = "", const fs::path& path = "")
     {
         json obj = {

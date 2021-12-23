@@ -2,7 +2,7 @@ import Utils from "./utils";
 import { Player, PlayerState, TrackInfo, SpotifyUtils } from "./spotify-apis";
 import Resources from "./resources";
 import config from "./config";
-import { PathTemplate, PathTemplateVars } from "./metadata";
+import { PathTemplate, PathTemplateVars } from "./path-template";
 
 export default class PlayerStateTracker
 {

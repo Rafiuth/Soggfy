@@ -7,7 +7,7 @@ import { Platform, SpotifyUtils } from "../spotify-apis";
 import ComponentsStyle from "./css/components.css";
 import SettingsStyle from "./css/settings.css";
 import StatusIndicatorStyle from "./css/status-indicator.css";
-import { PathTemplate } from "../metadata";
+import { PathTemplate } from "../path-template";
 
 const MergedStyles = [ComponentsStyle, SettingsStyle, StatusIndicatorStyle].join('\n'); //TODO: find a better way to do this
 

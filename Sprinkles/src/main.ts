@@ -58,7 +58,7 @@ function onMessage(type: MessageType, payload: any)
             if (payload.playbackId) {
                 setPlaybackStatusInd(payload.playbackId, payload);
             } else {
-                statusIndicator.updateRows(payload.tracks);
+                statusIndicator.updateRows(payload.results);
             }
             break;
         }
