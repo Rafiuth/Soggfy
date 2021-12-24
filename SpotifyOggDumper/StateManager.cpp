@@ -41,8 +41,12 @@ struct StateManagerImpl : public StateManager
         if (configFile.good()) {
             _config = json::parse(configFile, nullptr, true, true);
         }
-        if (!fs::exists(fs::u8path(_config["savePaths"]["basePath"].get<std::string>()))) {
-            _config["savePaths"]["basePath"] = Utils::GetMusicFolder();
+        
+        std::string basePath = _config["savePaths"]["basePath"];
+        if (!fs::exists(fs::u8path(basePath))) {
+            basePath = Utils::GetMusicFolder() + "\\Soggfy";
+            fs::create_directories(fs::u8path(basePath));
+            _config["savePaths"]["basePath"] = basePath;
         }
         //delete old temp files
         std::error_code deleteError;

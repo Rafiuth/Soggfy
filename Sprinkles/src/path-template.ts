@@ -149,7 +149,7 @@ export class TemplatedSearchTree
 
     constructor(template: string)
     {
-        this._template = template.split(/[\/\\]/);
+        this._template = template.replace(/\..+$/, "{_ext}").split(/[\/\\]/);
     }
 
     add(id: string, vars: PathTemplateVars)

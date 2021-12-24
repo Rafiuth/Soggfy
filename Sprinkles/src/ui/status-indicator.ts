@@ -102,7 +102,7 @@ ${icons[info.status]}`;
     private sendUpdateRequest(dirtyRows: HTMLDivElement[])
     {
         let listSection = document.querySelector('section[data-testid="playlist-page"],[data-testid="album-page"]');
-        let tree = new TemplatedSearchTree(config.savePaths.track + "{_ext}");
+        let tree = new TemplatedSearchTree(config.savePaths.track);
 
         for (let row of dirtyRows) {
             let trackInfo = this.getRowTrackInfo(row, listSection);
