@@ -167,10 +167,12 @@ export class TemplatedSearchTree
             }
             node = this.findOrAddChild(node, pattern, literal);
         }
-        if (node.id && node.id !== id) {
-            throw Error(`Node with same path already exists: ${node.id} (trying to add ${id})`);
+        if (node.id == null) {
+            node.id = id;
+        } else if (node.id !== id) {
+            node.id += ",";
+            node.id += id;
         }
-        node.id = id;
     }
     
     private findOrAddChild(node: TemplateNode, pattern: string, isLiteral: boolean)

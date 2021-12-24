@@ -58,7 +58,21 @@ function onMessage(type: MessageType, payload: any)
             if (payload.playbackId) {
                 setPlaybackStatusInd(payload.playbackId, payload);
             } else {
-                statusIndicator.updateRows(payload.results);
+                let results = payload.results;
+                //split multiple tracks
+                for (let key in results) {
+                    if (!key.includes(",")) continue;
+
+                    let val = {
+                        ...results[key],
+                        status: DownloadStatus.WARN,
+                        message: "Different tracks mapping to the same file name"
+                    };
+                    for (let subkey of key.split(',')) {
+                        results[subkey] = val;
+                    }
+                }
+                statusIndicator.updateRows(results);
             }
             break;
         }
