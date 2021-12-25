@@ -15,7 +15,10 @@ namespace std
 }
 
 //hack to prevent linking to cef library
+#ifndef NDEBUG
 #define NDEBUG
+#endif
+
 #include <include/base/cef_logging.h>
 #undef DCHECK
 #define DCHECK

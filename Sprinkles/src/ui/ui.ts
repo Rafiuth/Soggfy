@@ -184,15 +184,15 @@ export default class UI
                 UIC.row("Output format",        UIC.select("outputFormat", Object.getOwnPropertyNames(defaultFormats), onFormatChange)),
                 customFormatSection,
                 UIC.row("Embed cover art",      UIC.toggle("embedCoverArt", onChange)),
+                UIC.row("Save cover art in album folder", UIC.toggle("saveCoverArt", onChange)),
                 UIC.row("Embed lyrics",         UIC.toggle("embedLyrics", onChange)),
-                UIC.row("Save lyrics as .lrc/.txt",UIC.toggle("saveLyrics", onChange)),
+                UIC.row("Save lyrics as .lrc/.txt", UIC.toggle("saveLyrics", onChange))
             ),
             UIC.section("Paths",
                 UIC.rows("Base Path",           UIC.colSection(basePathTextInput, UIC.button(null, Icons.Folder, browseBasePath))),
                 UIC.rows("Track template",      UIC.textInput("savePaths.track", onChange)),
                 UIC.rows("Podcast template",    UIC.textInput("savePaths.episode", onChange)),
-                UIC.rows(UIC.collapsible("Variables", ...pathVarTags)),
-                UIC.row("Save cover art in album folder",   UIC.toggle("saveCoverArt", onChange)),
+                UIC.rows(UIC.collapsible("Variables", ...pathVarTags))
             )
         );
     }
@@ -207,7 +207,7 @@ export default class UI
                     if (elem.querySelector("ul")) {
                         this.onContextMenuOpened(elem);
                     } else {
-                        //the ... popup has a delay, wait for it to be populated
+                        //the ... popup has a delay before being populated
                         let obs = new MutationObserver(() => {
                             this.onContextMenuOpened(elem);
                             obs.disconnect();
