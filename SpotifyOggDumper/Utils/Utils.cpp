@@ -174,22 +174,49 @@ namespace Utils
         SHOpenFolderAndSelectItems(pidl, 0, NULL, 0);
         CoTaskMemFree(pidl);
     }
-    fs::path OpenFolderPicker(const fs::path& initialPath)
+    fs::path OpenFilePicker(FilePickerType type, const fs::path& initialPath, const std::vector<std::string>& fileTypes)
     {
         IFileDialog* fd = NULL;
         fs::path result;
 
-        if (FAILED(CoCreateInstance(CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&fd)))) {
+        bool isSave = type == FilePickerType::SAVE_FILE;
+        if (FAILED(CoCreateInstance(isSave ? CLSID_FileSaveDialog : CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&fd)))) {
             return result;
         }
-        fd->SetOptions(FOS_FORCEFILESYSTEM | FOS_PICKFOLDERS);
+        FILEOPENDIALOGOPTIONS opts = FOS_FORCEFILESYSTEM | FOS_STRICTFILETYPES;
+        if (type == FilePickerType::SELECT_FOLDER) opts |= FOS_PICKFOLDERS;
+        fd->SetOptions(opts);
+
+        if (isSave && !fileTypes.empty()) {
+            std::vector<COMDLG_FILTERSPEC> filters;
+            std::wstring buf;
+
+            for (auto& str : fileTypes) {
+                size_t bufPos = buf.size();
+                size_t sepPos = str.find('|');
+
+                buf.append(str.begin(), str.end());
+                buf[bufPos + sepPos] = L'\0'; //replace '|' with '\0'
+                buf += L'\0';
+
+                filters.push_back({
+                    .pszName = buf.data() + bufPos,
+                    .pszSpec = buf.data() + bufPos + sepPos + 1
+                });
+            }
+            fd->SetFileTypes(filters.size(), filters.data());
+        }
         if (!initialPath.empty()) {
             fs::path normPath = fs::absolute(initialPath);
             IShellItem* item;
             if (SUCCEEDED(SHCreateItemFromParsingName(normPath.c_str(), NULL, IID_PPV_ARGS(&item)))) {
-                fd->SetDefaultFolder(item);
+                fd->SetFolder(item);
                 item->Release();
             }
+        }
+        if (!initialPath.empty() && type != FilePickerType::SELECT_FOLDER) {
+            fs::path filename = initialPath.filename();
+            fd->SetFileName(filename.c_str());
         }
         fd->Show(NULL);
 

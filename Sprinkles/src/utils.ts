@@ -90,7 +90,7 @@ export default class Utils
         }
         //now find the react state
         let state = node[keyof_ReactEventHandlers];
-        for (let i = path.length - 1; i >= 0; i--) {
+        for (let i = path.length - 1; i >= 0 && state != null; i--) {
             let loc = path[i];
             
             //find the react state children, ignoring "non element" children
@@ -101,7 +101,7 @@ export default class Utils
                 if (isElem && ++childElemIndex === loc.index) break;
                 childStateIndex++;
             }
-            state = state.children[childStateIndex].props;
+            state = state.children[childStateIndex]?.props;
             node = loc.next;
         }
         return state;

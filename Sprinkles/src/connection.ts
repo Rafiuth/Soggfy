@@ -7,31 +7,36 @@ enum MessageType
      * [S->C] Once the connection is established.
      * [C->S] To update a toplevel config field.
      */
-    SYNC_CONFIG      = 1,
+    SYNC_CONFIG         = 1,
     /**
      * [S->C] To request metadata for a given playbackId.
      * [C->S] In response for a request with all metadata necessary to save a track.
      * Note that the client also removes the playbackId from the tracking state.
      */
-    TRACK_META       = 2,
+    TRACK_META          = 2,
     /** 
      * [C->S] To request the download status of a list of tracks (uri, name, album, artist).
      * [S->C] In response to a request with a map of uri -> { path }.
      * [S->C] Whenever a download is aborted or completed with a playbackId.
      */
-    DOWNLOAD_STATUS  = 3,
+    DOWNLOAD_STATUS     = 3,
     /**
      * [C->S] To open the file explorer with the specified file selected.
      */
-    OPEN_FOLDER      = 4,
+    OPEN_FOLDER         = 4,
 
     /**
-     * [C->S] To open a directory browse dialog and update config.savePaths.basePath accordingly
+     * [C->S] To open a path browser dialog. { type: 1 = OPEN_FILE | 2 = SAVE_FILE | 3 = SELECT_FOLDER }
      */
-    BROWSE_FOLDER    = 5,
+    OPEN_FILE_PICKER    = 5,
     
-    READY            = -1, //Internal
-    CLOSED           = -2, //Internal
+    /**
+     * [C->S] To write data in a file.
+     */
+    WRITE_FILE          = 6,
+    
+    READY               = -1, //Internal
+    CLOSED              = -2, //Internal
 }
 type MessageHandler = (type: MessageType, payload: any, payloadPayload?: ArrayBuffer) => void;
 

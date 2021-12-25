@@ -99,7 +99,7 @@ ${icons[info.status]}`;
             }
         }
     }
-    private sendUpdateRequest(dirtyRows: HTMLDivElement[])
+    private async sendUpdateRequest(dirtyRows: HTMLDivElement[])
     {
         let listSection = document.querySelector('section[data-testid="playlist-page"],[data-testid="album-page"]');
         let tree = new TemplatedSearchTree(config.savePaths.track);
@@ -112,11 +112,26 @@ ${icons[info.status]}`;
                 album_name: trackInfo.albumName,
             });
         }
-        this._conn.send(MessageType.DOWNLOAD_STATUS, {
-            reqId: 0,
+        let data = await this._conn.request(MessageType.DOWNLOAD_STATUS, {
             searchTree: tree.root,
             basePath: config.savePaths.basePath
         });
+        let results = data.payload.results;
+        //split multiple tracks
+        for (let key in results) {
+            if (!key.includes(",")) continue;
+
+            let val = {
+                ...results[key],
+                status: DownloadStatus.WARN,
+                message: "Different tracks mapping to the same file name"
+            };
+            for (let subkey of key.split(',')) {
+                results[subkey] = val;
+            }
+        }
+
+        this.updateRows(results);
     }
     private getRowTrackInfo(row: Element, listSection: Element)
     {

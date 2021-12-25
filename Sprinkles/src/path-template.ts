@@ -1,3 +1,4 @@
+import Resources from "./resources";
 import { PlayerState } from "./spotify-apis";
 
 interface PathVar
@@ -32,6 +33,12 @@ export class PathTemplate
             desc: "Artist name / Publisher name",
             pattern: `.+`,
             getValue: m => m.album_artist
+        },
+        {
+            name: "all_artist_names",
+            desc: "Name of all artists featured in the track, separated by comma",
+            pattern: `.+`,
+            getValue: m => m.artist ? m.artist.replaceAll("/", ", ") : m.album_artist
         },
         {
             name: "album_name",
@@ -97,15 +104,63 @@ export class PathTemplate
         }
         return vals;
     }
+    /** Returns a object with metadata and variables for all tracks in the specified album or playlist. */
+    static async getTracks(uri: string)
+    {
+        let type = Resources.getUriType(uri);
+
+        if (type === "playlist") {
+            let data = await Resources.getPlaylistTracks(uri, true);
+            
+            return {
+                name: data.name,
+                type: "playlist",
+                tracks: data.tracks.items.map(track => ({
+                    uri: track.uri,
+                    durationMs: track.duration.milliseconds,
+                    vars: {
+                        track_name: track.name,
+                        artist_name: track.artists[0].name,
+                        all_artist_names: track.artists.map(v => v.name).join(", "),
+                        album_name: track.album.name,
+                        track_num: track.trackNumber,
+                        playlist_name: data.name,
+                        context_name: data.name
+                    }
+                }))
+            };
+        }
+        if (type === "album") {
+            let data = await Resources.getAlbumTracks(uri);
+            
+            return {
+                name: data.name,
+                tracks: data.tracks.items.map(track => ({
+                    uri: track.uri,
+                    durationMs: track.duration_ms,
+                    vars: {
+                        track_name: track.name,
+                        artist_name: track.artists[0].name,
+                        all_artist_names: track.artists.map(v => v.name).join(", "),
+                        album_name: data.name,
+                        track_num: track.track_number,
+                        playlist_name: "unknown",
+                        context_name: data.name
+                    }
+                }))
+            };
+        }
+        throw Error("Unknown URI type: " + type);
+    }
 
     static render(template: string, vars: PathTemplateVars)
     {
         return template.replace(/{(.+?)}/g, (g0, g1) => {
             let val = vars[g1];
-            return val !== undefined ? this.replaceInvalidPathChars(val) : g0;
+            return val !== undefined ? this.escapePath(val) : g0;
         });
     }
-    private static replaceInvalidPathChars(str: string)
+    static escapePath(str: string)
     {
         const ReplacementChars = {
             '\\': '＼',

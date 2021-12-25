@@ -1,17 +1,17 @@
-import { SpotifyUtils, WebAPI } from "./spotify-apis";
+import { Platform, SpotifyUtils, WebAPI } from "./spotify-apis";
 
 class Resources
 {
     static getTrackMetadataWG(uri: string): Promise<TrackMetadataWG>
     {
         let trackId = this.idToHex(this.getUriId(uri, "track"));
-        return SpotifyUtils.fetchAuthed({
+        return this.fetchAuthed({
             url: `https://spclient.wg.spotify.com/metadata/4/track/${trackId}`
         });
     }
     static getColorAndLyricsWG(trackUri: string, coverUri: string): Promise<ColorAndLyricsWG>
     {
-        return SpotifyUtils.fetchAuthed({
+        return this.fetchAuthed({
             url: `https://spclient.wg.spotify.com/color-lyrics/v2/track/${this.getUriId(trackUri)}/image/${encodeURIComponent(coverUri)}`,
             params: {
                 format: "json",
@@ -23,16 +23,60 @@ class Resources
     {
         return await WebAPI.getEpisode(this.getUriId(uri, "episode"));
     }
-    static async getAlbumTracks(uri: string, offset: number, limit: number)
+
+    static async getPlaylistTracks(uri: string, sorted = true)
+    {
+        let api = Platform.getPlaylistAPI();
+        let metadata = await api.getMetadata(uri);
+
+        let sortState = sorted ? SpotifyUtils.getPlaylistSortState(uri) : undefined;
+        let contents = await api.getContents(uri, { sort: sortState });
+
+        return { ...metadata, tracks: contents };
+    }
+    static async getAlbumTracks(uri: string)
     {
         let id = this.getUriId(uri, "album");
-        let params = {
-            offset: offset,
-            limit: limit
+        let result = await this.fetchAuthed({ url: `https://api.spotify.com/v1/albums/${id}` });
+        
+        let nextPageUrl = result.tracks.next;
+        while (nextPageUrl != null) {
+            let page = await this.fetchAuthed({ url: nextPageUrl });
+            result.tracks.items.push(page.items);
+            nextPageUrl = page.next;
+        }
+        return result;
+    }
+
+    /**
+     * Fetches a JSON object from an authenticated Spotify endpoint.
+     */
+    static async fetchAuthed(init: SpRequestInit)
+    {
+        const spt = WebAPI.spotifyTransport;
+        
+        let req: RequestInit = {
+            method: init.method,
+            headers: {
+                "Authorization": "Bearer " + spt.accessToken,
+                "Accept": "application/json",
+                "Accept-Language": spt.locale,
+                ...Object.fromEntries(spt.globalRequestHeaders)
+            }
         };
-        let ep = WebAPI.endpoints.Album;
-        let resp = await ep.getAlbumTracks(WebAPI.spotifyTransport, id, params);
-        return resp.body;
+        if (init.body) {
+            req.body = JSON.stringify(init.body);
+            req.headers["Content-Type"] = "application/json;charset=UTF-8";
+        }
+
+        let url = new URL(init.url);
+        for (let [k, v] of Object.entries(init.params ?? {})) {
+            url.searchParams.append(k, v);
+        }
+        url.searchParams.append("market", spt.market);
+        
+        let resp = await fetch(url.toString(), req);
+        return await resp.json();
     }
 
     static async getImageData(uri: string)
@@ -89,6 +133,14 @@ class Resources
         }
         return val.toString(16).padStart(32, '0');
     }
+}
+interface SpRequestInit
+{
+    url: string;
+    /** Additional url query parameters */
+    params?: Record<string, any>;
+    method?: string;
+    body?: any;
 }
 
 interface TrackMetadataWG

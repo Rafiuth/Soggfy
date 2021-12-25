@@ -4,7 +4,6 @@
 #include "ControlServer.h"
 #include "JsInjector.h"
 #include "Utils/Log.h"
-#include "Utils/Http.h"
 #include "Utils/Utils.h"
 
 struct PlaybackInfo
@@ -17,6 +16,8 @@ struct PlaybackInfo
     bool Discard = false;
     bool ReadyToSave = false;
 };
+//TODO: maybe static link + setlocale for auto u8path construction
+//https://docs.microsoft.com/en-us/cpp/c-runtime-library/global-state?view=msvc-170
 
 struct StateManagerImpl : public StateManager
 {
@@ -140,18 +141,34 @@ struct StateManagerImpl : public StateManager
                 Utils::RevealInFileExplorer(fs::u8path(path));
                 break;
             }
-            case MessageType::BROWSE_FOLDER: {
+            case MessageType::OPEN_FILE_PICKER: {
                 std::thread([this, ct = content]() {
                     auto initialPath = fs::u8path(ct["initialPath"].get<std::string>());
-                    auto selectedPath = Utils::OpenFolderPicker(initialPath);
-                    if (selectedPath.empty()) {
-                        selectedPath = initialPath;
-                    }
-                    _ctrlSv.Broadcast(MessageType::BROWSE_FOLDER, {
+                    auto fileTypes = ct.value("fileTypes", std::vector<std::string>());
+                    auto selectedPath = Utils::OpenFilePicker(ct["type"], initialPath, fileTypes);
+                    bool success = !selectedPath.empty();
+
+                    //FIXME: broadcasting because conn could be freed before this thread finishes
+                    _ctrlSv.Broadcast(MessageType::OPEN_FILE_PICKER, {
                         { "reqId", ct["reqId"] },
-                        { "path", Utils::PathToUtf(selectedPath) },
+                        { "path", Utils::PathToUtf(success ? selectedPath : initialPath) },
+                        { "success", success }
                     });
                 }).detach();
+                break;
+            }
+            case MessageType::WRITE_FILE: {
+                auto path = fs::u8path(content["path"].get<std::string>());
+                std::ofstream ofs(path, std::ios::binary);
+                if (content.contains("textData")) {
+                    ofs << content["textData"].get_ref<const json::string_t&>();
+                } else {
+                    ofs << msg.BinaryContent;
+                }
+                conn->Send(MessageType::WRITE_FILE, {
+                    { "reqId", content["reqId"] },
+                    { "success", true }
+                });
                 break;
             }
             default: {

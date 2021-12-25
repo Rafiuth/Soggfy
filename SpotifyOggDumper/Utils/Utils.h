@@ -4,6 +4,13 @@
 
 namespace fs = std::filesystem;
 
+enum class FilePickerType
+{
+    OPEN_FILE       = 1,
+    SAVE_FILE       = 2,
+    SELECT_FOLDER   = 3
+};
+
 namespace Utils
 {
     void Replace(std::string& str, const std::string& needle, const std::string& replacement);
@@ -30,7 +37,11 @@ namespace Utils
     std::string GetMusicFolder();
     void RevealInFileExplorer(const fs::path& path);
 
-    fs::path OpenFolderPicker(const fs::path& initialPath);
+    /**
+     * @brief Opens a file browser dialog.
+     * @param saveTypes A list of save filters in the format "DisplayName|*.ext"
+     */
+    fs::path OpenFilePicker(FilePickerType type, const fs::path& initialPath, const std::vector<std::string>& fileTypes = {});
 
     int64_t CurrentMillis();
 }

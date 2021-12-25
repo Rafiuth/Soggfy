@@ -26,7 +26,7 @@ let platform = await getPlatform();
 let player: PlayerAPI = platform.getPlayerAPI();
 let cosmos = player._cosmos;
 let webApi = platform?.getAdManagers()?.hpto?.hptoApi?.webApi; //TODO: this api reports telemetry, is it a good idea to use it?
-let user = platform.getUserAPI().getUser();
+let user = await platform.getUserAPI().getUser();
 
 export {
     platform as Platform,
@@ -78,52 +78,12 @@ export class SpotifyUtils
             3: "SECONDARY_ASC",
             4: "SECONDARY_DESC"
         };
-        let state = this.getLocalStorageItem("sortedState")[uri];
-        return !state ? null : {
-            field: state.column,
-            order: SortOrders[state.order]
+        let state = this.getLocalStorageItem("sortedState")?.[uri];
+        return !state ? undefined : {
+            field: state.column as string,
+            order: SortOrders[state.order] as string
         };
     }
-
-    /**
-     * Fetches a JSON object from an authenticated Spotify endpoint.
-     */
-    static async fetchAuthed(init: SpRequestInit)
-    {
-        const spt = webApi.spotifyTransport;
-        
-        let req: RequestInit = {
-            method: init.method,
-            headers: {
-                "Authorization": "Bearer " + spt.accessToken,
-                "Accept": "application/json",
-                "Accept-Language": spt.locale,
-                ...Object.fromEntries(spt.globalRequestHeaders)
-            }
-        };
-        if (init.body) {
-            req.body = JSON.stringify(init.body);
-            req.headers["Content-Type"] = "application/json;charset=UTF-8";
-        }
-
-        let url = new URL(init.url);
-        for (let [k, v] of Object.entries(init.params ?? {})) {
-            url.searchParams.append(k, v);
-        }
-        url.searchParams.append("market", spt.market);
-        
-        let resp = await fetch(url.toString(), req);
-        return await resp.json();
-    }
-}
-
-interface SpRequestInit
-{
-    url: string;
-    /** Additional url query parameters */
-    params?: Record<string, any>;
-    method?: string;
-    body?: any;
 }
 
 interface PlayerAPI

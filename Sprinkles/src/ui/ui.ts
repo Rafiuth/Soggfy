@@ -7,7 +7,8 @@ import { Platform, SpotifyUtils } from "../spotify-apis";
 import ComponentsStyle from "./css/components.css";
 import SettingsStyle from "./css/settings.css";
 import StatusIndicatorStyle from "./css/status-indicator.css";
-import { PathTemplate } from "../path-template";
+import { PathTemplate, TemplatedSearchTree } from "../path-template";
+import Resources from "../resources";
 
 const MergedStyles = [ComponentsStyle, SettingsStyle, StatusIndicatorStyle].join('\n'); //TODO: find a better way to do this
 
@@ -26,11 +27,17 @@ export default class UI
     private _settingsButton: HTMLButtonElement;
     private _conn: Connection;
 
+    private _bodyObs: MutationObserver;
+    private _ctxMenuHooks: ContextMenuItemFactory[] = [];
+
     constructor(conn: Connection)
     {
         this._conn = conn;
         this._styleElement = document.createElement("style");
         this._styleElement.innerHTML = MergedStyles;
+
+        this._bodyObs = new MutationObserver(this.onDocBodyChanged.bind(this));
+        this._bodyObs.observe(document.body, { childList: true });
     }
 
     install()
@@ -43,10 +50,64 @@ export default class UI
             `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M18,15v3H6v-3H4v3c0,1.1,0.9,2,2,2h12c1.1,0,2-0.9,2-2v-3H18z M17,11l-1.41-1.41L13,12.17V4h-2v8.17L8.41,9.59L7,11l5,5 L17,11z"></path></svg>`,
             () => document.body.append(this.createSettingsDialog())
         );
+        this.addContextMenuHook(menuList => {
+            for (let item of menuList.children) {
+                let props = Utils.getReactProps(menuList, item);
+                let isTarget = props && (
+                    (props.contextUri && props.highlightedUri) ||               //Track: Show credits
+                    (props.uri && props.hasOwnProperty("onRemoveCallback")) ||  //Album: Add/remove to library
+                    (props.uri && props.isPublished != null)                    //Playlist: Add/remove to profile
+                );
+                if (isTarget) {
+                    let uri = props.contextUri ?? props.uri;
+                    return {
+                        text: "Export M3U",
+                        location: item as HTMLLIElement,
+                        locationOffset: "beforebegin",
+                        onClick: () => this.createM3U(uri)
+                    };
+                }
+            }
+        });
     }
     setEnabled(enabled: boolean)
     {
         this._settingsButton.disabled = !enabled;
+    }
+
+    private async createM3U(uri: string)
+    {
+        let info = await PathTemplate.getTracks(uri);
+        let tracks = info.tracks;
+        
+        let saveResult = await this._conn.request(MessageType.OPEN_FILE_PICKER, {
+            type: 2 /* SAVE_FILE */,
+            initialPath: config.savePaths.basePath + `/${PathTemplate.escapePath(info.name)}.m3u8`,
+            fileTypes: [ "M3U Playlist|*.m3u8" ]
+        }, null, -1);
+        let savePath = saveResult.payload.path;
+        if (!saveResult.payload.success) return;
+
+        let tree = new TemplatedSearchTree(config.savePaths.track);
+        for (let track of tracks) {
+            tree.add(track.uri, track.vars);
+        }
+
+        let data = await this._conn.request(MessageType.DOWNLOAD_STATUS, {
+            searchTree: tree.root,
+            basePath: config.savePaths.basePath,
+            relativeTo: savePath
+        });
+        let results = data.payload.results;
+        let plData = `#EXTM3U\n#PLAYLIST:${info.name}\n\n`;
+
+        for (let track of tracks) {
+            let loc = results[track.uri];
+            if (!loc) continue;
+            plData += `#EXTINF:${(track.durationMs / 1000).toFixed(0)},${track.vars.artist_name} - ${track.vars.track_name}\n`;
+            plData += `${loc.path}\n\n`;
+        }
+        await this._conn.request(MessageType.WRITE_FILE, { path: savePath, textData: plData })
     }
 
     private createSettingsDialog()
@@ -97,7 +158,8 @@ export default class UI
 
         let basePathTextInput = UIC.textInput("savePaths.basePath", onChange);
         let browseBasePath = async () => {
-            let resp = await this._conn.request(MessageType.BROWSE_FOLDER, {
+            let resp = await this._conn.request(MessageType.OPEN_FILE_PICKER, {
+                type: 3 /* SELECT_FOLDER */,
                 initialPath: config.savePaths.basePath
             }, null, -1);
             basePathTextInput.value = resp.payload.path;
@@ -116,8 +178,6 @@ export default class UI
             pathVarTags.push(tag);
         }
 
-        let playlistM3UPathRow = UIC.rows("Playlist template (M3U)", UIC.textInput("savePaths.playlistM3U", onChange));
-
         return UIC.createSettingOverlay(
             UIC.section("General",
                 UIC.row("Playback speed",       speedSlider),
@@ -131,16 +191,56 @@ export default class UI
                 UIC.rows("Base Path",           UIC.colSection(basePathTextInput, UIC.button(null, Icons.Folder, browseBasePath))),
                 UIC.rows("Track template",      UIC.textInput("savePaths.track", onChange)),
                 UIC.rows("Podcast template",    UIC.textInput("savePaths.episode", onChange)),
-                //playlistM3UPathRow,
                 UIC.rows(UIC.collapsible("Variables", ...pathVarTags)),
-                /*UIC.row("Generate M3U for playlists", UIC.toggle("generatePlaylistM3U", (k, v) => {
-                    v = onChange(k, v);
-                    playlistM3UPathRow.style.display = v ? "block" : "none";
-                    return v;
-                })),*/
                 UIC.row("Save cover art in album folder",   UIC.toggle("saveCoverArt", onChange)),
             )
         );
+    }
+
+    private onDocBodyChanged(records: MutationRecord[])
+    {
+        for (let record of records) {
+            for (let node of record.addedNodes) {
+                let elem = node as HTMLElement;
+
+                if (elem.querySelector("#context-menu")) {
+                    if (elem.querySelector("ul")) {
+                        this.onContextMenuOpened(elem);
+                    } else {
+                        //the ... popup has a delay, wait for it to be populated
+                        let obs = new MutationObserver(() => {
+                            this.onContextMenuOpened(elem);
+                            obs.disconnect();
+                        });
+                        obs.observe(elem, { childList: true, subtree: true });
+                    }
+                }
+            }
+        }
+    }
+
+    public addContextMenuHook(itemFactory: ContextMenuItemFactory)
+    {
+        this._ctxMenuHooks.push(itemFactory);
+    }
+    private onContextMenuOpened(popdiv: HTMLElement)
+    {
+        let list = popdiv.querySelector("ul");
+
+        for (let factory of this._ctxMenuHooks) {
+            let desc = factory(list);
+            if (!desc) continue;
+
+            let itemTemplate = list.querySelector("li button[aria-disabled='false'] span").parentElement.parentElement;
+            let item = itemTemplate.cloneNode(true) as HTMLLIElement;
+            item.querySelector("span").innerText = desc.text;
+            item.querySelector("button").onclick = () => {
+                desc.onClick();
+                popdiv["_tippy"]?.props?.onClickOutside(); //based on Spicetify code
+            };
+            if (!list.contains(desc.location)) throw Error("Location must be inside list");
+            desc.location.insertAdjacentElement(desc.locationOffset ?? "afterend", item);
+        }
     }
 
     private configAccessor(key: string, newValue?: any)
@@ -155,6 +255,16 @@ export default class UI
         }
         return finalValue;
     }
+}
+
+type ContextMenuItemFactory = (menuList: HTMLUListElement) => ContextMenuItemDesc | null;
+interface ContextMenuItemDesc
+{
+    text: string;
+    location?: HTMLLIElement;
+    locationOffset?: "beforebegin" | "afterend";
+
+    onClick: () => void;
 }
 
 /**
