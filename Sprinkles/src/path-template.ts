@@ -6,6 +6,7 @@ interface PathVar
     name: string;
     desc: string;
     pattern: string;
+    dontEscape?: boolean;
     getValue: (meta: any, playback: PlayerState) => string;
 };
 
@@ -68,6 +69,7 @@ export class PathTemplate
             name: "multi_disc_path",
             desc: "'/CD {disc number}' if the album has multiple discs, or empty.",
             pattern: `(\\/CD \\d+)?`,
+            dontEscape: true,
             getValue: m => m.totaldiscs > 1 ? `/CD ${m.disc}` : ""
         },
         {
@@ -81,9 +83,9 @@ export class PathTemplate
             desc: "Playlist name or 'unknown' if the track playback didn't originate from a playlist.",
             pattern: `.+`,
             getValue: (m, s) => {
-                return s.context.uri.startsWith("spotify:playlist:")
-                    ? s.context.metadata.context_description
-                    : "unknown";
+                let name = s.index.itemIndex != null && s.context.uri.startsWith("spotify:playlist:")
+                            ? s.context.metadata.context_description : null;
+                return name ?? "unknown";
             }
         },
         {
@@ -91,7 +93,8 @@ export class PathTemplate
             desc: "Context name or 'unknown' - Similar to {playlist_name}, but includes albums.",
             pattern: `.+`,
             getValue: (m, s) => {
-                return s.context.metadata.context_description ?? "unknown";
+                let name = s.index.itemIndex != null ? s.context.metadata.context_description : null;
+                return name ?? "unknown";
             }
         }
     ]);
@@ -157,7 +160,13 @@ export class PathTemplate
     {
         return template.replace(/{(.+?)}/g, (g0, g1) => {
             let val = vars[g1];
-            return val !== undefined ? this.escapePath(val) : g0;
+            if (val == null) {
+                return g0;
+            }
+            if (!this.Vars[g1]?.dontEscape) {
+                val = this.escapePath(val);
+            }
+            return val;
         });
     }
     static escapePath(str: string)

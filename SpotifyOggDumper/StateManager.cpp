@@ -193,7 +193,7 @@ struct StateManagerImpl : public StateManager
         for (auto& child : children) {
             std::string pattern = child["pattern"];
             if (child.value("literal", false)) {
-                SearchTemplatedTree(results, node, currPath / fs::u8path(pattern));
+                SearchTemplatedTree(results, child, currPath / fs::u8path(pattern));
             } else {
                 std::regex regex(pattern, std::regex::ECMAScript | std::regex::icase);
                 regexChildren.emplace_back(&child, regex);

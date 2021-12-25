@@ -203,17 +203,19 @@ export default class UI
             for (let node of record.addedNodes) {
                 let elem = node as HTMLElement;
 
-                if (elem.querySelector("#context-menu")) {
-                    if (elem.querySelector("ul")) {
-                        this.onContextMenuOpened(elem);
-                    } else {
-                        //the ... popup has a delay before being populated
-                        let obs = new MutationObserver(() => {
+                if (!elem.querySelector("#context-menu")) continue;
+                
+                if (elem.querySelector("ul")) {
+                    this.onContextMenuOpened(elem);
+                } else {
+                    //the ... popup has a delay before being populated
+                    let obs = new MutationObserver(() => {
+                        if (elem.querySelector("ul")) {
                             this.onContextMenuOpened(elem);
-                            obs.disconnect();
-                        });
-                        obs.observe(elem, { childList: true, subtree: true });
-                    }
+                        }
+                        obs.disconnect();
+                    });
+                    obs.observe(elem, { childList: true, subtree: true });
                 }
             }
         }
