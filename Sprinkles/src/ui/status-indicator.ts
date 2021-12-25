@@ -2,7 +2,7 @@ import config from "../config"
 import { Connection, MessageType } from "../connection";
 import { Selectors } from "./ui";
 import Utils from "../utils";
-import { PathTemplate, TemplatedSearchTree } from "../path-template";
+import { TemplatedSearchTree } from "../path-template";
 
 export enum DownloadStatus
 {
@@ -58,14 +58,17 @@ export class StatusIndicator
 
     updateRows(map: { [uri: string]: TrackStatus })
     {
+        //TODO: find a better way to extract data from playlist rows
         let listSection = document.querySelector('section[data-testid="playlist-page"],[data-testid="album-page"]');
+        if (!listSection) return;
+
         let listDiv = listSection.querySelector('div[tabindex="0"]');
         let listDivRows = listDiv.querySelector('div[role="presentation"]:not([class])');
 
         for (let rowWrapper of listDivRows.children) {
             let row = rowWrapper.firstElementChild;
             let trackInfo = this.getRowTrackInfo(row, listSection);
-            let info = map[trackInfo.uri];
+            let info = map[trackInfo?.uri];
             if (!info) continue;
             
             let node = row["__sgf_status_ind"] ??= document.createElement("div");
@@ -102,51 +105,47 @@ ${icons[info.status]}`;
     private async sendUpdateRequest(dirtyRows: HTMLDivElement[])
     {
         let listSection = document.querySelector('section[data-testid="playlist-page"],[data-testid="album-page"]');
+        if (!listSection) return;
+
         let tree = new TemplatedSearchTree(config.savePaths.track);
 
         for (let row of dirtyRows) {
             let trackInfo = this.getRowTrackInfo(row, listSection);
-            tree.add(trackInfo.uri, {
-                track_name: trackInfo.name,
-                artist_name: trackInfo.artistName,
-                album_name: trackInfo.albumName,
-            });
+            if (trackInfo) {
+                tree.add(trackInfo.uri, trackInfo.vars);
+            }
         }
-        let data = await this._conn.request(MessageType.DOWNLOAD_STATUS, {
+        this._conn.send(MessageType.DOWNLOAD_STATUS, {
             searchTree: tree.root,
             basePath: config.savePaths.basePath
         });
-        let results = data.payload.results;
-        //split multiple tracks
-        for (let key in results) {
-            if (!key.includes(",")) continue;
-
-            let val = {
-                ...results[key],
-                status: DownloadStatus.WARN,
-                message: "Different tracks mapping to the same file name"
-            };
-            for (let subkey of key.split(',')) {
-                results[subkey] = val;
-            }
-        }
-
-        this.updateRows(results);
     }
     private getRowTrackInfo(row: Element, listSection: Element)
     {
-        let albumName =
-            (row.querySelector('a[href^="/album"]') as HTMLElement)?.innerText ??
-            (listSection.querySelector('section[data-testid="album-page"] span h1') as HTMLElement).innerText;
-        
+        let isPlaylist = true;
+        let albumName = (row.querySelector('a[href^="/album"]') as HTMLElement)?.innerText;
+        let listTitle = listSection.querySelector("h1")?.innerText;
+
+        if (!albumName) {
+            isPlaylist = false;
+            albumName = listTitle;
+        }
         let menuBtn = row.querySelector(Selectors.rowMoreButton);
+
+        if (albumName == null || menuBtn == null) return;
+
         let extraProps = Utils.getReactProps(row, menuBtn).menu.props;
 
         return {
             uri: extraProps.uri,
-            name: row.querySelector(Selectors.rowTitle).innerText,
-            artistName: row.querySelector(Selectors.rowSubTitle).firstChild.innerText,
-            albumName: albumName
+            vars: {
+                track_name: row.querySelector(Selectors.rowTitle).innerText,
+                artist_name: extraProps.artists[0].name,
+                all_artist_names: extraProps.artists.map(v => v.name).join(", "),
+                album_name: albumName,
+                playlist_name: isPlaylist ? listTitle : "unknown",
+                context_name: listTitle
+            }
         };
     }
 }
