@@ -45,7 +45,6 @@ void ControlServer::Run()
                 _msgHandler(ws->getUserData(), msg);
             } catch (std::exception& ex) {
                 LogWarn("Error while processing message from {}: {}", (void*)ws, ex.what());
-                ws->end(1002 /* CLOSE_PROTOCOL_ERROR */, ex.what());
             }
         },
         .close = [&](WebSocket* ws, int code, std::string_view reason) {

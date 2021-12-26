@@ -138,6 +138,7 @@ export class PathTemplate
             
             return {
                 name: data.name,
+                type: "album",
                 tracks: data.tracks.items.map(track => ({
                     uri: track.uri,
                     durationMs: track.duration_ms,

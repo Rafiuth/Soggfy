@@ -181,8 +181,9 @@ struct StateManagerImpl : public StateManager
         if (!currPath.empty() && !(currPathExists || fs::exists(currPath))) return;
 
         auto& children = node["children"];
-        if (children.empty()) {
-            results[node["id"].get<std::string>()] = {
+        if (children.empty() && node.contains("id")) {
+            std::string id = node["id"];
+            results[id] = {
                 { "path", Utils::PathToUtf(currPath) },
                 { "status", "DONE" }
             };
