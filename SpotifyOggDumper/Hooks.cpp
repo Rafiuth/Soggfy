@@ -5,6 +5,7 @@
 #include "AppVersion.h"
 #include "StateManager.h"
 #include "Utils/Log.h"
+#include "CefUtils.h"
 
 HMODULE _selfModule;
 std::deque<std::string> _logHistory;
@@ -122,7 +123,6 @@ DETOUR_FUNC(__fastcall, void, CloseTrack, (
     }
     CloseTrack_Orig(ecx, edx, param_1, param_2, reason, param_4, param_5);
 }
-
 static const HookInfo HookTargets[] =
 {
     HOOK_INFO(
@@ -180,6 +180,10 @@ void InstallHooks()
         }
         LogDebug("Hook created: {} @ {}", hook.Name, (void*)addr);
     }
+
+    auto urlreqHook = CefUtils::InitUrlBlocker([&](auto url) { return _stateMgr && _stateMgr->IsUrlBlocked(url); });
+    MH_CreateHookApi(L"libcef.dll", "cef_urlrequest_create", urlreqHook.first, urlreqHook.second);
+
     auto enableResult = MH_EnableHook(MH_ALL_HOOKS);
     if (enableResult != MH_OK) {
         throw std::runtime_error("Failed to enable hooks (code " + std::to_string(enableResult) + ")");

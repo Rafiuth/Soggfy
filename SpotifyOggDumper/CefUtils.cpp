@@ -1,8 +1,8 @@
-#include "JsInjector.h"
+#include "CefUtils.h"
 #include "Hooks.h"
+#include "Utils/Log.h"
 
 #include <memory>
-#include <functional>
 
 #include <type_traits>
 
@@ -29,6 +29,7 @@ namespace std
 #include <include/capi/cef_thread_capi.h>
 #include <include/internal/cef_types_wrappers.h>
 #include <include/cef_version.h>
+#include <include/capi/cef_urlrequest_capi.h>
 
 #pragma comment(lib, "../external/cef_bin/Release/libcef.lib")
 
@@ -179,9 +180,9 @@ _CefContext* FindCefContext()
     return **(_CefContext***)(addr + 6);
 }
 
-namespace JsInjector
+namespace CefUtils
 {
-    void Inject(const std::string& code)
+    void InjectJS(const std::string& code)
     {
         auto context = FindCefContext();
 
@@ -192,5 +193,37 @@ namespace JsInjector
 
             CEF_STRING_ABANDON(url);
         }
+    }
+
+    typedef cef_urlrequest_t* (*cef_urlrequest_create_proc)(
+        _cef_request_t* request,
+        _cef_urlrequest_client_t* client,
+        _cef_request_context_t* request_context
+    );
+    cef_urlrequest_create_proc UrlRequestCreate_Orig;
+    std::function<bool(std::wstring_view)> _isUrlBlocked;
+
+    cef_urlrequest_t* UrlRequestCreate_Detour(
+        _cef_request_t* request,
+        _cef_urlrequest_client_t* client,
+        _cef_request_context_t* request_context)
+    {
+        auto url = request->get_url(request);
+        auto urlsv = std::wstring_view(url->str, url->length);
+        bool blocked = _isUrlBlocked(urlsv);
+
+        if (LogMinLevel <= LOG_TRACE) {
+            LogTrace("CefRequestCreate: [{}] {}", blocked ? "x" : ">", std::string(urlsv.begin(), urlsv.end()));
+        }
+        cef_string_userfree_free(url);
+        return blocked ? nullptr : UrlRequestCreate_Orig(request, client, request_context);
+    }
+    std::pair<OpaqueFn, OpaqueFn*> InitUrlBlocker(std::function<bool(std::wstring_view)> isUrlBlocked)
+    {
+        _isUrlBlocked = isUrlBlocked;
+        return std::make_pair(
+            (OpaqueFn)&UrlRequestCreate_Detour,
+            (OpaqueFn*)&UrlRequestCreate_Orig
+        );
     }
 }

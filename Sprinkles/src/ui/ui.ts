@@ -95,8 +95,7 @@ export default class UI
 
         let data = await this._conn.request(MessageType.DOWNLOAD_STATUS, {
             searchTree: tree.root,
-            basePath: config.savePaths.basePath,
-            relativeTo: savePath
+            basePath: config.savePaths.basePath
         });
         let results = data.payload.results;
         let plData = `#EXTM3U\n#PLAYLIST:${info.name}\n\n`;
@@ -189,10 +188,13 @@ export default class UI
                 UIC.row("Save lyrics as .lrc/.txt", UIC.toggle("saveLyrics", onChange))
             ),
             UIC.section("Paths",
-                UIC.rows("Base Path",           UIC.colSection(basePathTextInput, UIC.button(null, Icons.Folder, browseBasePath))),
+                UIC.rows("Base path",           UIC.colSection(basePathTextInput, UIC.button(null, Icons.Folder, browseBasePath))),
                 UIC.rows("Track template",      UIC.textInput("savePaths.track", onChange)),
                 UIC.rows("Podcast template",    UIC.textInput("savePaths.episode", onChange)),
                 UIC.rows(UIC.collapsible("Variables", ...pathVarTags))
+            ),
+            UIC.section("Misc",
+                UIC.row("Block ads and telemetry",UIC.toggle("blockAds", onChange)),
             )
         );
     }

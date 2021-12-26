@@ -2,7 +2,7 @@
 
 #include "StateManager.h"
 #include "ControlServer.h"
-#include "JsInjector.h"
+#include "CefUtils.h"
 #include "Utils/Log.h"
 #include "Utils/Utils.h"
 
@@ -78,7 +78,7 @@ struct StateManagerImpl : public StateManager
                     LogInfo("Injecting JS...");
                     std::string srcJs(std::istreambuf_iterator<char>(srcJsFile), {});
                     Utils::Replace(srcJs, "ws://127.0.0.1:28653/sgf_ctrl", msg.Content["addr"]);
-                    JsInjector::Inject(srcJs);
+                    CefUtils::InjectJS(srcJs);
                 }
                 LogInfo("Ready");
                 break;
@@ -130,7 +130,7 @@ struct StateManagerImpl : public StateManager
                     SearchTemplatedTree(results, content["searchTree"], fs::u8path(basePath));
 
                     conn->Send(MessageType::DOWNLOAD_STATUS, { 
-                        { "reqId", content["reqId"] },
+                        { "reqId", content.value("reqId", 0) },
                         { "results", results }
                     });
                 }
@@ -304,6 +304,16 @@ struct StateManagerImpl : public StateManager
         if (newSpeed > 0) {
             speed = newSpeed;
             return true;
+        }
+        return false;
+    }
+    bool IsUrlBlocked(std::wstring_view url)
+    {
+        if (_config.value("blockAds", true)) {
+            //https://github.com/abba23/spotify-adblock/blob/main/config.toml#L73
+            return url.starts_with(L"https://spclient.wg.spotify.com/ads/") ||
+                   url.starts_with(L"https://spclient.wg.spotify.com/ad-logic/") ||
+                   url.starts_with(L"https://spclient.wg.spotify.com/gabo-receiver-service/");
         }
         return false;
     }

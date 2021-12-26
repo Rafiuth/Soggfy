@@ -143,7 +143,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="Hooks.cpp" />
-    <ClCompile Include="JsInjector.cpp" />
+    <ClCompile Include="CefUtils.cpp" />
     <ClCompile Include="pch.cpp" />
     <ClCompile Include="ControlServer.cpp" />
     <ClCompile Include="Utils\Utils.cpp" />
@@ -155,7 +155,7 @@
     <ClInclude Include="AppVersion.h" />
     <ClInclude Include="ControlServer.h" />
     <ClInclude Include="Hooks.h" />
-    <ClInclude Include="JsInjector.h" />
+    <ClInclude Include="CefUtils.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="Utils\Utils.h" />
     <ClInclude Include="Utils\Http.h" />

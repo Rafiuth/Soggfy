@@ -11,6 +11,7 @@ public:
     virtual void DiscardTrack(const std::string& playbackId, const std::string& reason = "") = 0;
 
     virtual bool OverridePlaybackSpeed(double& speed) = 0;
+    virtual bool IsUrlBlocked(std::wstring_view url) = 0;
 
     virtual void RunControlServer() = 0;
     //Closes any open files and the control server.
