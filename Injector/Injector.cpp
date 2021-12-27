@@ -179,7 +179,7 @@ PROCESS_INFORMATION FindTargetProcess()
     }
     return target;
 }
-void CleanupTargetProcess(PROCESS_INFORMATION& target)
+void CloseProcess(PROCESS_INFORMATION& target)
 {
     if (target.hThread) {
         CloseHandle(target.hThread);
@@ -203,11 +203,12 @@ int main()
         std::cout << "Injection succeeded!\n";
     } catch (std::exception& ex) {
         std::cout << "Error: " << ex.what() << "\n";
-        for (int i = 5; i > 0; i--) {
-            std::cout << "Exiting in " << i << "s...\r";
-            Sleep(1000);
-        }
     }
-    CleanupTargetProcess(targetProc);
+    CloseProcess(targetProc);
+    
+    for (int i = 3; i > 0; i--) {
+        std::cout << "Exiting in " << i << "s...\r";
+        Sleep(1000);
+    }
     return 0;
 }

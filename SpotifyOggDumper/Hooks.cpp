@@ -207,7 +207,7 @@ std::filesystem::path GetModuleFileNameEx(HMODULE module)
 
 void Exit()
 {
-    LogInfo("Uninstalling... (you can close this console now)");
+    LogInfo("Uninstalling...");
 
     MH_DisableHook(MH_ALL_HOOKS);
     MH_Uninitialize();
@@ -215,15 +215,21 @@ void Exit()
     _stateMgr->Shutdown();
     _stateMgr = nullptr;
 
-    FreeConsole();
+    CloseLogger();
     FreeLibraryAndExitThread(_selfModule, 0);
 }
 
 DWORD WINAPI Init(LPVOID param)
 {
-    InstallConsole();
-
     auto dataDir = GetModuleFileNameEx(_selfModule).parent_path();
+    
+    bool logToCon = true;
+    fs::path logFile = dataDir / "log.txt";
+#if NDEBUG
+    logToCon = fs::exists(dataDir / "_debug.txt"); //TODO: move this to config.json
+#endif
+    InitLogger(logToCon, logFile);
+
     _stateMgr = StateManager::New(dataDir);
 
     try {
@@ -234,22 +240,25 @@ DWORD WINAPI Init(LPVOID param)
 
         std::thread(&StateManager::RunControlServer, _stateMgr).detach();
     } catch (std::exception& ex) {
-        LogError("Failed to install hooks: {}", ex.what());
+        auto msg = std::string("Failed to install hooks: ") + ex.what() + "\n\nTry update Soggfy.";
+        LogError("{}", msg);
+        if (!logToCon) MessageBoxA(NULL, msg.c_str(), "Soggfy", MB_ICONERROR);
         Exit();
     }
     LogInfo("Hooks were successfully installed.");
 
-    //TODO: eject through UI?
-    while (true) {
-        auto ch = std::tolower(std::cin.get());
+    if (logToCon) {
+        while (true) {
+            auto ch = std::tolower(std::cin.get());
 
-        if (ch == 'l') {
-            LogMinLevel = (LogLevel)(LogMinLevel == LOG_TRACE ? LOG_INFO : LogMinLevel - 1); // cycle through [INFO, DEBUG, TRACE]
-            LogInfo("Min log level set to {}", (int)LogMinLevel);
+            if (ch == 'l') {
+                LogMinLevel = (LogLevel)(LogMinLevel == LOG_TRACE ? LOG_INFO : LogMinLevel - 1); // cycle through [INFO, DEBUG, TRACE]
+                LogInfo("Min log level set to {}", (int)LogMinLevel);
+            }
+            if (ch == 'u') break;
         }
-        if (ch == 'u') break;
+        Exit();
     }
-    Exit();
     return 0;
 }
 
