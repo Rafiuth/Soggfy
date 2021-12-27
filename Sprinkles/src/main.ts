@@ -79,10 +79,13 @@ function onMessage(type: MessageType, payload: any)
     }
 }
 
-function setPlaybackStatusInd(playbackId: string, status: TrackStatus)
+function setPlaybackStatusInd(playbackId: string, data: TrackStatus)
 {
     let info = playbackTracker.getTrackInfo(playbackId);
     if (info) {
-        statusIndicator.updateRows({ [info.uri]: status });
+        statusIndicator.updateRows({ [info.uri]: data });
+    }
+    if (data.status === DownloadStatus.ERROR || data.status === DOWNLOAD_STATUS.DONE) {
+        playbackTracker.remove(playbackId);
     }
 }
