@@ -1,9 +1,8 @@
-
 <div align="center">
 
 # Soggfy - SpotifyOggDumper
 
-An downloader mod for the Windows Spotify client
+A downloader mod for the Windows Spotify client
 [![Discord](https://discord.com/api/guilds/897274718942531594/widget.png)](https://discord.gg/syc9aMDVBf)
 
 <img align="right" src="https://user-images.githubusercontent.com/53208252/147526053-a62850c2-9ee9-471f-83c1-481f2f0dca32.png" width="250" />
