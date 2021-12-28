@@ -28,6 +28,7 @@ If the injector crashes because missing DLLs, you need to install the [MSVC Redi
 - Songs are only downloaded if you play them from start to finish, without seeking (pausing is fine).
 - Quality depends on the account you are using: _160Kb/s_ or _320Kb/s_ for _free_ and _premium_ accounts respectively. Note that you may need to change the streaming quality to "Very high" on Spotify settings.
 _This only applies to the original OGGs._
+- If you are converting to AAC and care about quality, read this: [High quality AAC](/USAGE.md#high-quality-aac)
 - **You could get banned by using this. Please consider using alt accounts or keeping backups (see [Exportify](https://watsonbox.github.io/exportify) and [SpotMyBackup](http://www.spotmybackup.com)).**
 - Last supported Spotify client version: [1.1.74.631.g0b24d9ad-16](https://upgrade.scdn.co/upgrade/client/win32-x86/spotify_installer-1.1.74.631.g0b24d9ad-16.exe)
 
