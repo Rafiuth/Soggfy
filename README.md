@@ -1,37 +1,41 @@
+
+<div align="center">
+
 # Soggfy - SpotifyOggDumper
+
+An downloader mod for the Windows Spotify client
 [![Discord](https://discord.com/api/guilds/897274718942531594/widget.png)](https://discord.gg/syc9aMDVBf)
 
-Previous Spotify downloader projects ([XSpotify](https://web.archive.org/web/20200303145624/https://github.com/meik97/XSpotify), spotifykeydumper) worked by recovering encryption keys and re-downloading tracks manually from Spotify's CDN.
+<img align="right" src="https://user-images.githubusercontent.com/53208252/147526053-a62850c2-9ee9-471f-83c1-481f2f0dca32.png" width="250" />
+</div>
 
-This project takes a completely different approach - by hooking directly into functions that demux the (already decrypted) OGG stream, a replica of the track can be reconstructed without any quality loss. The resulting files are automatically tagged with metadata fetched from Spotify's public API.
+# Features
+- Integration with Spotify's UI
+- Download and/or embed lyrics
+- Generate M3U for albums and playlists
+- Controllable playback speed
+- Automatic conversion to MP3 and many other formats
 
-**Soggfy does not download from YouTube, or other sources unlike most other "Spotify Downloading Tools." It actually dumps from Spotify!**
+# Installation and Usage
+1. Download and extract the `.zip` package of the [latest release](https://github.com/Rafiuth/Soggfy/releases/latest)
+2. Open Spotify, then run `Injector.exe`. If it works, a download button will appear on Spotify's top bar (you may click on it to change settings)
+3. After that, any song you play will be downloaded to the selected save path
 
-# Installation
-1. Go to the [releases page](https://github.com/Rafiuth/Soggfy/releases) and download the latest version of Soggfy from the `.zip` file
-2. Right click your downloaded `.zip`, then select "Extract All" or "Extract Here" if you have WinRAR or 7-zip installed.
-3. Disable your antivirus or Windows Defender because it may flag the `Injector.exe` file you find in the extracted folder. Antiviruses detect this file because they think its some sort of virus that changes a program to make it malicious, but don't worry, this doesn't do that.
-4. Open up Spotify, make sure it's updated to the latest version and then run the `Injector.exe` file in the Soggfy folder.
-5. Once you ran the Injector, a new Spotify window should open up with `SOGGFY` in it, and everything should look fine.
-6. Play the music you want to download and enjoy! Read [Notes](https://github.com/Rafiuth/Soggfy#Notes) for more info.
+You may need to disable or whitelist Soggfy in your anti-virus for this to work
+If the injector crashes because missing DLLs, you need to install the [MSVC Redistributable package](https://aka.ms/vs/17/release/vc_redist.x86.exe).
 
-## Enabling tagging and conversion
-1. Run `DownloadFFmpeg.ps1` (right click it and select `Run with PowerShell`). If you see any prompts about execution policy, press A.
-2. Drag and drop the `config.json` file into notepad;
-3. Change the value of `convert_to` to the format you want, one listed in `formats`. e.g: `"convert_to": "MP3 320K"`
-4. Save the file and inject Soggfy as described above.
-
-_Step 1 is not necessary if you already have ffmpeg installed and set on `%PATH%`_
-
-## Blocking Spotify updates
-Spotify auto updates itself every about two weeks. Soggfy will stop working because the function addresses that need to be intercepted changes.
-You can optionally prevent this by running `BlockSpotifyUpdates.bat`.
-   
 # Notes
-- Tracks are dumped in real time, seeking or skipping will cancel the dump / download.
-- Podcasts can be downloaded as long as they are audio only. They may also have lower bitrate: OGG 96Kb/s or MP3 128Kb/s.
-- Video podcasts such as The Joe Rogan Experience, Misfits, Storytime with Seth Rogan, and others cannot be downloaded yet.
-- Default save path is `%userprofile%/Music/Soggfy`. It can be changed in `config.json`.
-- Quality depends on account type: 160Kb/s for free accounts, and 320Kb/s for premium accounts. It may also depend on the client settings.
-- **You could get banned by using this. Please consider using alt accounts or keeping backups (see [Exportify](https://watsonbox.github.io/exportify) or [SpotMyBackup](http://www.spotmybackup.com)).**
-- Last supported Spotify client version: [1.1.70.610.g4585142b](https://upgrade.scdn.co/upgrade/client/win32-x86/spotify_installer-1.1.70.610.g4585142b-8.exe)
+- Songs are only downloaded if you play them from start to finish, without seeking (pausing is fine).
+- Quality depends on the account you are using: _160Kb/s_ or _320Kb/s_ for _free_ and _premium_ accounts respectively. Note that you may need to change the streaming quality to "Very high" on Spotify settings.
+_This only applies to the original OGGs._
+- **You could get banned by using this. Please consider using alt accounts or keeping backups (see [Exportify](https://watsonbox.github.io/exportify) and [SpotMyBackup](http://www.spotmybackup.com)).**
+- Last supported Spotify client version: [1.1.74.631.g0b24d9ad-16](https://upgrade.scdn.co/upgrade/client/win32-x86/spotify_installer-1.1.74.631.g0b24d9ad-16.exe)
+
+# How it works
+Soggfy works by intercepting and dumping OGG streams in real time (hence _ogg dumper_ -> s_ogg_fy). Note that this is different from recording the audio output - this actually gets you a copy of the original OGG files, with no loss in quality. They are then optionally converted and embedded with metadata, depending on settings.
+
+# Credits/Tools
+- [XSpotify](https://web.archive.org/web/20200303145624/https://github.com/meik97/XSpotify) and spotifykeydumper - The main source of inspiration for this project
+- [Spicetify](https://github.com/khanhas/spicetify-cli) - Used during development of the UI integration code
+- [abba23's spotify-adblock](https://github.com/abba23/spotify-adblock) - For the built-in ad/telemetry blocker
+- [Ghidra](https://ghidra-sre.org/) and [x64dbg](https://x64dbg.com/) - Tools for reversing and debugging the client
