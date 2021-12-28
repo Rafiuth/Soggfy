@@ -21,7 +21,8 @@ An downloader mod for the Windows Spotify client
 2. Open Spotify, then run `Injector.exe`. If it works, a download button will appear on Spotify's top bar (you may click on it to change settings)
 3. After that, any song you play will be downloaded to the selected save path
 
-You may need to disable or whitelist Soggfy in your anti-virus for this to work
+You may need to disable or whitelist Soggfy in your anti-virus for it to work.
+
 If the injector crashes because missing DLLs, you need to install the [MSVC Redistributable package](https://aka.ms/vs/17/release/vc_redist.x86.exe).
 
 # Notes
