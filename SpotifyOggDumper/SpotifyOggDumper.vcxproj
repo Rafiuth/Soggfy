@@ -147,7 +147,6 @@
     <ClCompile Include="pch.cpp" />
     <ClCompile Include="ControlServer.cpp" />
     <ClCompile Include="Utils\Utils.cpp" />
-    <ClCompile Include="Utils\Http.cpp" />
     <ClCompile Include="Utils\Log.cpp" />
     <ClCompile Include="StateManager.cpp" />
   </ItemGroup>
@@ -158,7 +157,6 @@
     <ClInclude Include="CefUtils.h" />
     <ClInclude Include="pch.h" />
     <ClInclude Include="Utils\Utils.h" />
-    <ClInclude Include="Utils\Http.h" />
     <ClInclude Include="StateManager.h" />
     <ClInclude Include="Utils\Log.h" />
   </ItemGroup>

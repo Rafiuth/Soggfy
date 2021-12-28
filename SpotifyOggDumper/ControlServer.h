@@ -65,12 +65,12 @@ private:
 struct Connection;
 
 using WebSocket = uWS::WebSocket<false, true, Connection>;
-using MessageHandler = std::function<void(Connection*, const Message&)>;
+using MessageHandler = std::function<void(Connection*, Message&&)>;
 
 class ControlServer
 {
 public:
-    ControlServer(const MessageHandler& msgHandler) :
+    ControlServer(MessageHandler msgHandler) :
         _msgHandler(msgHandler)
     {
     }

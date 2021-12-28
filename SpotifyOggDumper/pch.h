@@ -11,22 +11,9 @@
 #include <Windows.h>
 
 #include <cstdint>
-#include <vector>
-#include <unordered_map>
-#include <unordered_set>
-
-#include <string>
-#include <format>
-#include <regex>
-#include <codecvt>
 
 #include <filesystem>
-#include <fstream>
 #include <iostream>
-#include <iterator>
-#include <algorithm>
-
-#include <thread>
 
 #define JSON_DIAGNOSTICS _DEBUG
 #include <nlohmann/json.hpp>

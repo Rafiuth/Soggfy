@@ -1,5 +1,6 @@
 #include "Utils.h"
 #include <chrono>
+#include <codecvt>
 #include <shellapi.h>
 #include <Shlobj.h>
 
@@ -74,8 +75,8 @@ namespace Utils
     }
     std::string PathToUtf(const fs::path& path)
     {
-        auto utf = path.u8string();
-        return std::string((char*)utf.data(), utf.size());
+        std::wstring_convert<std::codecvt_utf8_utf16<wchar_t>> conv;
+        return conv.to_bytes(path.c_str());
     }
 
     std::string EncodeBase64(std::string_view data)

@@ -1,6 +1,7 @@
 #pragma once
 #include "../pch.h"
 #include <filesystem>
+#include <regex>
 
 namespace fs = std::filesystem;
 
@@ -65,3 +66,19 @@ public:
 
     std::string ToString();
 };
+
+namespace nlohmann
+{
+    template<>
+    struct adl_serializer<fs::path>
+    {
+        static void to_json(json& j, const fs::path& val)
+        {
+            j = Utils::PathToUtf(val);
+        }
+        static void from_json(const json& j, fs::path& val)
+        {
+            val = fs::u8path(j.get_ref<const json::string_t&>());
+        }
+    };
+}

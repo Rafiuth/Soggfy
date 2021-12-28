@@ -1,4 +1,6 @@
 #include "pch.h"
+#include <fstream>
+#include <regex>
 
 #include "StateManager.h"
 #include "ControlServer.h"
@@ -34,19 +36,17 @@ struct StateManagerImpl : public StateManager
 
     StateManagerImpl(const fs::path& dataDir) :
         _dataDir(dataDir),
-        _ctrlSv(
-            [this](auto conn, auto& msg) { HandleMessage(conn, msg); }
-        )
+        _ctrlSv(std::bind(&StateManagerImpl::HandleMessage, this, std::placeholders::_1, std::placeholders::_2))
     {
         std::ifstream configFile(dataDir / "config.json");
         if (configFile.good()) {
             _config = json::parse(configFile, nullptr, true, true);
         }
         
-        std::string basePath = _config["savePaths"]["basePath"];
-        if (!fs::exists(fs::u8path(basePath))) {
+        fs::path basePath = _config["savePaths"]["basePath"];
+        if (!fs::exists(basePath)) {
             basePath = Utils::GetMusicFolder() + "\\Soggfy";
-            fs::create_directories(fs::u8path(basePath));
+            fs::create_directories(basePath);
             _config["savePaths"]["basePath"] = basePath;
         }
         //delete old temp files
@@ -64,7 +64,7 @@ struct StateManagerImpl : public StateManager
         _ctrlSv.Run();
     }
 
-    void HandleMessage(Connection* conn, const Message& msg)
+    void HandleMessage(Connection* conn, Message&& msg)
     {
         auto& content = msg.Content;
 
@@ -126,8 +126,7 @@ struct StateManagerImpl : public StateManager
                 }
                 else if (content.contains("searchTree")) {
                     json results = json::object();
-                    std::string basePath = content["basePath"];
-                    SearchTemplatedTree(results, content["searchTree"], fs::u8path(basePath));
+                    SearchTemplatedTree(results, content["searchTree"], content["basePath"]);
 
                     conn->Send(MessageType::DOWNLOAD_STATUS, { 
                         { "reqId", content.value("reqId", 0) },
@@ -137,13 +136,12 @@ struct StateManagerImpl : public StateManager
                 break;
             }
             case MessageType::OPEN_FOLDER: {
-                std::string path = content["path"];
-                Utils::RevealInFileExplorer(fs::u8path(path));
+                Utils::RevealInFileExplorer(content["path"]);
                 break;
             }
             case MessageType::OPEN_FILE_PICKER: {
                 std::thread([this, ct = content]() {
-                    auto initialPath = fs::u8path(ct["initialPath"].get<std::string>());
+                    fs::path initialPath = ct["initialPath"];
                     auto fileTypes = ct.value("fileTypes", std::vector<std::string>());
                     auto selectedPath = Utils::OpenFilePicker(ct["type"], initialPath, fileTypes);
                     bool success = !selectedPath.empty();
@@ -151,14 +149,14 @@ struct StateManagerImpl : public StateManager
                     //FIXME: broadcasting because conn could be freed before this thread finishes
                     _ctrlSv.Broadcast(MessageType::OPEN_FILE_PICKER, {
                         { "reqId", ct["reqId"] },
-                        { "path", Utils::PathToUtf(success ? selectedPath : initialPath) },
+                        { "path", success ? selectedPath : initialPath },
                         { "success", success }
                     });
                 }).detach();
                 break;
             }
             case MessageType::WRITE_FILE: {
-                auto path = fs::u8path(content["path"].get<std::string>());
+                fs::path path = content["path"];
                 std::ofstream ofs(path, std::ios::binary);
                 if (content.contains("textData")) {
                     ofs << content["textData"].get_ref<const json::string_t&>();
@@ -338,8 +336,8 @@ struct StateManagerImpl : public StateManager
             LogInfo("Saving track {}", trackName);
             LogDebug("  stream: {}", Utils::PathToUtf(playback->FileName.filename()));
             
-            fs::path trackPath = fs::u8path(ct["trackPath"].get<std::string>());
-            fs::path coverPath = fs::u8path(ct["coverPath"].get<std::string>());
+            fs::path trackPath = ct["trackPath"];
+            fs::path coverPath = ct["coverPath"];
             fs::path tmpCoverPath = MakeTempPath(ct["coverTempPath"]);
 
             //always cache cover art

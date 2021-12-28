@@ -42,7 +42,7 @@ void ControlServer::Run()
                 }
                 Message msg;
                 msg.Deserialize(data);
-                _msgHandler(ws->getUserData(), msg);
+                _msgHandler(ws->getUserData(), std::move(msg));
             } catch (std::exception& ex) {
                 LogWarn("Error while processing message from {}: {}", (void*)ws, ex.what());
             }
@@ -109,10 +109,6 @@ void SendData(WebSocket* socket, const std::string& data, uWS::OpCode opcode = u
     }
 }
 
-void Connection::Send(const Message& msg)
-{
-    SendData(Socket, msg.Serialize());
-}
 void ControlServer::Broadcast(const Message& msg)
 {
     _loop->defer([this, data = std::move(msg.Serialize())]() {
@@ -120,4 +116,9 @@ void ControlServer::Broadcast(const Message& msg)
             SendData(ws, data);
         }
     });
+}
+
+void Connection::Send(const Message& msg)
+{
+    SendData(Socket, msg.Serialize());
 }
