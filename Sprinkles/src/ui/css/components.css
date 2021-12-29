@@ -166,6 +166,7 @@
 .sgf-notification-bubble {
     display: flex;
     position: absolute;
+    z-index: 999;
     background: #222;
     padding: 2px 4px;
     border-radius: 4px;
@@ -173,22 +174,31 @@
     box-shadow: 1px 1px 4px rgb(0 0 0 / 30%);
 
     animation-name: sgf-fade-out;
-    animation-delay: var(--fade-delay);
-    animation-duration: var(--fade-dur);
+    animation-delay: var(--anim-delay);
+    animation-duration: 0.2s;
 }
 .sgf-notification-bubble::before {
     content: '';
     width: 0;
     height: 0;
-    border-left: 8px solid transparent;
-    border-right: 8px solid transparent;
-    border-bottom: 8px solid transparent;
-    border-top: 6px solid #222;
-
+    border: 8px solid transparent;
     position: absolute;
-    top: 100%;
-    left: calc(50% - 8px);
+    color: #222;
 }
+.sgf-notification-bubble-left::before   { border-left:   6px solid; left: 100%; top: calc(50% - 8px); }
+.sgf-notification-bubble-right::before  { border-right:  6px solid; left: -14px; top: calc(50% - 8px); }
+.sgf-notification-bubble-up::before     { border-top:    6px solid; left: calc(50% - 8px); top: 100%; }
+.sgf-notification-bubble-down::before   { border-bottom: 6px solid; left: calc(50% - 8px); top: -14px; }
+
+.sgf-notification-wrapper {
+    display: flex;
+    align-items: center;
+    padding: 4px 6px;
+    gap: 8px;
+    font-size: 16px;
+    font-weight: 500;
+}
+
 @keyframes sgf-fade-out {
     from { opacity: 1; }
     to { opacity: 0; }

@@ -8,6 +8,8 @@ type SliderOptions = {
 }
 type SwitchButton = HTMLButtonElement & { index: number };
 
+type AlignDir = "up" | "down" | "left" | "right" | "none";
+
 export default class Components
 {
     static createSettingOverlay(...elements: Node[])
@@ -211,21 +213,36 @@ export default class Components
 
         return node;
     }
-    static notification(text: string, anchor: Element, fadeDelay = 5, fadeDur = 0.2)
+    static notification(content: (string | Node), anchor: Element, dir: AlignDir, showArrow = true, fadeDelay = 2.5)
     {
         let node = document.createElement("span");
-        node.className = "sgf-notification-bubble";
-        node.innerText = text;
-        node.style.setProperty("--fade-delay", fadeDelay + "s");
-        node.style.setProperty("--fade-dur", fadeDur + "s");
+        node.className = `sgf-notification-bubble sgf-notification-bubble-${showArrow ? dir : "none"}`;
 
+        if (typeof content === "string") {
+            node.innerText = content;
+        } else {
+            node.appendChild(content);
+        }
+        node.style.setProperty("--anim-delay", fadeDelay + "s");
+        //getBoundingClientRect() won't work before adding to dom
         anchor.parentElement.appendChild(node);
+        node.onanimationend = () => node.remove();
 
         let rect = node.getBoundingClientRect();
         let anchorRect = anchor.getBoundingClientRect();
-        node.style.top = (anchorRect.top - rect.height - 6) + "px";
-        node.style.left = (anchorRect.left + (anchorRect.width - rect.width) / 2) + "px";
-        node.onanimationend = () => node.remove();
+
+        let [x, y, aw, ah] = [anchorRect.left, anchorRect.top, anchorRect.width, anchorRect.height];
+        let cx = (aw - rect.width) / 2;
+        let cy = (ah - rect.height) / 2;
+
+        if (dir === "none") dir = "up";
+        if (dir === "up")    { x += cx;             y -= rect.height + 7; }
+        if (dir === "down")  { x += cx;             y += ah + 7; }
+        if (dir === "left")  { x -= rect.width + 7; y += cy; }
+        if (dir === "right") { x += aw + 7;         y += cy; }
+
+        node.style.left = x + "px";
+        node.style.top = y + "px";
 
         return node;
     }
@@ -257,7 +274,7 @@ export default class Components
     static colDesc(text: string)
     {
         let node = document.createElement("label");
-        node.classList.add("col", "description");
+        node.className = "col description";
         node.innerText = text;
         return node;
     }
