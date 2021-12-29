@@ -4,6 +4,12 @@
   "version": "1.0",
   "dependencies": [
     "minhook",
-    "nlohmann-json"
+    "nlohmann-json",
+    {
+      "name": "usockets",
+      "default-features": false,
+      "features": [ "network" ]
+    },
+    "uwebsockets"
   ]
 }

@@ -1,0 +1,100 @@
+.sgf-settings-overlay {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    background-color: rgba(0, 0, 0, 0.7);
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    overflow: hidden;
+    z-index: 999;
+
+    user-select: none;
+}
+.sgf-settings-modal {
+    width: 40rem;
+    height: 90%;
+    display: block;
+}
+.sgf-settings-container, .sgf-quick-settings-popup {
+    background-color: #333;
+    border-radius: 10px;
+    box-shadow: 0px 0px 8px 4px rgb(0, 0, 0, 0.15);
+    height: inherit;
+    display: flex;
+    flex-direction: column;
+}
+.sgf-quick-settings-popup {
+    position: absolute;
+    width: 380px;
+    height: auto;
+    padding: 4px 8px 8px 8px;
+}
+.sgf-quick-settings-popup .sgf-setting-row {
+    min-height: 0;
+}
+
+.sgf-settings-header {
+    display: flex;
+    align-items: baseline;
+    border-bottom: 1px solid rgba(255,255,255,.1);
+    justify-content: space-between;
+    padding: 32px 32px 12px;
+}
+.sgf-header-title { /* main-type-alto */
+    font-size: 32px;
+    font-weight: 700;
+    letter-spacing: -.04em;
+    line-height: 36px;
+    text-transform: none;
+}
+.sgf-settings-closeBtn {
+    background-color: transparent;
+    border: 0;
+    padding: 8px;
+}
+.sgf-settings-closeBtn:hover {
+    transform: scale(1.1);
+}
+.sgf-settings-closeBtn:active {
+    transform: scale(0.9);
+}
+
+.sgf-settings-elements {
+    overflow: auto;
+    padding: 16px 32px 16px 32px;
+}
+
+.sgf-setting-row {
+    display: flex;
+    align-items: center;
+    flex-direction: row;
+    margin: 4px 0px;
+    min-height: 37px;
+}
+.sgf-setting-row .col.description {
+    float: left;
+    padding-right: 15px;
+    cursor: default;
+    flex: 1;
+}
+.sgf-setting-row .col.action {
+    float: right;
+    text-align: right;
+}
+
+.sgf-setting-rows {
+    display: flex;
+    flex-direction: column;
+}
+.sgf-setting-cols {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 4px;
+}

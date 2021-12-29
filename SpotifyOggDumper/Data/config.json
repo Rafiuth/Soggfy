@@ -1,38 +1,18 @@
 {
-    //The path to save tracks in. Supports all %env_vars% and the following metadata vars:
-    // {album_artist}, {album}, {year}, {track}, {title}
-    "track_path_fmt": "%userprofile%/Music/Soggfy/{album_artist}/{album}/{track}. {title}.ogg",
-
-    //The path to save album covers in. Can be disabled by setting to ""
-    "track_cover_path_fmt": "%userprofile%/Music/Soggfy/{album_artist}/{album}/cover.jpg",
-
-    //Note: {track} is always 0
-    "podcast_path_fmt": "%userprofile%/Music/SoggfyPodcasts/{album_artist}/{album}/{title}.ogg",
-    "podcast_cover_path_fmt": "%userprofile%/Music/SoggfyPodcasts/{album_artist}/{album}/cover.jpg",
-    
-    //One of the formats listed below, or empty to disable conversion. e.g.: "convert_to": "MP3 320K"
-    "convert_to": "",
-    //Change to true if you also want to keep the original OGGs
-    "convert_keep_ogg": false,
-    
-    "formats": {
-        "MP3 320K":         { "ext": "mp3",  "args": "-id3v2_version 3 -c:v copy -c:a libmp3lame -b:a 320k" },
-        "MP3 192K":         { "ext": "mp3",  "args": "-id3v2_version 3 -c:v copy -c:a libmp3lame -b:a 192k" },
-        "MP3 ~240K VBR":    { "ext": "mp3",  "args": "-id3v2_version 3 -c:v copy -c:a libmp3lame -q:a 0" },
-        "MP3 ~160K VBR":    { "ext": "mp3",  "args": "-id3v2_version 3 -c:v copy -c:a libmp3lame -q:a 4" },
-        
-        "AAC 128K":         { "ext": "m4a",  "args": "-disposition:v attached_pic -c:v copy -c:a aac -b:a 128k" },
-        "AAC 256K":         { "ext": "m4a",  "args": "-disposition:v attached_pic -c:v copy -c:a aac -b:a 256k" },     
-        
-        "Opus 128K":        { "ext": "opus", "args": "-c:a libopus -b:a 128k" }
-        
-        //Notes:
-        //- Soggfy will invoke ffmpeg with a command like this: ffmpeg -i {dumped_file} -i {cover} -map 0:0 -map 1:0 {selected_format.args} -metadata ... {out_path}.{selected_format.ext}
-        //- "-c:v copy" is used to prevent ffmpeg from converting covers to PNG. If you find any issues, try removing it or changing to "-c:v mjpeg -pix_fmt yuvj420p -q:v 1"
-        //- You can change or add your own formats if you want. For more info, visit
-        //    Google
-        //    https://ffmpeg.org/ffmpeg-codecs.html
-        //    https://trac.ffmpeg.org/wiki/Encode/MP3
-        //    https://trac.ffmpeg.org/wiki/Encode/AAC
+    "outputFormat": {
+        "args": "-c copy",
+        "ext": ""
+    },
+    "embedLyrics": true,
+    "saveLyrics": true,
+    "embedCoverArt": true,
+    "saveCoverArt": true,
+    "generatePlaylistM3U": true,
+    "playbackSpeed": 1.0,
+    "savePaths": {
+        "basePath": "",
+        "track": "{artist_name}/{album_name}{multi_disc_path}/{track_num}. {track_name}.ogg",
+        "episode": "Podcasts/{artist_name}/{album_name}/{release_date} - {track_name}.ogg",
+        "playlistM3U": "{playlist_name}.m3u8"
     }
 }

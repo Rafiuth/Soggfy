@@ -7,27 +7,19 @@
 #ifndef PCH_H
 #define PCH_H
 
+#define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 
 #include <cstdint>
-#include <vector>
-#include <unordered_map>
-#include <unordered_set>
-
-#include <string>
-#include <format>
-#include <regex>
-#include <codecvt>
 
 #include <filesystem>
-#include <fstream>
 #include <iostream>
-#include <iterator>
-#include <algorithm>
 
-#include <thread>
-
+#define JSON_DIAGNOSTICS _DEBUG
 #include <nlohmann/json.hpp>
+
+namespace fs = std::filesystem;
+using namespace nlohmann;
 
 //undef windows macros that conflict with stdlib
 #undef min

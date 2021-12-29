@@ -1,52 +1,28 @@
-#include <Windows.h>
-#include <TlHelp32.h>
-#include <psapi.h>
-#include <shlobj_core.h>
 #include <iostream>
+#include <filesystem>
 #include <functional>
 #include <unordered_set>
 
-std::wstring NormalizePath(const std::wstring& path)
-{
-    DWORD finalLen = GetFullPathName(path.c_str(), 0, NULL, NULL);
-    std::wstring fullPath;
-    fullPath.resize(finalLen - 1);
+#include <Windows.h>
+#include <winternl.h>
+#include <TlHelp32.h>
+#include <psapi.h>
+#include <shlobj_core.h>
 
-    GetFullPathName(path.c_str(), finalLen, (LPWSTR)fullPath.c_str(), NULL);
-    return fullPath;
-}
+namespace fs = std::filesystem;
 
-BOOL FileExists(LPCTSTR szPath)
+void InjectDll(HANDLE hProc, const fs::path& dllPath)
 {
-  DWORD dwAttrib = GetFileAttributes(szPath);
-
-  return dwAttrib != INVALID_FILE_ATTRIBUTES && 
-         !(dwAttrib & FILE_ATTRIBUTE_DIRECTORY);
-}
-LPVOID GetRemoteProcAddress(HANDLE hProc, LPCWSTR moduleName, LPCSTR procName)
-{
-    //This is fine for a small hack, as kernel32 is always on the same address for all processes.
-    //A more arch independent way to do this is to scan the target process modules for the specified
-    //moduleName, find the entry point of procName in the PE exports, then return mod.lpBaseOfDll + export.EntryPoint.
-    //https://stackoverflow.com/a/22750425
-    HMODULE module = LoadLibrary(moduleName);
-    return GetProcAddress(module, procName);
-}
-void InjectDll(HANDLE hProc, const std::wstring& dllPath)
-{
-    std::wstring fullPath = NormalizePath(dllPath);
-    LPCWSTR path = fullPath.c_str();
-    DWORD pathLenBytes = (fullPath.size() + 1) * 2;
+    fs::path path = fs::absolute(dllPath);
+    std::wstring pathW = path.wstring();
+    DWORD pathLenBytes = (pathW.size() + 1) * 2;
     
-    if (!FileExists(path)) {
-        throw std::exception("DLL file does not exist");
-    }
-    HANDLE loadLibAddr = GetRemoteProcAddress(hProc, L"Kernel32.dll", "LoadLibraryW");
+    HANDLE loadLibAddr = GetProcAddress(GetModuleHandle(L"Kernel32.dll"), "LoadLibraryW");
     LPVOID pathArgAddr = VirtualAllocEx(hProc, NULL, pathLenBytes, MEM_COMMIT | MEM_RESERVE, PAGE_READWRITE);
     if (!pathArgAddr) {
         throw std::exception("Could not allocate memory on target process");
     }
-    WriteProcessMemory(hProc, pathArgAddr, path, pathLenBytes, NULL);
+    WriteProcessMemory(hProc, pathArgAddr, pathW.data(), pathLenBytes, NULL);
 
     HANDLE thread = CreateRemoteThread(hProc, NULL, 0, (LPTHREAD_START_ROUTINE)loadLibAddr, pathArgAddr, 0, NULL);
     if (!thread) {
@@ -85,6 +61,49 @@ void EnumWindowsEx(std::function<BOOL(HWND)> visitor)
     }, (LPARAM)&visitor);
 }
 
+std::wstring GetProcessCommandLine(HANDLE hProc)
+{
+    typedef NTSTATUS(NTAPI* NtQueryInformationProcess_FuncType)(
+        IN HANDLE ProcessHandle,
+        ULONG ProcessInformationClass,
+        OUT PVOID ProcessInformation,
+        IN ULONG ProcessInformationLength,
+        OUT PULONG ReturnLength OPTIONAL
+    );
+    static const auto _QueryProcInfo = (NtQueryInformationProcess_FuncType)GetProcAddress(GetModuleHandle(L"ntdll.dll"), "NtQueryInformationProcess");
+
+    PROCESS_BASIC_INFORMATION info;
+    if (!NT_SUCCESS(_QueryProcInfo(hProc, ProcessBasicInformation, &info, sizeof(info), NULL))) {
+        throw std::exception("Failed to get process information");
+    }
+    PEB peb;
+    RTL_USER_PROCESS_PARAMETERS procParams;
+    ReadProcessMemory(hProc, info.PebBaseAddress, &peb, sizeof(peb), NULL);
+    ReadProcessMemory(hProc, peb.ProcessParameters, &procParams, sizeof(procParams), NULL);
+
+    std::wstring cmdLine(procParams.CommandLine.Length, '\0');
+    ReadProcessMemory(hProc, procParams.CommandLine.Buffer, cmdLine.data(), cmdLine.size(), NULL);
+    return cmdLine;
+}
+
+void KillCrashpadProcess()
+{
+    EnumProcessesEx([&](auto proc) {
+        if (_wcsicmp(proc.szExeFile, L"Spotify.exe") == 0) {
+            DWORD accFlags =
+                PROCESS_TERMINATE | PROCESS_QUERY_INFORMATION |
+                PROCESS_VM_OPERATION | PROCESS_VM_READ | PROCESS_VM_WRITE;
+            HANDLE hProc = OpenProcess(accFlags, false, proc.th32ProcessID);
+            std::wstring cmdLine = GetProcessCommandLine(hProc);
+            if (cmdLine.find(L"--type=crashpad-handler") != std::wstring::npos) {
+                TerminateProcess(hProc, 0);
+                std::cout << "Spotify crash reporter process killed successfully (" << proc.th32ProcessID << ")\n";
+            }
+            CloseHandle(hProc);
+        }
+    });
+}
+
 HANDLE FindMainProcess()
 {
     //Find spotify processes
@@ -119,11 +138,10 @@ HANDLE FindMainProcess()
         false, actualProcId
     );
 }
-bool FindSpotifyExePath(std::wstring& exePath)
+bool FindSpotifyExePath(fs::path& exePath)
 {
     //Check current directory
-    exePath = NormalizePath(L"Spotify.exe");
-    if (FileExists(exePath.c_str())) {
+    if (fs::exists(exePath.c_str())) {
         return true;
     }
     //Check %appdata%/Spotify/Spotify.exe
@@ -132,7 +150,7 @@ bool FindSpotifyExePath(std::wstring& exePath)
     exePath = std::wstring(appdataPath) + L"\\Spotify\\Spotify.exe";
     CoTaskMemFree(appdataPath);
 
-    if (FileExists(exePath.c_str())) {
+    if (fs::exists(exePath)) {
         return true;
     }
     return false;
@@ -146,12 +164,11 @@ PROCESS_INFORMATION FindTargetProcess()
     if (!target.hProcess) {
         std::cout << "Spotify process not found, creating a new one...\n";
 
-        std::wstring exePath;
-        std::wstring workDir;
+        fs::path exePath;
         if (!FindSpotifyExePath(exePath)) {
             throw std::exception("Could not find Spotify exe path");
         }
-        workDir = exePath.substr(0, exePath.find_last_of('\\'));
+        fs::path workDir = exePath.parent_path();
 
         STARTUPINFO startInfo = {};
         startInfo.cb = sizeof(STARTUPINFO);
@@ -162,7 +179,7 @@ PROCESS_INFORMATION FindTargetProcess()
     }
     return target;
 }
-void CleanupTargetProcess(PROCESS_INFORMATION& target)
+void CloseProcess(PROCESS_INFORMATION& target)
 {
     if (target.hThread) {
         CloseHandle(target.hThread);
@@ -182,14 +199,16 @@ int main()
         std::cout << "Injecting dumper dll into process " << GetProcessId(targetProc.hProcess) << "...\n";
 
         InjectDll(targetProc.hProcess, L"SpotifyOggDumper.dll");
+        KillCrashpadProcess();
         std::cout << "Injection succeeded!\n";
     } catch (std::exception& ex) {
         std::cout << "Error: " << ex.what() << "\n";
-        for (int i = 5; i > 0; i--) {
-            std::cout << "Exiting in " << i << "s...\r";
-            Sleep(1000);
-        }
     }
-    CleanupTargetProcess(targetProc);
+    CloseProcess(targetProc);
+    
+    for (int i = 3; i > 0; i--) {
+        std::cout << "Exiting in " << i << "s...\r";
+        Sleep(1000);
+    }
     return 0;
 }

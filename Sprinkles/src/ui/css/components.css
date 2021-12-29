@@ -1,0 +1,263 @@
+:root {
+    --sgf-green: #1db954;
+    --sgf-active: #444;
+    --sgf-inactive: #555;
+    --sgf-hover: #666;
+    --sgf-container-background: #333;
+    --sgf-text: #ddd;
+    --sgf-text-active: #fff;
+}
+
+
+.sgf-toggle-switch {
+    appearance: none;
+    display: inline-block;
+    position: relative;
+    width: 42px;
+    height: 24px;
+    border-radius: 24px;
+    background-color: var(--sgf-inactive);
+    transition: all 0.1s ease;
+    cursor: pointer;
+}
+.sgf-toggle-switch:after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #fff;
+    box-shadow: 0 0 4px rgb(0 0 0 / 20%);
+    transition: all 0.1s ease;
+}
+.sgf-toggle-switch:checked {
+    background-color: var(--sgf-green);
+}
+.sgf-toggle-switch:checked:after {
+    transform: translatex(18px)
+}
+
+.sgf-select {
+    width: 100%;
+    border-radius: 4px;
+    border: 0;
+    background-color: var(--sgf-inactive);
+    color: var(--sgf-text);
+    font-family: arial;
+    font-size: 14px;
+    font-weight: 400;
+    height: 32px;
+    line-height: 20px;
+    padding: 0 32px 0 12px;
+    cursor: pointer;
+}
+
+.sgf-text-input {
+    width: 100%;
+    height: 32px;
+    padding: 0 5px;
+    border-radius: 3px;
+    border: 0;
+    background-color: var(--sgf-inactive);
+    color: var(--sgf-text);
+    font-family: arial;
+    font-size: 14px;
+    font-weight: 400;
+}
+
+.sgf-slider-wrapper {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+}
+.sgf-slider {
+    appearance: none;
+    position: relative;
+    width: 100%;
+    height: 8px;
+    border-radius: 4px;
+    background: var(--sgf-inactive);
+    outline: none;
+    cursor: e-resize;
+}
+.sgf-slider::-webkit-slider-thumb {
+    appearance: none;
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    background: var(--sgf-green);
+}
+.sgf-slider-label {
+    width: 64px;
+    margin-right: 4px;
+    text-align: right;
+    font-size: 11px;
+    background: var(--sgf-container-background);
+    border: none;
+}
+.sgf-slider-label:hover, .sgf-slider-label:focus {
+    border: solid;
+    border-width: 1px;
+    border-color: var(--sgf-active);
+}
+/* TODO: this is all hacky af, there has to be a better way to do it. */
+.sgf-collapsible {
+    padding: 4px 4px 0;
+    margin-top: 8px;
+    background: var(--sgf-active);
+    border-radius: 4px;
+    overflow: hidden;
+    max-height: 33px;
+    transition: max-height 0.5s ease;
+}
+.sgf-collapsible[open] {
+    padding: 4px;
+    border-bottom: 0px;
+    max-height: 30rem;
+}
+.sgf-collapsible > summary {
+    border-radius: 4px;
+    margin: -4px -4px 0;
+    padding: 4px;
+    list-style: none;
+    background-color: var(--sgf-inactive);
+    color: var(--sgf-text);
+    cursor: pointer;
+}
+.sgf-collapsible[open] > summary {
+    margin-bottom: 4px;
+    border-bottom-right-radius: 0px;
+    border-bottom-left-radius: 0px;
+}
+.sgf-collapsible > summary::before {
+    content: '';
+    display: inline-block;
+    vertical-align: middle;
+    margin-left: 6px;
+    margin-right: 8px;
+    transform: translateY(-2px) rotate(-45deg);
+    transition: transform 0.15s ease-in-out;
+    border: solid;
+    border-width: 0 2px 2px 0;
+    padding: 3px;
+}
+.sgf-collapsible[open] > summary::before {
+    transform: translateY(-4px) rotate(45deg);
+}
+
+.sgf-tag-button {
+    border-radius: 4px;
+    border: 0;
+    background-color: var(--sgf-inactive);
+    color: var(--sgf-text);
+    font-family: monospace;
+    font-size: 11px;
+    cursor: pointer;
+    padding: 4px;
+    margin: 2px;
+}
+.sgf-tag-button:hover {
+    background-color: var(--sgf-hover);
+    box-shadow: 0px 0px 4px 2px rgb(0 0 0 / 15%);
+}
+
+.sgf-notification-bubble {
+    display: flex;
+    position: absolute;
+    z-index: 999;
+    background: #222;
+    padding: 2px 4px;
+    border-radius: 4px;
+    pointer-events: none;
+    box-shadow: 1px 1px 4px rgb(0 0 0 / 30%);
+
+    animation-name: sgf-fade-out;
+    animation-delay: var(--anim-delay);
+    animation-duration: 0.2s;
+}
+.sgf-notification-bubble::before {
+    content: '';
+    width: 0;
+    height: 0;
+    border: 8px solid transparent;
+    position: absolute;
+    color: #222;
+}
+.sgf-notification-bubble-left::before   { border-left:   6px solid; left: 100%; top: calc(50% - 8px); }
+.sgf-notification-bubble-right::before  { border-right:  6px solid; left: -14px; top: calc(50% - 8px); }
+.sgf-notification-bubble-up::before     { border-top:    6px solid; left: calc(50% - 8px); top: 100%; }
+.sgf-notification-bubble-down::before   { border-bottom: 6px solid; left: calc(50% - 8px); top: -14px; }
+
+.sgf-notification-wrapper {
+    display: flex;
+    align-items: center;
+    padding: 4px 6px;
+    gap: 8px;
+    font-size: 16px;
+    font-weight: 500;
+}
+
+@keyframes sgf-fade-out {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+.sgf-switch-field {
+    display: flex;
+    overflow: hidden;
+}
+.sgf-switch-field button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    background-color: var(--sgf-inactive);
+    color: var(--sgf-text);
+    font-size: 14px;
+    padding: 4px 8px;
+    border: 1px solid rgba(0, 0, 0, 0.2);
+    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3), 0 1px rgba(255, 255, 255, 0.1);
+    transition: all 0.1s ease-in-out;
+}
+.sgf-switch-field button[active] {
+    background-color: var(--sgf-green);
+    color: var(--sgf-text-active);
+    box-shadow: none;
+}
+.sgf-switch-field button:not([active]):hover {
+    background-color: var(--sgf-hover);
+    cursor: pointer;
+}
+.sgf-switch-field button:first-of-type {
+    border-radius: 4px 0 0 4px;
+}
+.sgf-switch-field button:last-of-type {
+    border-radius: 0 4px 4px 0;
+}
+
+.sgf-button {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    height: 32px;
+    border: none;
+    border-radius: 4px;
+    background-color: var(--sgf-inactive);
+    color: var(--sgf-text);
+    gap: 4px;
+    padding: 2px 8px;
+    font-size: 14px;
+}
+
+/* Hover effects */
+.sgf-select, .sgf-text-input, .sgf-button, .sgf-collapsible > summary {
+    transition: background-color 0.1s ease-in-out;
+}
+.sgf-select:hover, .sgf-text-input:hover, .sgf-button:hover, .sgf-collapsible > summary:hover {
+    background-color: var(--sgf-hover);
+}
+.sgf-text-input:focus {
+    box-shadow: 0 0 8px 4px rgb(0 0 0 / 15%);
+}
