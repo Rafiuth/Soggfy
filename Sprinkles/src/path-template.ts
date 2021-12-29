@@ -165,7 +165,7 @@ export class PathTemplate
                 return g0;
             }
             if (!this.Vars[g1]?.dontEscape) {
-                val = this.escapePath(val);
+                val = this.escapePath(val.toString());
             }
             return val;
         });
@@ -202,6 +202,9 @@ interface TemplateNode
     literal: boolean;
     id?: string;
 }
+
+const EXT_REGEX = /\.(mp3|m4a|mp4|ogg|opus)$/i;
+    
 export class TemplatedSearchTree
 {
     root: TemplateNode = {
@@ -211,10 +214,10 @@ export class TemplatedSearchTree
     };
     private _collator = new Intl.Collator(undefined, { sensitivity: "accent", usage: "search" });
     private _template: string[];
-
+    
     constructor(template: string)
     {
-        this._template = template.replace(/\..+$/, "{_ext}").split(/[\/\\]/);
+        this._template = template.replace(EXT_REGEX, "{_ext}").split(/[\/\\]/);
     }
 
     add(id: string, vars: PathTemplateVars)
@@ -226,7 +229,7 @@ export class TemplatedSearchTree
             if (!literal) { //placeholder is keept for unknown variables
                 pattern = pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
                 pattern = pattern.replace(/\\{(.+?)\\}/g, (g0, g1) => {
-                    if (g1 === "_ext") return "\\.(mp3|m4a|mp4|ogg|opus)$";
+                    if (g1 === "_ext") return EXT_REGEX.source;
                     return PathTemplate.Vars[g1]?.pattern ?? g0;
                 });
             }

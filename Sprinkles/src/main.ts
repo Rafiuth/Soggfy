@@ -85,7 +85,7 @@ function setPlaybackStatusInd(playbackId: string, data: TrackStatus)
     if (info) {
         statusIndicator.updateRows({ [info.uri]: data });
     }
-    if (data.status === DownloadStatus.ERROR || data.status === DOWNLOAD_STATUS.DONE) {
+    if (data.status === DownloadStatus.ERROR || data.status === DownloadStatus.DONE) {
         playbackTracker.remove(playbackId);
     }
 }
