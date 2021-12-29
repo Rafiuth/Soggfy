@@ -17,8 +17,9 @@ A downloader mod for the Windows Spotify client
 
 # Installation and Usage
 1. Download and extract the `.zip` package of the [latest release](https://github.com/Rafiuth/Soggfy/releases/latest)
-2. Open Spotify, then run `Injector.exe`. If it works, a download button will appear on Spotify's top bar (you may click on it to change settings)
-3. After that, any song you play will be downloaded to the selected save path
+2. Right click the `DownloadFFmpeg.ps1` file, and select "Run with PowerShell". If it prompts about execution policy, press A to allow, then wait for it to finish.
+3. Open Spotify, then run `Injector.exe`. If it works, a download button will appear on Spotify's top bar (you may click on it to change settings)
+4. After that, any song you play will be downloaded to the selected save path
 
 You may need to disable or whitelist Soggfy in your anti-virus for it to work.
 
