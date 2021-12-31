@@ -129,7 +129,7 @@ struct StateManagerImpl : public StateManager
                     SearchTemplatedTree(results, content["searchTree"], content["basePath"]);
 
                     conn->Send(MessageType::DOWNLOAD_STATUS, { 
-                        { "reqId", content.value("reqId", 0) },
+                        { "reqId", content["reqId"] },
                         { "results", results }
                     });
                 }
@@ -157,16 +157,26 @@ struct StateManagerImpl : public StateManager
             }
             case MessageType::WRITE_FILE: {
                 fs::path path = content["path"];
-                std::ofstream ofs(path, std::ios::binary);
+                
+                int flags = std::ios::binary;
+                if (content.value("trunc", false)) flags |= std::ios::trunc;
+                if (content.value("app", false)) flags |= std::ios::app;
+                
+                fs::create_directories(path.parent_path());
+                std::ofstream ofs(path, flags);
                 if (content.contains("textData")) {
                     ofs << content["textData"].get_ref<const json::string_t&>();
                 } else {
                     ofs << msg.BinaryContent;
                 }
-                conn->Send(MessageType::WRITE_FILE, {
-                    { "reqId", content["reqId"] },
-                    { "success", true }
-                });
+                
+                auto& reqId = content["reqId"];
+                if (!reqId.is_null()) {
+                    conn->Send(MessageType::WRITE_FILE, {
+                        { "reqId", reqId },
+                        { "success", true }
+                    });
+                }
                 break;
             }
             default: {
@@ -360,11 +370,6 @@ struct StateManagerImpl : public StateManager
 
                 trackPath.replace_extension(convExt.empty() ? playback->ActualExt : convExt);
                 InvokeFFmpeg(playback->FileName, tmpCoverPath, trackPath, convArgs, meta);
-            }
-            if (ct.contains("lyrics")) {
-                fs::path lrcPath = trackPath;
-                lrcPath.replace_extension(ct["lyricsExt"]);
-                std::ofstream(lrcPath, std::ios::binary) << ct["lyrics"].get<std::string>();
             }
             fs::remove(playback->FileName);
             SendTrackStatus(trackUri, "DONE", "", trackPath);

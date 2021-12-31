@@ -10,7 +10,8 @@ A downloader mod for the Windows Spotify client
 
 # Features
 - Integration with Spotify's UI
-- Download and/or embed lyrics
+- Download and embed metadata, including lyrics
+- Download canvas videos
 - Generate M3U for albums and playlists
 - Controllable playback speed
 - Automatic conversion to MP3 and many other formats

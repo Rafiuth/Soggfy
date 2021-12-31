@@ -32,6 +32,8 @@ enum MessageType
     
     /**
      * [C->S] To write data in a file.
+     * Format: { path: string, trunc?: bool, app?: bool }
+     * Data to write is either { textData: string } or binaryPayload.
      */
     WRITE_FILE          = 6,
     
@@ -44,7 +46,7 @@ type Message = {
     type: MessageType,
     payload: any,
     binaryPayload?: Uint8Array
-};
+}
 
 type RequestInfo = {
     id: number;

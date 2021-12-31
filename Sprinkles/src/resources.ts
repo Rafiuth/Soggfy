@@ -79,12 +79,15 @@ class Resources
         return await resp.json();
     }
 
-    static async getImageData(uri: string)
+    static getImageData(uri: string)
     {
         //Spotify actually does some blackmagic and sets this id directly to <img> src
         //There's no way to get the original data out of it without reencoding.
         //this EP is public so it's probably ok to do another request
-        let url = "https://i.scdn.co/image/" + this.getUriId(uri, "image");
+        return this.getDataUrl("https://i.scdn.co/image/" + this.getUriId(uri, "image"));
+    }
+    static async getDataUrl(url: string)
+    {
         let resp = await fetch(url);
         return await resp.arrayBuffer();
     }

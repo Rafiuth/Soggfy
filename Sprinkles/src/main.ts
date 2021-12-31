@@ -6,7 +6,7 @@ import config from "./config";
 import { PlayerState } from "./spotify-apis";
 
 let conn = new Connection(onMessage);
-let playbackTracker = new PlayerStateTracker(onPlayerStateChanged);
+let playbackTracker = new PlayerStateTracker(conn, onPlayerStateChanged);
 let ui = new UI(conn);
 let statusIndicator = new StatusIndicator(conn);
 ui.install();

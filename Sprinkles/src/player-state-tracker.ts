@@ -2,15 +2,17 @@ import Utils from "./utils";
 import { Player, PlayerState, TrackInfo, SpotifyUtils } from "./spotify-apis";
 import Resources from "./resources";
 import config from "./config";
-import { PathTemplate, PathTemplateVars } from "./path-template";
+import { PathTemplate } from "./path-template";
+import { Connection, MessageType } from "./connection";
 
 export default class PlayerStateTracker
 {
-    private _playbacks: Map<string, PlayerState>;
+    private _playbacks = new Map<string, PlayerState>();
+    private _conn: Connection;
 
-    constructor(stateChanged?: (newState: PlayerState, oldState?: PlayerState) => void)
+    constructor(conn: Connection, stateChanged?: (newState: PlayerState, oldState?: PlayerState) => void)
     {
-        this._playbacks = new Map();
+        this._conn = conn;
 
         Utils.createHook(Player._events._emitter.__proto__, "createEvent", (stage, args, ret) => {
             let eventType = args[0];
@@ -59,8 +61,6 @@ export default class PlayerStateTracker
             metadata: meta,
             trackPath: paths.track,
             coverPath: paths.cover,
-            lyrics: undefined,
-            lyricsExt: undefined,
             coverTempPath: track.metadata.image_xlarge_url.replaceAll(":", "_")
         };
         let coverData = await Resources.getImageData(track.metadata.image_xlarge_url);
@@ -78,9 +78,18 @@ export default class PlayerStateTracker
                 data.metadata.lyrics = text;
             }
             if (lyrics && config.saveLyrics) {
-                data.lyrics = lyrics.text;
-                data.lyricsExt = lyrics.isSynced ? "lrc" : "txt";
+                let ext = lyrics.isSynced ? "lrc" : "txt";
+                this._conn.send(MessageType.WRITE_FILE, {
+                    path: PathTemplate.replaceExt(data.trackPath, ext),
+                    textData: lyrics.text,
+                    trunc: true
+                });
             }
+        }
+        let canvasUrl = track.metadata["canvas.url"];
+        if (config.saveCanvas && canvasUrl) {
+            let canvasData = await Resources.getDataUrl(canvasUrl);
+            this._conn.send(MessageType.WRITE_FILE, { path: paths.canvas, trunc: true }, canvasData);
         }
         this.fixMetadata(data.metadata, config.outputFormat.ext || "ogg");
         return { info: data, coverData: coverData };
@@ -108,7 +117,8 @@ export default class PlayerStateTracker
         }
         return {
             track: path + PathTemplate.render(template, vars),
-            cover: coverPath
+            cover: coverPath,
+            canvas: path + PathTemplate.render(config.savePaths.canvas, vars)
         };
     }
     private fixMetadata(meta: any, format: string): any
@@ -178,7 +188,9 @@ export default class PlayerStateTracker
         }
         let resp = await Resources.getColorAndLyricsWG(track.uri, track.metadata.image_url);
         let lyrics = resp.lyrics;
-
+        if (!lyrics) {
+            return null; //has_lyrics seems to be wrong sometimes?
+        }
         let isSynced = ["LINE_SYNCED", "SYLLABLE_SYNCED"].includes(lyrics.syncType);
 
         let text = "";

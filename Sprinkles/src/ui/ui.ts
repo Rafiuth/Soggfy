@@ -190,6 +190,8 @@ export default class UI
             pathVarTags.push(tag);
         }
 
+        let canvasPathTxt = UIC.rows("Canvas template", UIC.textInput("savePaths.canvas", onChange));
+
         return UIC.createSettingOverlay(
             UIC.section("General",
                 UIC.row("Playback speed",       speedSlider),
@@ -198,12 +200,18 @@ export default class UI
                 UIC.row("Embed cover art",      UIC.toggle("embedCoverArt", onChange)),
                 UIC.row("Save cover art in album folder", UIC.toggle("saveCoverArt", onChange)),
                 UIC.row("Embed lyrics",         UIC.toggle("embedLyrics", onChange)),
-                UIC.row("Save lyrics as .lrc/.txt", UIC.toggle("saveLyrics", onChange))
+                UIC.row("Save lyrics as .lrc/.txt", UIC.toggle("saveLyrics", onChange)),
+                UIC.row("Save canvas",          UIC.toggle("saveCanvas", (k, v) => { 
+                    v = onChange(k, v);
+                    canvasPathTxt.style.display = v ? "block" : "none";
+                    return v;
+                }))
             ),
             UIC.section("Paths",
                 UIC.rows("Base path",           UIC.colSection(basePathTextInput, UIC.button(null, Icons.Folder, browseBasePath))),
                 UIC.rows("Track template",      UIC.textInput("savePaths.track", onChange)),
                 UIC.rows("Podcast template",    UIC.textInput("savePaths.episode", onChange)),
+                canvasPathTxt,
                 UIC.rows(UIC.collapsible("Variables", ...pathVarTags))
             ),
             UIC.section("Misc",

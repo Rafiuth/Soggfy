@@ -96,6 +96,12 @@ export class PathTemplate
                 let name = s.index.itemIndex != null ? s.context.metadata.context_description : null;
                 return name ?? "unknown";
             }
+        },
+        {
+            name: "canvas_id",
+            desc: "A random 32-character canvas id, or empty if unavailable.",
+            pattern: `[0-9a-f]{32}`,
+            getValue: m => m["canvas.id"] ?? ""
         }
     ]);
 
@@ -192,6 +198,23 @@ export class PathTemplate
         str = str.replace(/\.+$/g, v => "．".repeat(v.length));
 
         return str;
+    }
+    static replaceExt(path: string, newExt: string)
+    {
+        //https://github.com/dotnet/runtime/blob/e7312999cad22236211c654ff0dd9efb00b3e101/src/libraries/System.Private.CoreLib/src/System/IO/Path.cs#L42
+        let subLen = path.length;
+        for (let i = path.length - 1; i >= 0; i--) {
+            let ch = path[i];
+
+            if (ch === '.') {
+                subLen = i;
+                break;
+            }
+            if (ch === '/' || ch === '\\') break;
+        }
+        path = path.substring(0, subLen);
+        if (!newExt.startsWith('.')) path += '.';
+        return path + newExt;
     }
 }
 
