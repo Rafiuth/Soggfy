@@ -158,14 +158,23 @@ namespace Utils
         return WideToUtf(dstW);
     }
 
-    std::string GetMusicFolder()
+    fs::path GetKnownPath(REFKNOWNFOLDERID id)
     {
         PWSTR pathW;
-        SHGetKnownFolderPath(FOLDERID_Music, 0, NULL, &pathW);
-        auto path = WideToUtf(pathW);
+        SHGetKnownFolderPath(id, 0, NULL, &pathW);
+        fs::path path(pathW);
         CoTaskMemFree(pathW);
         return path;
     }
+    fs::path GetAppDataFolder()
+    {
+        return GetKnownPath(FOLDERID_RoamingAppData);
+    }
+    fs::path GetMusicFolder()
+    {
+        return GetKnownPath(FOLDERID_Music);
+    }
+
     void RevealInFileExplorer(const fs::path& path)
     {
         //https://stackoverflow.com/a/54524363

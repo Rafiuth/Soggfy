@@ -33,7 +33,7 @@ function onMessage(type: MessageType, payload: any)
         }
         case MessageType.SYNC_CONFIG: {
             Utils.deepMerge(config, payload);
-            conn.send(MessageType.SYNC_CONFIG, config); //FIXME: don't do this
+            conn.send(MessageType.SYNC_CONFIG, config);
             break;
         }
         case MessageType.TRACK_META: {

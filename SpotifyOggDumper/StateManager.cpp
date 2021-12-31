@@ -23,14 +23,15 @@ struct PlaybackInfo
 
 struct StateManagerImpl : public StateManager
 {
-    fs::path _dataDir;
-
     std::unordered_map<std::string, std::shared_ptr<PlaybackInfo>> _playbacks;
 
     std::mutex _mutex;
 
-    fs::path _ffmpegPath;
     json _config;
+
+    fs::path _dataDir;
+    fs::path _configPath;
+    fs::path _ffmpegPath;
 
     ControlServer _ctrlSv;
 
@@ -38,16 +39,22 @@ struct StateManagerImpl : public StateManager
         _dataDir(dataDir),
         _ctrlSv(std::bind(&StateManagerImpl::HandleMessage, this, std::placeholders::_1, std::placeholders::_2))
     {
-        std::ifstream configFile(dataDir / "config.json");
+        _configPath = Utils::GetAppDataFolder() / "Soggfy/config.json";
+
+        fs::path currConfigPath = _dataDir / "config.json";
+        std::ifstream configFile(fs::exists(currConfigPath) ? currConfigPath : _configPath);
+
         if (configFile.good()) {
             _config = json::parse(configFile, nullptr, true, true);
+        } else {
+            _config = json::object();
+            fs::create_directories(_configPath.parent_path());
         }
-        
-        fs::path basePath = _config["savePaths"]["basePath"];
-        if (!fs::exists(basePath)) {
-            basePath = Utils::GetMusicFolder() + "\\Soggfy";
-            fs::create_directories(basePath);
-            _config["savePaths"]["basePath"] = basePath;
+        fs::path baseSavePath = _config.value("/savePaths/basePath"_json_pointer, fs::path());
+        if (!fs::exists(baseSavePath)) {
+            baseSavePath = Utils::GetMusicFolder() / "Soggfy";
+            fs::create_directories(baseSavePath);
+            _config["savePaths"]["basePath"] = baseSavePath;
         }
         //delete old temp files
         std::error_code deleteError;
@@ -94,7 +101,7 @@ struct StateManagerImpl : public StateManager
                 for (auto& [key, val] : content.items()) {
                     _config[key] = val;
                 }
-                std::ofstream(_dataDir / "config.json") << _config.dump(4);
+                std::ofstream(_configPath) << _config.dump(4);
                 break;
             }
             case MessageType::TRACK_META: {

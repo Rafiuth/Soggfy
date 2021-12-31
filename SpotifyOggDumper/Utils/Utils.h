@@ -35,7 +35,8 @@ namespace Utils
     //Call WINAPI ExpandEnvironmentStrings(), assuming str is UTF8.
     std::string ExpandEnvVars(const std::string& str);
 
-    std::string GetMusicFolder();
+    fs::path GetAppDataFolder();
+    fs::path GetMusicFolder();
     void RevealInFileExplorer(const fs::path& path);
 
     /**
