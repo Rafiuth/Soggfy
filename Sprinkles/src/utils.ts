@@ -69,6 +69,29 @@ export default class Utils
         }
         return obj[lastField];
     }
+
+    /** Recursively merges source into target. */
+    static deepMerge(target: any, source: any)
+    {
+        //https://stackoverflow.com/a/34749873
+        if (isObject(target) && isObject(source)) {
+            for (let key in source) {
+                if (isObject(source[key])) {
+                    target[key] ??= {};
+                    this.deepMerge(target[key], source[key]);
+                } else {
+                    Object.assign(target, { [key]: source[key] });
+                }
+            }
+        }
+        return target;
+
+        function isObject(item: any)
+        {
+            return item && typeof item === "object" && !Array.isArray(item);
+        }
+    }
+
     static getReactProps(rootElem: Element, targetElem: Element): any
     {
         const keyof_ReactEventHandlers =

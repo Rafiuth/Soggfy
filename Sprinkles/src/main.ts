@@ -4,6 +4,7 @@ import { StatusIndicator, DownloadStatus, TrackStatus } from "./ui/status-indica
 import UI from "./ui/ui";
 import config from "./config";
 import { PlayerState } from "./spotify-apis";
+import Utils from "./utils";
 
 let conn = new Connection(onMessage);
 let playbackTracker = new PlayerStateTracker(conn, onPlayerStateChanged);
@@ -31,9 +32,8 @@ function onMessage(type: MessageType, payload: any)
             break;
         }
         case MessageType.SYNC_CONFIG: {
-            for (let key in payload) {
-                config[key] = payload[key];
-            }
+            Utils.deepMerge(config, payload);
+            conn.send(MessageType.SYNC_CONFIG, config); //FIXME: don't do this
             break;
         }
         case MessageType.TRACK_META: {
