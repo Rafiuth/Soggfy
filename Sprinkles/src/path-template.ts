@@ -68,7 +68,7 @@ export class PathTemplate
         {
             name: "multi_disc_path",
             desc: "'/CD {disc number}' if the album has multiple discs, or empty.",
-            pattern: `(\\/CD \\d+)?`,
+            pattern: `([\\/\\\\]CD \\d+)?`,
             dontEscape: true,
             getValue: m => m.totaldiscs > 1 ? `/CD ${m.disc}` : ""
         },
@@ -224,6 +224,9 @@ interface TemplateNode
     pattern: string;
     literal: boolean;
     id?: string;
+    //how deep the parent should recuse for the pattern to match (must be regex).
+    //ex. pattern "album(/CD 1)?" may need an extra recursion to match path "album/CD 1/".
+    maxDepth?: number;
 }
 
 const EXT_REGEX = /\.(mp3|m4a|mp4|ogg|opus)$/i;
@@ -249,6 +252,8 @@ export class TemplatedSearchTree
         for (let part of this._template) {
             let pattern = PathTemplate.render(part, vars);
             let literal = !/{(.+?)}/.test(pattern);
+            let mayBranch = pattern.includes("{multi_disc_path}"); //still fucked if included more than once, but that's enough for now.
+            
             if (!literal) { //placeholder is keept for unknown variables
                 pattern = pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
                 pattern = pattern.replace(/\\{(.+?)\\}/g, (g0, g1) => {
@@ -257,6 +262,7 @@ export class TemplatedSearchTree
                 });
             }
             node = this.findOrAddChild(node, pattern, literal);
+            if (mayBranch) node.maxDepth = 2;
         }
         if (node.id == null) {
             node.id = id;

@@ -1,6 +1,7 @@
 #include "pch.h"
 #include <fstream>
 #include <regex>
+#include <deque>
 
 #include "StateManager.h"
 #include "ControlServer.h"
@@ -18,8 +19,6 @@ struct PlaybackInfo
     bool Discard = false;
     bool ReadyToSave = false;
 };
-//TODO: maybe static link + setlocale for auto u8path construction
-//https://docs.microsoft.com/en-us/cpp/c-runtime-library/global-state?view=msvc-170
 
 struct StateManagerImpl : public StateManager
 {
@@ -133,7 +132,7 @@ struct StateManagerImpl : public StateManager
                 }
                 else if (content.contains("searchTree")) {
                     json results = json::object();
-                    SearchTemplatedTree(results, content["searchTree"], content["basePath"]);
+                    SearchPathTree(results, content["searchTree"], content["basePath"]);
 
                     conn->Send(MessageType::DOWNLOAD_STATUS, { 
                         { "reqId", content["reqId"] },
@@ -191,61 +190,7 @@ struct StateManagerImpl : public StateManager
             }
         }
     }
-    void SearchTemplatedTree(json& results, const json& node, const fs::path& currPath = {}, bool currPathExists = false)
-    {
-        if (!currPath.empty() && !(currPathExists || fs::exists(currPath))) return;
 
-        auto& children = node["children"];
-        if (children.empty() && node.contains("id")) {
-            std::string id = node["id"];
-            results[id] = {
-                { "path", Utils::PathToUtf(currPath) },
-                { "status", "DONE" }
-            };
-            return;
-        }
-        std::vector<std::pair<const json*, std::regex>> regexChildren;
-
-        for (auto& child : children) {
-            std::string pattern = child["pattern"];
-            if (child.value("literal", false)) {
-                SearchTemplatedTree(results, child, currPath / fs::u8path(pattern));
-            } else {
-                std::regex regex(pattern, std::regex::ECMAScript | std::regex::icase);
-                regexChildren.emplace_back(&child, regex);
-            }
-        }
-        if (regexChildren.empty()) return;
-
-        for (auto& entry : fs::directory_iterator(currPath)) {
-            auto& path = entry.path();
-            auto pathUtf = Utils::PathToUtf(path.filename());
-
-            for (auto& child : regexChildren) {
-                if (std::regex_match(pathUtf, child.second)) {
-                    SearchTemplatedTree(results, *child.first, path, true);
-                }
-            }
-        }
-    }
-    
-    void SendTrackStatus(const std::string& uri, const std::string& status, const std::string& msg = "", const fs::path& path = "")
-    {
-        json obj = {
-            { "status", status },
-            { "message", msg },
-            { "path", Utils::PathToUtf(path) }
-        };
-        json content;
-        
-        if (uri.starts_with("spotify:")) {
-            content["results"] = { { uri, obj } };
-        } else {
-            content = obj;
-            content["playbackId"] = uri;
-        }
-        _ctrlSv.Broadcast(MessageType::DOWNLOAD_STATUS, content);
-    }
     void ReceiveAudioData(const std::string& playbackId, const char* data, int length)
     {
         auto playback = GetPlayback(playbackId);
@@ -386,6 +331,71 @@ struct StateManagerImpl : public StateManager
             SendTrackStatus(trackUri, "ERROR", ex.what());
         }
     }
+    void SearchPathTree(json& results, const json& node, const fs::path& currPath = {}, bool currPathExists = false)
+    {
+        if (!currPath.empty() && !(currPathExists || fs::exists(currPath))) return;
+
+        auto& children = node["children"];
+        if (children.empty() && node.contains("id")) {
+            std::string id = node["id"];
+            results[id] = {
+                { "path", Utils::PathToUtf(currPath) },
+                { "status", "DONE" }
+            };
+            return;
+        }
+        std::vector<std::tuple<const json*, std::regex, int>> regexChildren;
+
+        for (auto& child : children) {
+            std::string pattern = child["pattern"];
+            if (child.value("literal", false)) {
+                SearchPathTree(results, child, currPath / fs::u8path(pattern));
+            } else {
+                std::regex regex(pattern, std::regex::ECMAScript | std::regex::icase);
+                regexChildren.emplace_back(&child, regex, child.value("maxDepth", 1));
+            }
+        }
+        if (regexChildren.empty()) return;
+
+        //BFS up to maxDepth to catch patterns like "album(\/CD 1)?"
+        std::deque<std::pair<fs::path, int>> pending;
+        pending.emplace_back(currPath, 0);
+
+        for (; !pending.empty(); pending.pop_front()) {
+            auto& [origin, depth] = pending.front();
+
+            for (auto& entry : fs::directory_iterator(origin)) {
+                auto name = Utils::PathToUtf(fs::relative(entry.path(), currPath));
+
+                for (auto& [node, pattern, maxDepth] : regexChildren) {
+                    if (std::regex_match(name, pattern)) {
+                        SearchPathTree(results, *node, entry.path(), true);
+                    }
+                    if (entry.is_directory() && depth + 1 < maxDepth) {
+                        pending.emplace_back(entry.path(), depth + 1);
+                    }
+                }
+            }
+        }
+    }
+    void SendTrackStatus(const std::string& uri, const std::string& status, const std::string& msg = "", const fs::path& path = "")
+    {
+        json obj = {
+            { "status", status },
+            { "message", msg },
+            { "path", Utils::PathToUtf(path) }
+        };
+        json content;
+        
+        if (uri.starts_with("spotify:")) {
+            content["results"] = { { uri, obj } };
+        } else {
+            content = obj;
+            content["playbackId"] = uri;
+        }
+        _ctrlSv.Broadcast(MessageType::DOWNLOAD_STATUS, content);
+    }
+    
     void InvokeFFmpeg(const fs::path& path, const fs::path& coverPath, const fs::path& outPath, const std::string& extraArgs, const json& meta)
     {
         //TODO: fix 32k char command line limit for lyrics
