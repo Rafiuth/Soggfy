@@ -260,6 +260,7 @@ export class TemplatedSearchTree
                     if (g1 === "_ext") return EXT_REGEX.source;
                     return PathTemplate.Vars[g1]?.pattern ?? g0;
                 });
+                pattern = "^" + pattern + "$";
             }
             node = this.findOrAddChild(node, pattern, literal);
             if (mayBranch) node.maxDepth = 2;

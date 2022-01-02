@@ -368,7 +368,7 @@ struct StateManagerImpl : public StateManager
                 auto name = Utils::PathToUtf(fs::relative(entry.path(), currPath));
 
                 for (auto& [node, pattern, maxDepth] : regexChildren) {
-                    if (std::regex_match(name, pattern)) {
+                    if (depth < maxDepth && std::regex_match(name, pattern)) {
                         SearchPathTree(results, *node, entry.path(), true);
                     }
                     if (entry.is_directory() && depth + 1 < maxDepth) {
