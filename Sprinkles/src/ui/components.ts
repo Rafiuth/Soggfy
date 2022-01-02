@@ -81,10 +81,8 @@ export default class Components
         node.className = "sgf-toggle-switch";
         node.type = "checkbox";
         node.checked = callback(key);
+        node.onchange = () => callback(key, node.checked);
 
-        if (callback) {
-            node.onchange = () => callback(key, node.checked);
-        }
         return node;
     }
     static select(key: string, options: string[], callback: ComponentValueCallback<string>)
@@ -100,10 +98,8 @@ export default class Components
             node.appendChild(opt);
         }
         node.value = options.indexOf(callback(key)).toString();
-        
-        if (callback) {
-            node.onchange = () => callback(key, options[parseInt(node.value)]);
-        }
+        node.onchange = () => callback(key, options[parseInt(node.value)]);
+
         return node;
     }
     static textInput(key: string, callback: ComponentValueCallback<string>)
@@ -111,10 +107,8 @@ export default class Components
         let node = document.createElement("input");
         node.className = "sgf-text-input";
         node.value = callback(key);
-        
-        if (callback) {
-            node.onchange = () => callback(key, node.value);
-        }
+        node.onchange = () => callback(key, node.value);
+
         return node;
     }
 
@@ -135,19 +129,15 @@ export default class Components
         let label: HTMLInputElement = node.querySelector(".sgf-slider-label");
         label.value = formatter(initialValue);
         
-        let updateLabel = () => label.value = formatter(parseFloat(slider.value));
-        slider.oninput = updateLabel;
-        
+        slider.oninput = () => label.value = formatter(slider.valueAsNumber);
         //remove custom format when editing via the textbox
         label.oninput = () => slider.value = label.value;
-        label.onfocus = () => label.value = slider.value;
-        label.onblur = updateLabel;
+        label.onfocus = () => label.value = callback(key).toString();
+        label.onblur = () => label.value = formatter(callback(key));
+    
+        label.onchange = () => callback(key, parseFloat(label.value));
+        slider.onchange = () => callback(key, parseFloat(slider.value));
         
-        if (callback) {
-            let fireCallback = () => callback(key, parseFloat(slider.value));
-            label.onchange = fireCallback;
-            slider.onchange = fireCallback;
-        }
         return node;
     }
     static collapsible(desc: string, ...elements: Node[])
