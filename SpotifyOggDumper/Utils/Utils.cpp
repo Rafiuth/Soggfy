@@ -193,9 +193,10 @@ namespace Utils
         if (FAILED(CoCreateInstance(isSave ? CLSID_FileSaveDialog : CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&fd)))) {
             return result;
         }
-        FILEOPENDIALOGOPTIONS opts = FOS_FORCEFILESYSTEM | FOS_STRICTFILETYPES;
+        FILEOPENDIALOGOPTIONS opts = 0;
+        fd->GetOptions(&opts);
         if (type == FilePickerType::SELECT_FOLDER) opts |= FOS_PICKFOLDERS;
-        fd->SetOptions(opts);
+        fd->SetOptions(opts | FOS_FORCEFILESYSTEM | FOS_STRICTFILETYPES);
 
         if (isSave && !fileTypes.empty()) {
             std::vector<COMDLG_FILTERSPEC> filters;
