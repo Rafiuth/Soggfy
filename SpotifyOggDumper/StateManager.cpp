@@ -19,11 +19,11 @@ struct PlaybackInfo
     bool Discard = false;
     bool ReadyToSave = false;
 };
-
+//TODO: move most of playback state handling to TS
 struct StateManagerImpl : public StateManager
 {
+    //TODO: fix potential race conditions with these (mutex is only locked when accessing this map)
     std::unordered_map<std::string, std::shared_ptr<PlaybackInfo>> _playbacks;
-
     std::mutex _mutex;
 
     json _config;
@@ -200,7 +200,7 @@ struct StateManagerImpl : public StateManager
 
         if (!fs.is_open()) {
             LogWarn("Received audio data after playback ended (this should never happen).");
-            DiscardTrack(playbackId, "Stream truncated");
+            DiscardTrack(*playback, "Stream truncated");
             return;
         }
         if (fs.tellp() == 0) {
@@ -243,6 +243,7 @@ struct StateManagerImpl : public StateManager
         }
         if (playback->ActualExt.empty()) {
             LogWarn("Unrecognized audio codec in playback {}, aborting download. This is a bug, please report.", playbackId);
+            SendTrackStatus(playback->Id, "ERROR", "Unrecognized audio codec");
             return;
         }
         LogDebug("Requesting metadata for playback {}...", playbackId);
@@ -251,12 +252,18 @@ struct StateManagerImpl : public StateManager
     void DiscardTrack(const std::string& playbackId, const std::string& reason)
     {
         auto playback = GetPlayback(playbackId);
-        if (!playback || playback->Discard) return;
+        if (!playback) return;
+
+        DiscardTrack(*playback, reason);
+    }
+    void DiscardTrack(PlaybackInfo& playback, const std::string& reason)
+    {
+        if (playback.Discard) return;
 
         auto status = std::make_pair("ERROR", "Canceled: " + reason);
-        playback->Discard = true;
-        playback->Status = status;
-        SendTrackStatus(playbackId, status.first, status.second);
+        playback.Discard = true;
+        playback.Status = status;
+        SendTrackStatus(playback.Id, status.first, status.second);
     }
     bool OverridePlaybackSpeed(double& speed)
     {
@@ -507,12 +514,20 @@ struct StateManagerImpl : public StateManager
         auto itr = _playbacks.find(id);
         return itr != _playbacks.end() ? itr->second : nullptr;
     }
-    std::shared_ptr<PlaybackInfo> CreatePlayback(const std::string& id)
+    void CreatePlayback(const std::string& id)
     {
         std::lock_guard<std::mutex> lock(_mutex);
 
         if (_playbacks.contains(id)) {
-            throw std::runtime_error("Playback already exists");
+            //This only seems to happen when skipping tracks with ~1s of playback left
+            auto& pb = _playbacks.find(id)->second;
+            auto pos = pb->FileStream.tellp();
+            LogWarn("CreatePlayback() called for a playback that already exists. id={}, file pos={}", id, (int64_t)pos);
+            if (pos != 0) {
+                //Enter wtf mode if something was written to the dump file
+                DiscardTrack(*pb, "CreatePlayback() called for a playback that already exists");
+            }
+            return;
         }
         auto filename = MakeTempPath("playback_" + id + ".dat");
         auto pb = std::make_shared<PlaybackInfo>();
@@ -522,7 +537,6 @@ struct StateManagerImpl : public StateManager
         pb->Status = std::make_pair("IN_PROGRESS", "Downloading...");
 
         _playbacks.emplace(id, pb);
-        return pb;
     }
     void RemovePlayback(const std::string& id)
     {

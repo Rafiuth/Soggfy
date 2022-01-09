@@ -240,7 +240,7 @@ DWORD WINAPI Init(LPVOID param)
 
         std::thread(&StateManager::RunControlServer, _stateMgr).detach();
     } catch (std::exception& ex) {
-        auto msg = std::string("Failed to install hooks: ") + ex.what() + "\n\nTry update Soggfy.";
+        auto msg = std::string("Failed to install hooks: ") + ex.what() + "\n\nTry updating Soggfy.";
         LogError("{}", msg);
         if (!logToCon) MessageBoxA(NULL, msg.c_str(), "Soggfy", MB_ICONERROR);
         Exit();
