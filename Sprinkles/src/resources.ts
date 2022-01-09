@@ -47,6 +47,56 @@ class Resources
         }
         return result;
     }
+    
+    /** Returns a object with metadata and variables for all tracks in the specified album or playlist. */
+    static async getTracks(uri: string)
+    {
+        let type = this.getUriType(uri);
+
+        if (type === "playlist") {
+            let data = await this.getPlaylistTracks(uri, true);
+            
+            return {
+                name: data.name,
+                type: "playlist",
+                tracks: data.tracks.items.map(track => ({
+                    uri: track.uri,
+                    durationMs: track.duration.milliseconds,
+                    vars: {
+                        track_name: track.name,
+                        artist_name: track.artists[0].name,
+                        all_artist_names: track.artists.map(v => v.name).join(", "),
+                        album_name: track.album.name,
+                        track_num: track.trackNumber,
+                        playlist_name: data.name,
+                        context_name: data.name
+                    }
+                }))
+            };
+        }
+        if (type === "album") {
+            let data = await this.getAlbumTracks(uri);
+            
+            return {
+                name: data.name,
+                type: "album",
+                tracks: data.tracks.items.map(track => ({
+                    uri: track.uri,
+                    durationMs: track.duration_ms,
+                    vars: {
+                        track_name: track.name,
+                        artist_name: track.artists[0].name,
+                        all_artist_names: track.artists.map(v => v.name).join(", "),
+                        album_name: data.name,
+                        track_num: track.track_number,
+                        playlist_name: "unknown",
+                        context_name: data.name
+                    }
+                }))
+            };
+        }
+        throw Error("Unknown collection type: " + uri);
+    }
 
     /**
      * Fetches a JSON object from an authenticated Spotify endpoint.
@@ -84,9 +134,9 @@ class Resources
         //Spotify actually does some blackmagic and sets this id directly to <img> src
         //There's no way to get the original data out of it without reencoding.
         //this EP is public so it's probably ok to do another request
-        return this.getDataUrl("https://i.scdn.co/image/" + this.getUriId(uri, "image"));
+        return this.fetchBytes("https://i.scdn.co/image/" + this.getUriId(uri, "image"));
     }
-    static async getDataUrl(url: string)
+    static async fetchBytes(url: string)
     {
         let resp = await fetch(url);
         return await resp.arrayBuffer();

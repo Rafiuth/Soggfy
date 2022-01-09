@@ -3,6 +3,7 @@ import { Connection, MessageType } from "../connection";
 import Utils from "../utils";
 import UIC from "./components";
 import { Platform, SpotifyUtils } from "../spotify-apis";
+import Resources from "../resources";
 
 import ComponentsStyle from "./css/components.css";
 import SettingsStyle from "./css/settings.css";
@@ -85,7 +86,7 @@ export default class UI
 
     private async createM3U(uri: string)
     {
-        let info = await PathTemplate.getTracks(uri);
+        let info = await Resources.getTracks(uri);
         let tracks = info.tracks;
         
         let saveResult = await this._conn.request(MessageType.OPEN_FILE_PICKER, {

@@ -223,9 +223,14 @@ struct StateManagerImpl : public StateManager
         fs.write(data, length);
     }
 
-    void OnTrackCreated(const std::string& playbackId)
+    void OnTrackCreated(const std::string& playbackId, double& speed)
     {
         CreatePlayback(playbackId);
+
+        double newSpeed = _config.value("playbackSpeed", 0.0);
+        if (newSpeed > 0) {
+            speed = newSpeed;
+        }
     }
     void OnTrackDone(const std::string& playbackId)
     {
@@ -264,15 +269,6 @@ struct StateManagerImpl : public StateManager
         playback.Discard = true;
         playback.Status = status;
         SendTrackStatus(playback.Id, status.first, status.second);
-    }
-    bool OverridePlaybackSpeed(double& speed)
-    {
-        double newSpeed = _config.value("playbackSpeed", 0.0);
-        if (newSpeed > 0) {
-            speed = newSpeed;
-            return true;
-        }
-        return false;
     }
     bool IsUrlBlocked(std::wstring_view url)
     {

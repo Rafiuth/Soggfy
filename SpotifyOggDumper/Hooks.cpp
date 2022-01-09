@@ -76,9 +76,8 @@ DETOUR_FUNC(__fastcall, void*, CreateTrackPlayer, (
 ))
 {
     std::string playbackId = ToHex((char*)(param_2 + 8), 16);
-    LogTrace("CreateTrack {}", playbackId);
-    _stateMgr->OnTrackCreated(playbackId);
-    _stateMgr->OverridePlaybackSpeed(speed);
+    LogDebug("CreateTrack {}", playbackId);
+    _stateMgr->OnTrackCreated(playbackId, speed);
 
     return CreateTrackPlayer_Orig(ecx, edx, param_1, param_2, speed, param_4, param_5, param_6, param_7, param_8);
 }
@@ -89,7 +88,7 @@ DETOUR_FUNC(__fastcall, int64_t, SeekTrack, (
     auto playerPtr = TraversePointers<0x15B4>(ecx);
     if (playerPtr) {
         std::string playbackId = ToHex(playerPtr + 0x338, 16);
-        LogTrace("SeekTrack {}", playbackId);
+        LogDebug("SeekTrack {}", playbackId);
         _stateMgr->DiscardTrack(playbackId, "Track was seeked");
     }
     return SeekTrack_Orig(ecx, edx, position);
@@ -102,7 +101,7 @@ DETOUR_FUNC(__fastcall, void, OpenTrack, (
     auto playerPtr = TraversePointers<0x15B4>(ecx);
     if (playerPtr && position != 0) {
         std::string playbackId = ToHex(playerPtr + 0x338, 16);
-        LogTrace("OpenTrack {}", playbackId);
+        LogDebug("OpenTrack {}", playbackId);
         _stateMgr->DiscardTrack(playbackId, "Track didn't play from start");
     }
     OpenTrack_Orig(ecx, edx, param_1, param_2, param_3, position, param_5, param_6);
@@ -114,7 +113,7 @@ DETOUR_FUNC(__fastcall, void, CloseTrack, (
     auto playerPtr = TraversePointers<0x15B4>(ecx);
     if (playerPtr) {
         std::string playbackId = ToHex(playerPtr + 0x338, 16);
-        LogTrace("CloseTrack {}, reason={}", playbackId, reason);
+        LogDebug("CloseTrack {}, reason={}", playbackId, reason);
 
         if (strcmp(reason, "trackdone") != 0) {
             _stateMgr->DiscardTrack(playbackId, "Track was skipped");

@@ -113,55 +113,6 @@ export class PathTemplate
         }
         return vals;
     }
-    /** Returns a object with metadata and variables for all tracks in the specified album or playlist. */
-    static async getTracks(uri: string)
-    {
-        let type = Resources.getUriType(uri);
-
-        if (type === "playlist") {
-            let data = await Resources.getPlaylistTracks(uri, true);
-            
-            return {
-                name: data.name,
-                type: "playlist",
-                tracks: data.tracks.items.map(track => ({
-                    uri: track.uri,
-                    durationMs: track.duration.milliseconds,
-                    vars: {
-                        track_name: track.name,
-                        artist_name: track.artists[0].name,
-                        all_artist_names: track.artists.map(v => v.name).join(", "),
-                        album_name: track.album.name,
-                        track_num: track.trackNumber,
-                        playlist_name: data.name,
-                        context_name: data.name
-                    }
-                }))
-            };
-        }
-        if (type === "album") {
-            let data = await Resources.getAlbumTracks(uri);
-            
-            return {
-                name: data.name,
-                type: "album",
-                tracks: data.tracks.items.map(track => ({
-                    uri: track.uri,
-                    durationMs: track.duration_ms,
-                    vars: {
-                        track_name: track.name,
-                        artist_name: track.artists[0].name,
-                        all_artist_names: track.artists.map(v => v.name).join(", "),
-                        album_name: data.name,
-                        track_num: track.track_number,
-                        playlist_name: "unknown",
-                        context_name: data.name
-                    }
-                }))
-            };
-        }
-        throw Error("Unknown URI type: " + type);
-    }
 
     static render(template: string, vars: PathTemplateVars)
     {

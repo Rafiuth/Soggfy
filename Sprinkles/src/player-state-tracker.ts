@@ -88,7 +88,7 @@ export default class PlayerStateTracker
         }
         let canvasUrl = track.metadata["canvas.url"];
         if (config.saveCanvas && canvasUrl) {
-            let canvasData = await Resources.getDataUrl(canvasUrl);
+            let canvasData = await Resources.fetchBytes(canvasUrl);
             this._conn.send(MessageType.WRITE_FILE, { path: paths.canvas, trunc: true }, canvasData);
         }
         this.fixMetadata(data.metadata, config.outputFormat.ext || "ogg");
