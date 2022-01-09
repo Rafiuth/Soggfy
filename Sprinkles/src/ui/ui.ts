@@ -118,7 +118,7 @@ export default class UI
             plData += `${loc.path}\n\n`;
             numExported++;
         }
-        await this._conn.request(MessageType.WRITE_FILE, { path: savePath, textData: plData });
+        await this._conn.send(MessageType.WRITE_FILE, { path: savePath, mode: "replace", text: plData });
 
         this.showNotification(Icons.DoneBig, `Exported ${numExported} tracks`);
     }

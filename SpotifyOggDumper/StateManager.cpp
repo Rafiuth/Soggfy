@@ -163,19 +163,19 @@ struct StateManagerImpl : public StateManager
             }
             case MessageType::WRITE_FILE: {
                 fs::path path = content["path"];
-                
-                int flags = std::ios::binary;
-                if (content.value("trunc", false)) flags |= std::ios::trunc;
-                if (content.value("app", false)) flags |= std::ios::app;
-                
-                fs::create_directories(path.parent_path());
-                std::ofstream ofs(path, flags);
-                if (content.contains("textData")) {
-                    ofs << content["textData"].get_ref<const json::string_t&>();
-                } else {
-                    ofs << msg.BinaryContent;
+                std::string mode = content.value("mode", "");
+
+                if (!(mode == "keep" && fs::exists(path))) {
+                    fs::create_directories(path.parent_path());
+
+                    int flags = std::ios::binary | (mode == "append" ? std::ios::app : std::ios::trunc);
+                    std::ofstream ofs(path, flags);
+                    if (content.contains("text")) {
+                        ofs << content["text"].get_ref<const json::string_t&>();
+                    } else {
+                        ofs << msg.BinaryContent;
+                    }
                 }
-                
                 auto& reqId = content["reqId"];
                 if (!reqId.is_null()) {
                     conn->Send(MessageType::WRITE_FILE, {

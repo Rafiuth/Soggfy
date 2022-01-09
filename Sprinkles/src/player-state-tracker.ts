@@ -81,15 +81,15 @@ export default class PlayerStateTracker
                 let ext = lyrics.isSynced ? "lrc" : "txt";
                 this._conn.send(MessageType.WRITE_FILE, {
                     path: PathTemplate.replaceExt(data.trackPath, ext),
-                    textData: lyrics.text,
-                    trunc: true
+                    text: lyrics.text,
+                    mode: "keep"
                 });
             }
         }
         let canvasUrl = track.metadata["canvas.url"];
         if (config.saveCanvas && canvasUrl) {
             let canvasData = await Resources.fetchBytes(canvasUrl);
-            this._conn.send(MessageType.WRITE_FILE, { path: paths.canvas, trunc: true }, canvasData);
+            this._conn.send(MessageType.WRITE_FILE, { path: paths.canvas, mode: "keep" }, canvasData);
         }
         this.fixMetadata(data.metadata, config.outputFormat.ext || "ogg");
         return { info: data, coverData: coverData };

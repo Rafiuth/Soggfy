@@ -32,8 +32,8 @@ enum MessageType
     
     /**
      * [C->S] To write data in a file.
-     * Format: { path: string, trunc?: bool, app?: bool }
-     * Data to write is either { textData: string } or binaryPayload.
+     * Format: { path: string, mode: "replace" (default) | "append" | "keep" }
+     * Data to write is either { text: string } or binaryPayload.
      */
     WRITE_FILE          = 6,
     
