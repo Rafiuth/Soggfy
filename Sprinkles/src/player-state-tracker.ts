@@ -88,8 +88,12 @@ export default class PlayerStateTracker
         }
         let canvasUrl = track.metadata["canvas.url"];
         if (config.saveCanvas && canvasUrl) {
-            let canvasData = await Resources.fetchBytes(canvasUrl);
-            this._conn.send(MessageType.WRITE_FILE, { path: paths.canvas, mode: "keep" }, canvasData);
+            try {
+                let canvasData = await Resources.fetchBytes(canvasUrl);
+                this._conn.send(MessageType.WRITE_FILE, { path: paths.canvas, mode: "keep" }, canvasData);
+            } catch (ex) {
+                console.error("Failed to fetch canvas for %s: %s", track.uri, ex);
+            }
         }
         this.fixMetadata(data.metadata, config.outputFormat.ext || "ogg");
         return { info: data, coverData: coverData };
@@ -183,14 +187,19 @@ export default class PlayerStateTracker
     }
     private async getLyrics(track: TrackInfo)
     {
-        if (track.metadata.has_lyrics !== "true") {
-            return null;
+        let lyrics;
+
+        try {
+            if (track.metadata.has_lyrics === "true") {
+                let resp = await Resources.getColorAndLyricsWG(track.uri, track.metadata.image_url);
+                lyrics = resp.lyrics;
+            }
+        } catch (ex) {
+            //has_lyrics seems to be wrong sometimes
+            console.error("Failed to fetch lyrics for %s: %s", track.uri, ex);
         }
-        let resp = await Resources.getColorAndLyricsWG(track.uri, track.metadata.image_url);
-        let lyrics = resp.lyrics;
-        if (!lyrics) {
-            return null; //has_lyrics seems to be wrong sometimes?
-        }
+        if (!lyrics) return null;
+
         let isSynced = ["LINE_SYNCED", "SYLLABLE_SYNCED"].includes(lyrics.syncType);
 
         let text = "";

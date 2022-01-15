@@ -126,6 +126,9 @@ class Resources
         url.searchParams.append("market", spt.market);
         
         let resp = await fetch(url.toString(), req);
+        if (!resp.ok) {
+            throw Error(`Failed to fetch ${url.toString()}: ${resp.status} ${resp.statusText}`);
+        }
         return await resp.json();
     }
 
@@ -139,6 +142,9 @@ class Resources
     static async fetchBytes(url: string)
     {
         let resp = await fetch(url);
+        if (!resp.ok) {
+            throw Error(`fetch("${url.toString()}") failed: ${resp.statusText}`);
+        }
         return await resp.arrayBuffer();
     }
 
