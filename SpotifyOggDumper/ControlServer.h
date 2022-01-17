@@ -5,6 +5,7 @@
 #include "StateManager.h"
 
 //TODO: Redesign for "request" messages
+//TODO: Checkout gRPC
 
 //Server=CPP Client=JS
 enum class MessageType

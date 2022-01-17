@@ -1,6 +1,5 @@
 #include "Hooks.h"
-#include <mutex>
-#include <deque>
+#include <thread>
 #include <MinHook.h>
 #include "AppVersion.h"
 #include "StateManager.h"
@@ -8,7 +7,6 @@
 #include "CefUtils.h"
 
 HMODULE _selfModule;
-std::deque<std::string> _logHistory;
 std::shared_ptr<StateManager> _stateMgr;
 
 std::string ToHex(char* data, int length)
@@ -76,7 +74,7 @@ DETOUR_FUNC(__fastcall, void*, CreateTrackPlayer, (
 ))
 {
     std::string playbackId = ToHex((char*)(param_2 + 8), 16);
-    LogDebug("CreateTrack {}", playbackId);
+    LogTrace("CreateTrack {}", playbackId);
     _stateMgr->OnTrackCreated(playbackId, speed);
 
     return CreateTrackPlayer_Orig(ecx, edx, param_1, param_2, speed, param_4, param_5, param_6, param_7, param_8);
@@ -88,7 +86,7 @@ DETOUR_FUNC(__fastcall, int64_t, SeekTrack, (
     auto playerPtr = TraversePointers<0x15B4>(ecx);
     if (playerPtr) {
         std::string playbackId = ToHex(playerPtr + 0x338, 16);
-        LogDebug("SeekTrack {}", playbackId);
+        LogTrace("SeekTrack {}", playbackId);
         _stateMgr->DiscardTrack(playbackId, "Track was seeked");
     }
     return SeekTrack_Orig(ecx, edx, position);
@@ -101,7 +99,7 @@ DETOUR_FUNC(__fastcall, void, OpenTrack, (
     auto playerPtr = TraversePointers<0x15B4>(ecx);
     if (playerPtr && position != 0) {
         std::string playbackId = ToHex(playerPtr + 0x338, 16);
-        LogDebug("OpenTrack {}", playbackId);
+        LogTrace("OpenTrack {}", playbackId);
         _stateMgr->DiscardTrack(playbackId, "Track didn't play from start");
     }
     OpenTrack_Orig(ecx, edx, param_1, param_2, param_3, position, param_5, param_6);
@@ -113,7 +111,7 @@ DETOUR_FUNC(__fastcall, void, CloseTrack, (
     auto playerPtr = TraversePointers<0x15B4>(ecx);
     if (playerPtr) {
         std::string playbackId = ToHex(playerPtr + 0x338, 16);
-        LogDebug("CloseTrack {}, reason={}", playbackId, reason);
+        LogTrace("CloseTrack {}, reason={}", playbackId, reason);
 
         if (strcmp(reason, "trackdone") != 0) {
             _stateMgr->DiscardTrack(playbackId, "Track was skipped");
@@ -225,7 +223,7 @@ DWORD WINAPI Init(LPVOID param)
     bool logToCon = true;
     fs::path logFile = dataDir / "log.txt";
 #if NDEBUG
-    logToCon = fs::exists(dataDir / "_debug.txt"); //TODO: move this to config.json
+    logToCon = fs::exists(dataDir / "_debug.txt");
 #endif
     InitLogger(logToCon, logFile);
 
@@ -281,7 +279,7 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 int main()
 {
     LogMinLevel = LOG_TRACE;
-    ControlServer sv([](auto con, auto& msg) {
+    ControlServer sv([](auto con, auto&& msg) {
         LogInfo("Received message {}: {} (+{} bytes)", (int)msg.Type, msg.Content.dump(), msg.BinaryContent.size());
     });
     std::thread(&ControlServer::Run, &sv).detach();
