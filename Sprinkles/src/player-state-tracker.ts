@@ -14,19 +14,17 @@ export default class PlayerStateTracker
     {
         this._conn = conn;
 
-        Utils.createHook(Player._events._emitter.__proto__, "createEvent", (stage, args, ret) => {
-            let eventType = args[0];
-            let data = args[1];
-            if (stage === "pre" && eventType === "update" && data?.playbackId) {
-                if (stateChanged) {
-                    let oldState = this._playbacks.get(data.playbackId);
-                    stateChanged?.(data, oldState);
-                }
-                this._playbacks.set(data.playbackId, data);
+        Player.getEvents().addListener("update", ({data}) => {
+            if (!data.playbackId) return;
+            
+            if (stateChanged) {
+                let oldState = this._playbacks.get(data.playbackId);
+                stateChanged?.(data, oldState);
             }
+            this._playbacks.set(data.playbackId, data);
         });
         //Player stops sometimes when speed is too high (>= 30)
-        Player._client.getError({}, err => {
+        Player._events._client.getError({}, err => {
             if (err.message === "playback_stuck" && err.data.playback_id === Player.getState().playbackId) {
                 SpotifyUtils.resetCurrentTrack(false);
             }

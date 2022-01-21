@@ -93,6 +93,7 @@ interface PlayerAPI
     _client: any;
     _queue: any;
     
+    getEvents();
     getState(): PlayerState;
     skipToNext(): Promise<void>;
     skipToPrevious(): Promise<void>;
