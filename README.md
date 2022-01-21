@@ -32,7 +32,7 @@ If the injector crashes because missing DLLs, you need to install the [MSVC Redi
 _This only applies to the original OGGs._
 - If you are converting to AAC and care about quality, read this: [High quality AAC](/USAGE.md#high-quality-aac)
 - **You could get banned by using this. Please consider using alt accounts or keeping backups (see [Exportify](https://watsonbox.github.io/exportify) and [SpotMyBackup](http://www.spotmybackup.com)).**
-- Last supported Spotify client version: [1.1.76.447](https://upgrade.scdn.co/upgrade/client/win32-x86/spotify_installer-1.1.76.447.g11f432d8-14.exe)
+- Last supported Spotify client version: [1.1.77.643](https://upgrade.scdn.co/upgrade/client/win32-x86/spotify_installer-1.1.77.643.g3c4c6fc6-20.exe)
 
 # How it works
 Soggfy works by intercepting and dumping OGG streams in real time (hence _ogg dumper_ -> s_ogg_fy). Note that this is different from recording the audio output - this actually gets you a copy of the original OGG files, with no loss in quality. They are then optionally converted and embedded with metadata, depending on settings.
