@@ -1,15 +1,16 @@
 //note: keep this in sync with config.json
 let config = {
-    outputFormat: {
-        args: "-c copy",
-        ext: ""
-    },
+    playbackSpeed: 1.0,
+    skipDownloadedTracks: false,
     embedLyrics: true,
     saveLyrics: true,
     embedCoverArt: true,
     saveCoverArt: true,
-    playbackSpeed: 1.0,
     saveCanvas: false,
+    outputFormat: {
+        args: "-c copy",
+        ext: ""
+    },
     savePaths: {
         basePath: "",
         track: "{artist_name}/{album_name}{multi_disc_path}/{track_num}. {track_name}.ogg",

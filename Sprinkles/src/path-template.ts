@@ -197,6 +197,11 @@ export class TemplatedSearchTree
         this._template = template.replace(EXT_REGEX, "{_ext}").split(/[\/\\]/);
     }
 
+    get isEmpty()
+    {
+        return this.root.children.length === 0;
+    }
+    
     add(id: string, vars: PathTemplateVars)
     {
         let node = this.root;

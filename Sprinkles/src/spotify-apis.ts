@@ -98,6 +98,8 @@ interface PlayerAPI
     skipToNext(): Promise<void>;
     skipToPrevious(): Promise<void>;
     seekTo(position: number): Promise<void>;
+
+    removeFromQueue(tracks: { uri: string, uid?: string }[]): Promise<void>;
 }
 interface PlayerState
 {

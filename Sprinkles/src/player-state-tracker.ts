@@ -2,7 +2,7 @@ import Utils from "./utils";
 import { Player, PlayerState, TrackInfo, SpotifyUtils } from "./spotify-apis";
 import Resources from "./resources";
 import config from "./config";
-import { PathTemplate } from "./path-template";
+import { PathTemplate, TemplatedSearchTree } from "./path-template";
 import { Connection, MessageType } from "./connection";
 
 export default class PlayerStateTracker
@@ -23,8 +23,15 @@ export default class PlayerStateTracker
             }
             this._playbacks.set(data.playbackId, data);
         });
+
+        let queueStatusCache = new Map<string, boolean>();
+        Player.getEvents().addListener("queue_update", async ({ data }) => {
+            if (config.skipDownloadedTracks && conn.isConnected) {
+                this.skipDownloadedTracks(data, queueStatusCache);
+            }
+        });
         //Player stops sometimes when speed is too high (>= 30)
-        Player._events._client.getError({}, err => {
+        Player.getEvents()._client.getError({}, err => {
             if (err.message === "playback_stuck" && err.data.playback_id === Player.getState().playbackId) {
                 SpotifyUtils.resetCurrentTrack(false);
             }
@@ -219,5 +226,43 @@ export default class PlayerStateTracker
             text += '\n';
         }
         return { text: text, rawData: lyrics, isSynced: isSynced };
+    }
+
+    private async skipDownloadedTracks(queue: any, statusCache: Map<string, boolean>)
+    {
+        let tree = new TemplatedSearchTree(config.savePaths.track);
+        let queuedTracks = new Set<string>();
+        
+        for (let track of queue.nextUp) {
+            if (!statusCache.has(track.uri)) {
+                statusCache.set(track.uri, false);
+
+                let vars = {
+                    track_name: track.name,
+                    artist_name: track.artists[0].name,
+                    all_artist_names: track.artists.map(v => v.name).join(", "),
+                    album_name: track.album.name
+                };
+                tree.add(track.uri, vars);
+            }
+            queuedTracks.add(track.uri);
+        }
+        //remove junk from cache
+        for (let track of statusCache.keys()) {
+            if (!queuedTracks.has(track)) {
+                statusCache.delete(track);
+            }
+        }
+        if (!tree.isEmpty) {
+            let data = await this._conn.request(MessageType.DOWNLOAD_STATUS, {
+                searchTree: tree.root,
+                basePath: config.savePaths.basePath
+            });
+            for (let track in data.payload.results) {
+                statusCache.set(track, true);
+            }
+        }
+        let tracksToRemove = queue.nextUp.filter(v => statusCache.get(v.uri) === true);
+        await Player.removeFromQueue(tracksToRemove);
     }
 }

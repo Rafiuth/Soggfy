@@ -118,14 +118,13 @@ export default class UI
             plData += `${loc.path}\n\n`;
             numExported++;
         }
-        await this._conn.send(MessageType.WRITE_FILE, { path: savePath, mode: "replace", text: plData });
-
+        this._conn.send(MessageType.WRITE_FILE, { path: savePath, mode: "replace", text: plData });
         this.showNotification(Icons.DoneBig, `Exported ${numExported} tracks`);
     }
 
     private createSettingsDialog()
     {
-        //TODO: refactor
+        //TODO: refactor (+ react port?)
         let onChange = this.configAccessor.bind(this);
 
         let speedSlider = UIC.slider(
@@ -195,14 +194,15 @@ export default class UI
 
         return UIC.createSettingOverlay(
             UIC.section("General",
-                UIC.row("Playback speed",       speedSlider),
-                UIC.row("Output format",        UIC.select("outputFormat", Object.getOwnPropertyNames(defaultFormats), onFormatChange)),
+                UIC.row("Playback speed",           speedSlider),
+                UIC.row("Output format",            UIC.select("outputFormat", Object.getOwnPropertyNames(defaultFormats), onFormatChange)),
                 customFormatSection,
-                UIC.row("Embed cover art",      UIC.toggle("embedCoverArt", onChange)),
+                UIC.row("Skip downloaded tracks",   UIC.toggle("skipDownloadedTracks", onChange)),
+                UIC.row("Embed cover art",          UIC.toggle("embedCoverArt", onChange)),
                 UIC.row("Save cover art in album folder", UIC.toggle("saveCoverArt", onChange)),
-                UIC.row("Embed lyrics",         UIC.toggle("embedLyrics", onChange)),
+                UIC.row("Embed lyrics",             UIC.toggle("embedLyrics", onChange)),
                 UIC.row("Save lyrics as .lrc/.txt", UIC.toggle("saveLyrics", onChange)),
-                UIC.row("Save canvas",          UIC.toggle("saveCanvas", (k, v) => { 
+                UIC.row("Save canvas",              UIC.toggle("saveCanvas", (k, v) => { 
                     v = onChange(k, v);
                     canvasPathTxt.style.display = v ? "block" : "none";
                     return v;
