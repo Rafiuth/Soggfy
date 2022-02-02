@@ -129,6 +129,7 @@ export class PathTemplate
     }
     static escapePath(str: string)
     {
+        //https://docs.microsoft.com/en-us/windows/win32/fileio/naming-a-file
         const ReplacementChars = {
             '\\': '＼',
             '/': '／',
@@ -143,10 +144,12 @@ export class PathTemplate
         //invalid characters -> similar characters
         str = str.replace(/[\x00-\x1f\/\\:*?"<>|]/g, v => ReplacementChars[v] ?? " ");
         //leading/trailling spaces -> "\u2002 En Space"
-        str = str.replace(/(^ +| +$)/g, " ");
+        str = str.replace(/(^ +| +$)/g, "\u2002");
         //trailling dots -> "\uFF0E Fullwidth Stop"
         //also handles ".."
         str = str.replace(/\.+$/g, v => "．".repeat(v.length));
+        //special names (append "\u2002")
+        str = str.replace(/^(?:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])$/gi, "$&\u2002");
 
         return str;
     }
