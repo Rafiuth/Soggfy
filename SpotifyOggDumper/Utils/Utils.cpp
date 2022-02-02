@@ -3,6 +3,7 @@
 #include <codecvt>
 #include <shellapi.h>
 #include <Shlobj.h>
+#include <atlbase.h>
 
 namespace Utils
 {
@@ -186,11 +187,12 @@ namespace Utils
     }
     fs::path OpenFilePicker(FilePickerType type, const fs::path& initialPath, const std::vector<std::string>& fileTypes)
     {
-        IFileDialog* fd = NULL;
+        CComPtr<IFileDialog> fd;
         fs::path result;
 
         bool isSave = type == FilePickerType::SAVE_FILE;
-        if (FAILED(CoCreateInstance(isSave ? CLSID_FileSaveDialog : CLSID_FileOpenDialog, NULL, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&fd)))) {
+
+        if (FAILED(fd.CoCreateInstance(isSave ? CLSID_FileSaveDialog : CLSID_FileOpenDialog))) {
             return result;
         }
         FILEOPENDIALOGOPTIONS opts = 0;
@@ -219,10 +221,9 @@ namespace Utils
         }
         if (!initialPath.empty()) {
             fs::path normPath = fs::absolute(initialPath);
-            IShellItem* item;
+            CComPtr<IShellItem> item;
             if (SUCCEEDED(SHCreateItemFromParsingName(normPath.c_str(), NULL, IID_PPV_ARGS(&item)))) {
                 fd->SetFolder(item);
-                item->Release();
             }
         }
         if (!initialPath.empty() && type != FilePickerType::SELECT_FOLDER) {
@@ -231,17 +232,14 @@ namespace Utils
         }
         fd->Show(NULL);
 
-        IShellItem* resultItem;
-        if (SUCCEEDED(fd->GetResult(&resultItem))) {
-            PWSTR resultPath = NULL;
-            if (SUCCEEDED(resultItem->GetDisplayName(SIGDN_FILESYSPATH, &resultPath))) {
-                result = fs::path(resultPath);
-                CoTaskMemFree(resultPath);
-            }
-            resultItem->Release();
-        }
-        fd->Release();
+        CComPtr<IShellItem> resultItem;
 
+        if (SUCCEEDED(fd->GetResult(&resultItem))) {
+            CComHeapPtr<WCHAR> resultPath;
+            if (SUCCEEDED(resultItem->GetDisplayName(SIGDN_FILESYSPATH, &resultPath))) {
+                result = fs::path(resultPath.m_pData);
+            }
+        }
         return result;
     }
 
