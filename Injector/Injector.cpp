@@ -189,8 +189,36 @@ void CloseProcess(PROCESS_INFORMATION& target)
     }
 }
 
+#define COL_RED     "\033[1;91m"
+#define COL_GREEN   "\033[1;92m"
+#define COL_YELLOW  "\033[1;93m"
+#define COL_BLUE    "\033[1;94m"
+#define COL_RESET   "\033[0m"
+void EnableAnsiParsing()
+{
+    HANDLE handle = GetStdHandle(STD_OUTPUT_HANDLE);
+    DWORD currMode;
+    GetConsoleMode(handle, &currMode);
+    SetConsoleMode(handle, currMode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+}
+bool IsFFmpegInstalled()
+{
+    //Try Soggfy/ffmpeg/ffmpeg.exe
+    if (fs::exists("ffmpeg/ffmpeg.exe")) {
+        return true;
+    }
+    //Try %PATH%
+    std::wstring envPath;
+    DWORD envPathLen = SearchPath(NULL, L"ffmpeg.exe", NULL, 0, envPath.data(), NULL);
+    if (envPathLen != 0) {
+        return true;
+    }
+    return false;
+}
+
 int main()
 {
+    EnableAnsiParsing();
     PROCESS_INFORMATION targetProc = {};
 
     try {
@@ -200,9 +228,14 @@ int main()
 
         InjectDll(targetProc.hProcess, L"SpotifyOggDumper.dll");
         KillCrashpadProcess();
-        std::cout << "Injection succeeded!\n";
+        std::cout << COL_GREEN "Injection succeeded!\n" COL_RESET;
+
+        if (!IsFFmpegInstalled()) {
+            std::cout << COL_YELLOW "FFmpeg not found, songs won't be tagged nor converted.\n";
+            std::cout << COL_YELLOW "Run DownloadFFmpeg.ps1 or add ffmpeg to the PATH environment variable.\n" COL_RESET;
+        }
     } catch (std::exception& ex) {
-        std::cout << "Error: " << ex.what() << "\n";
+        std::cout << COL_RED "Error: " << ex.what() << "\n" COL_RESET;
     }
     CloseProcess(targetProc);
     

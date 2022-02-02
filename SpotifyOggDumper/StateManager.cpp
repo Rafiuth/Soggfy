@@ -63,6 +63,7 @@ struct StateManagerImpl : public StateManager
         if (_ffmpegPath.empty()) {
             LogWarn("FFmpeg binaries were not found, downloaded files won't be tagged nor converted. Run DownloadFFmpeg.ps1 to fix this.");
         }
+        LogDebug("FFmpeg path: {}", _ffmpegPath.string());
     }
 
     void RunControlServer()
