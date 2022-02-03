@@ -27,7 +27,7 @@ DETOUR_FUNC(__fastcall, int, DecodeAudioData, (
 {
     //PlayerDriver can be found at ecx in seek function
     //struct PlayerDriver { 
-    //    0x338  uint8_t playback_id[16]
+    //    0x330  uint8_t playback_id[16]
     //}
     //The decoder->player path can be found with CheatEngine:
     //1. Find the player address with the track seek function
@@ -51,7 +51,7 @@ DETOUR_FUNC(__fastcall, int, DecodeAudioData, (
         mov _ebp, ebp
     }
     //caller `ebp-2C` = ebp + 90;   `(ebp - 2C) - esp`    before prolog's `mov ebp, esp`
-    //path = [[[[ebp+90]+3C]+B8]+1E8]+150]+338
+    //path = [[[[ebp+90]+3C]+B8]+1E8]+150]+330
 
     auto buf = (char*)param_4[0];
     int bufLen = (int)param_4[1];
@@ -62,7 +62,7 @@ DETOUR_FUNC(__fastcall, int, DecodeAudioData, (
 
     if (bytesRead != 0) {
         char* playerPtr = TraversePointers<0x90, 0x3C, 0xB8, 0x1E8, 0x150>(_ebp);
-        std::string playbackIdStr = ToHex(playerPtr + 0x338, 16);
+        std::string playbackIdStr = ToHex(playerPtr + 0x330, 16);
         _stateMgr->ReceiveAudioData(playbackIdStr, buf, bytesRead);
     }
     return ret;
@@ -85,20 +85,19 @@ DETOUR_FUNC(__fastcall, int64_t, SeekTrack, (
 {
     auto playerPtr = TraversePointers<0x15B4>(ecx);
     if (playerPtr) {
-        std::string playbackId = ToHex(playerPtr + 0x338, 16);
+        std::string playbackId = ToHex(playerPtr + 0x330, 16);
         LogTrace("SeekTrack {}", playbackId);
         _stateMgr->DiscardTrack(playbackId, "Track was seeked");
     }
     return SeekTrack_Orig(ecx, edx, position);
 }
 DETOUR_FUNC(__fastcall, void, OpenTrack, (
-    void* ecx, void* edx, int param_1, void* param_2, int* param_3,
+    void* ecx, void* edx, int param_1, char* param_2, int* param_3,
     int64_t position, char param_5, int* param_6
 ))
 {
-    auto playerPtr = TraversePointers<0x15B4>(ecx);
-    if (playerPtr && position != 0) {
-        std::string playbackId = ToHex(playerPtr + 0x338, 16);
+    if (position != 0) {
+        std::string playbackId = ToHex(param_2 + 0x330, 16);
         LogTrace("OpenTrack {}", playbackId);
         _stateMgr->DiscardTrack(playbackId, "Track didn't play from start");
     }
@@ -110,7 +109,7 @@ DETOUR_FUNC(__fastcall, void, CloseTrack, (
 {
     auto playerPtr = TraversePointers<0x15B4>(ecx);
     if (playerPtr) {
-        std::string playbackId = ToHex(playerPtr + 0x338, 16);
+        std::string playbackId = ToHex(playerPtr + 0x330, 16);
         LogTrace("CloseTrack {}, reason={}", playbackId, reason);
 
         if (strcmp(reason, "trackdone") != 0) {
