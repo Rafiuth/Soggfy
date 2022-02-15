@@ -133,7 +133,7 @@ struct StateManagerImpl : public StateManager
                 }
                 else if (content.contains("searchTree")) {
                     json results = json::object();
-                    SearchPathTree(results, content["searchTree"], content["basePath"]);
+                    SearchPathTree(results, content["searchTree"], Utils::NormalizeToLongPath(content["basePath"]));
 
                     conn->Send(MessageType::DOWNLOAD_STATUS, { 
                         { "reqId", content["reqId"] },
@@ -343,7 +343,7 @@ struct StateManagerImpl : public StateManager
         if (children.empty() && node.contains("id")) {
             std::string id = node["id"];
             results[id] = {
-                { "path", Utils::PathToUtf(currPath) },
+                { "path", currPath },
                 { "status", "DONE" }
             };
             return;

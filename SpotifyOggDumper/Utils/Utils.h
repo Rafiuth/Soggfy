@@ -45,6 +45,11 @@ namespace Utils
      */
     fs::path OpenFilePicker(FilePickerType type, const fs::path& initialPath, const std::vector<std::string>& fileTypes = {});
 
+    /**
+     * @brief Prepends "\\?\" to the specified path for long path support.
+     */
+    fs::path NormalizeToLongPath(const fs::path& path);
+
     int64_t CurrentMillis();
 }
 
@@ -75,11 +80,18 @@ namespace nlohmann
     {
         static void to_json(json& j, const fs::path& val)
         {
-            j = Utils::PathToUtf(val);
+            auto str = Utils::PathToUtf(val);
+            j = str.starts_with(R"(\\?\)") ? str.substr(4) : str;
         }
         static void from_json(const json& j, fs::path& val)
         {
-            val = fs::u8path(j.get_ref<const json::string_t&>());
+            auto& str = j.get_ref<const json::string_t&>();
+            val = fs::u8path(str);
+
+            if (str.size() >= 256 && !str.starts_with(R"(\\?\)")) {
+                //https://docs.microsoft.com/en-us/windows/win32/fileio/maximum-file-path-limitation
+                val = Utils::NormalizeToLongPath(val);
+            }
         }
     };
 }

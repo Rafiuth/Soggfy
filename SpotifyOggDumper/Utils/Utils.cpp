@@ -243,6 +243,13 @@ namespace Utils
         return result;
     }
 
+    fs::path NormalizeToLongPath(const fs::path& path)
+    {
+        fs::path norm = R"(\\?\)";
+        norm += fs::absolute(path);
+        return norm;
+    }
+
     int64_t CurrentMillis()
     {
         auto time = std::chrono::system_clock::now().time_since_epoch();
