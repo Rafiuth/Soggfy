@@ -91,6 +91,7 @@
 .sgf-setting-rows {
     display: flex;
     flex-direction: column;
+    margin: 4px 0px;
 }
 .sgf-setting-cols {
     display: flex;

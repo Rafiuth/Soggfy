@@ -147,10 +147,14 @@ export default class UI
             "Opus 160K":        { ext: "opus",args: "-c:a libopus -b:a 160k" },
             "Custom":           { ext: "mp3", args: "-c:a libmp3lame -b:a 320k -id3v2_version 3 -c:v copy" },
         };
+        let extensions = {
+            "MP3": "mp3", "M4A": "m4a", "MP4": "mp4",
+            "OGG": "ogg", "Opus": "opus"
+        };
         let customFormatSection = UIC.subSection(
             UIC.rows("FFmpeg arguments", UIC.textInput("outputFormat.args", onChange)),
             //TODO: allow this to be editable
-            UIC.row("Extension", UIC.select("outputFormat.ext", ["mp3", "m4a", "mp4", "ogg", "opus"], onChange))
+            UIC.row("Extension", UIC.select("outputFormat.ext", extensions, onChange))
         );
         customFormatSection.style.display = "none";
         
@@ -192,6 +196,13 @@ export default class UI
 
         let canvasPathTxt = UIC.rows("Canvas template", UIC.textInput("savePaths.canvas", onChange));
 
+        let invalidCharModes = {
+            "Unicodes": "unicode",
+            "Dashes (-)": "-",
+            "Underlines (_)": "_",
+            "None (remove)": ""
+        };
+
         return UIC.createSettingOverlay(
             UIC.section("General",
                 UIC.row("Playback speed",           speedSlider),
@@ -213,6 +224,7 @@ export default class UI
                 UIC.rows("Track template",      UIC.textInput("savePaths.track", onChange)),
                 UIC.rows("Podcast template",    UIC.textInput("savePaths.episode", onChange)),
                 canvasPathTxt,
+                UIC.row("Replace invalid characters with", UIC.select("savePaths.invalidCharRepl", invalidCharModes, onChange)),
                 UIC.rows(UIC.collapsible("Variables", ...pathVarTags))
             ),
             UIC.section("Misc",

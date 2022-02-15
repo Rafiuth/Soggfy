@@ -85,21 +85,31 @@ export default class Components
 
         return node;
     }
-    static select(key: string, options: string[], callback: ComponentValueCallback<string>)
+    static select<T>(key: string, options: Record<string, T> | string[], callback: ComponentValueCallback<T>)
     {
         let node = document.createElement("select");
         node.className = "sgf-select";
+
+        let entries = Array.isArray(options)
+            ? options.map(v => [v, v])
+            : Object.entries(options);
+
+        let defaultVal = callback(key);
         
-        for (let i = 0; i < options.length; i++) {
+        for (let i = 0; i < entries.length; i++) {
+            let [k, v] = entries[i];
+            
             let opt = document.createElement("option");
-            opt.setAttribute("value", i.toString());
-            opt.innerText = options[i];
-
+            opt.innerText = k;
             node.appendChild(opt);
-        }
-        node.value = options.indexOf(callback(key)).toString();
-        node.onchange = () => callback(key, options[parseInt(node.value)]);
 
+            if (v === defaultVal) {
+                node.selectedIndex = i;
+            }
+        }
+        node.onchange = () => {
+            callback(key, entries[node.selectedIndex][1] as any);
+        };
         return node;
     }
     static textInput(key: string, callback: ComponentValueCallback<string>)

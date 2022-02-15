@@ -1,4 +1,4 @@
-import Resources from "./resources";
+import config from "./config";
 import { PlayerState } from "./spotify-apis";
 
 interface PathVar
@@ -141,8 +141,12 @@ export class PathTemplate
             '>': '＞',
             '|': '￤',
         };
+        let repl: any = config.savePaths.invalidCharRepl;
+        if (repl === "unicode") {
+            repl = v => ReplacementChars[v] ?? " ";
+        }
         //invalid characters -> similar characters
-        str = str.replace(/[\x00-\x1f\/\\:*?"<>|]/g, v => ReplacementChars[v] ?? " ");
+        str = str.replace(/[\x00-\x1f\/\\:*?"<>|]/g, repl);
         //leading/trailling spaces -> "\u2002 En Space"
         str = str.replace(/(^ +| +$)/g, "\u2002");
         //trailling dots -> "\uFF0E Fullwidth Stop"
@@ -153,6 +157,7 @@ export class PathTemplate
 
         return str;
     }
+
     static replaceExt(path: string, newExt: string)
     {
         //https://github.com/dotnet/runtime/blob/e7312999cad22236211c654ff0dd9efb00b3e101/src/libraries/System.Private.CoreLib/src/System/IO/Path.cs#L42
