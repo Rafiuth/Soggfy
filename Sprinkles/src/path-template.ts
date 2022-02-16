@@ -98,6 +98,12 @@ export class PathTemplate
             }
         },
         {
+            name: "context_index",
+            desc: "The track number in the album or playlist, ordered from oldest to newest. This value will be `0` if track is from the queue.",
+            pattern: `\\d+`,
+            getValue: (m, s) => (s.index.itemIndex ?? -1) + 1
+        },
+        {
             name: "canvas_id",
             desc: "A random 32-character canvas id, or empty if unavailable.",
             pattern: `[0-9a-f]{32}`,
