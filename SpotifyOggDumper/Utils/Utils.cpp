@@ -243,11 +243,21 @@ namespace Utils
         return result;
     }
 
-    fs::path NormalizeToLongPath(const fs::path& path)
+    fs::path NormalizeToLongPath(const fs::path& path, bool force)
     {
-        fs::path norm = R"(\\?\)";
-        norm += fs::absolute(path);
-        return norm;
+        //https://docs.microsoft.com/en-us/windows/win32/fileio/maximum-file-path-limitation
+        fs::path absPath = fs::absolute(path);
+        std::wstring str = absPath.wstring();
+
+        if ((str.length() >= 256 || force) && !str.starts_with(L"\\\\?\\")) {
+            if (str.starts_with(L"\\\\")) {
+                str = L"\\\\?\\UNC\\" + str.substr(2);
+            } else {
+                str = L"\\\\?\\" + str;
+            }
+            return fs::path(str);
+        }
+        return path;
     }
 
     int64_t CurrentMillis()
