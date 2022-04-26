@@ -28,11 +28,11 @@ If the injector crashes because of missing DLLs, you need to install the [MSVC R
 
 # Notes
 - Songs are only downloaded if you play them from start to finish, without seeking (pausing is fine).
-- Quality depends on the account you are using: _160Kb/s_ or _320Kb/s_ for _free_ and _premium_ accounts respectively. You may need to change the streaming quality to "Very high" on Spotify settings to get 320Kb files.
+- Quality depends on the account you are using: _160Kb/s_ or _320Kb/s_ for _free_ and _premium_ accounts respectively. You may need to change the streaming quality to "Very high" on Spotify settings to get 320Kb files.  
 _This only applies to the original OGGs._
 - If you are converting to AAC and care about quality, read this: [High quality AAC](/USAGE.md#high-quality-aac)
 - **You could get banned by using this. Please consider using alt accounts or keeping backups (see [Exportify](https://watsonbox.github.io/exportify) and [SpotMyBackup](http://www.spotmybackup.com)).**
-- Last supported Spotify client version: 1.1.83.956-[1.1.84.716](https://upgrade.scdn.co/upgrade/client/win32-x86/spotify_installer-1.1.84.716.gc5f8b819-8.exe)
+- Last supported Spotify client version: 1.1.83.956-[1.1.84.716](https://upgrade.scdn.co/upgrade/client/win32-x86/spotify_installer-1.1.84.716.gc5f8b819-8.exe)  
 _Soggfy may not work with newer versions. In those cases it will generally show an error box, crash, or the injector will succeed but nothing else will happen, or it will appear to work but won't actually download songs. As a workaround, you can try installing the version in the link above, and optionally using the `BlockSpotifyUpdates.bat` script._
 
 # How it works
