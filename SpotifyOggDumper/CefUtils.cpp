@@ -1,5 +1,5 @@
 #include "CefUtils.h"
-#include "Hooks.h"
+#include "Utils/Hooks.h"
 #include "Utils/Log.h"
 
 #include <memory>
@@ -171,13 +171,18 @@ _CefContext* FindCefContext()
     //807E 01 00               | cmp byte ptr ds:[esi+1],0      
     //75 39                    | jne libcef.11D9BBA2            
     //E8 82F0FFFF              | call libcef.11D9ABF0       
-    Fingerprint fingerprint(
-        L"libcef.dll",
-        "\x55\x89\xE5\x56\x8B\x35\xDC\xF1\x36\x17\x85\xF6\x74\x44\x80\x3E\x00\x74\x3F\x80\x7E\x01\x00\x75\x39\xE8",
-        "\xFF\xFF\xFF\xFF\xFF\xFF\x00\x00\x00\x00\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF"
-    );
-    uintptr_t addr = fingerprint.SearchInModule();
-    return **(_CefContext***)(addr + 6);
+    Hooks::DataPattern pattern("55 89 E5 56 8B 35 ?? ?? ?? ?? 85 F6 74 44 80 3E 00 74 3F 80 7E 01 00 75 39 E8");
+    
+    const uint8_t* codeBase;
+    size_t codeLength;
+    Hooks::GetModuleCode("libcef.dll", &codeBase, &codeLength);
+    
+    int32_t offset = pattern.FindNext(codeBase, codeLength);
+    if (offset < 0) {
+        LogError("Could not find cef_shutdown()");
+        throw std::exception("Could not find CefContext");
+    }
+    return **(_CefContext***)(codeBase + offset + 6);
 }
 
 namespace CefUtils

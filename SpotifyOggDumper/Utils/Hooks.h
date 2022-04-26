@@ -40,6 +40,7 @@ namespace Hooks
         const char* hookName,
         const char* modName, const DataPattern& pattern
     );
+    void GetModuleCode(const char* modName, const uint8_t** codeSectionBase, size_t* codeSectionLength);
 
     void EnableAll();
     void DisableAll();

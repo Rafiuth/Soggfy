@@ -123,19 +123,27 @@ namespace Hooks
         const char* hookName,
         const char* modName, const DataPattern& pattern)
     {
-        auto mod = (uint8_t*)GetModuleHandleA(modName);
-        auto dosHdr = (IMAGE_DOS_HEADER*)mod;
-        auto ntHdrs = (IMAGE_NT_HEADERS*)(mod + dosHdr->e_lfanew);
-        auto optHdr = &ntHdrs->OptionalHeader;
-        auto codeBase = mod + optHdr->BaseOfCode;
+        const uint8_t* codeBase;
+        size_t codeLength;
+        GetModuleCode(modName, &codeBase, &codeLength);
 
-        int32_t offset = pattern.FindNext(codeBase, optHdr->SizeOfCode);
+        int32_t offset = pattern.FindNext(codeBase, codeLength);
         if (offset < 0) {
             LogDebug("[Hooks::CreatePattern] No matches found for {}", hookName);
             MH_Check(MH_ERROR_FUNCTION_NOT_FOUND, hookName);
         }
         LogDebug("[Hooks::CreatePattern] {} found at {}", hookName, (void*)(codeBase + offset));
-        Create(codeBase + offset, detour, orig, hookName);
+        Create((FuncAddr)(codeBase + offset), detour, orig, hookName);
+    }
+    
+    void GetModuleCode(const char* modName, const uint8_t** codeSectionBase, size_t* codeSectionLength)
+    {
+        auto mod = (uint8_t*)GetModuleHandleA(modName);
+        auto dosHdr = (IMAGE_DOS_HEADER*)mod;
+        auto ntHdrs = (IMAGE_NT_HEADERS*)(mod + dosHdr->e_lfanew);
+        auto optHdr = &ntHdrs->OptionalHeader;
+        *codeSectionBase = mod + optHdr->BaseOfCode;
+        *codeSectionLength = optHdr->SizeOfCode;
     }
 
     void EnableAll()

@@ -196,7 +196,7 @@ DWORD WINAPI Init(LPVOID param)
     fs::path logFile = dataDir / "log.txt";
 #if NDEBUG
     logToCon = fs::exists(dataDir / "_debug.txt");
-    LogMinLevel = logToCon ? LogLevel::TRACE : LogLevel::DEBUG;
+    LogMinLevel = logToCon ? LOG_TRACE : LOG_DEBUG;
 #endif
 
     std::string spotifyVersion = "<unknown>";
