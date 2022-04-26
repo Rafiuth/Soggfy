@@ -133,7 +133,7 @@ struct StateManagerImpl : public StateManager
                 }
                 else if (content.contains("searchTree")) {
                     json results = json::object();
-                    SearchPathTree(results, content["searchTree"], Utils::NormalizeToLongPath(content["basePath"]));
+                    SearchPathTree(results, content["searchTree"], Utils::NormalizeToLongPath(content["basePath"], true));
 
                     conn->Send(MessageType::DOWNLOAD_STATUS, { 
                         { "reqId", content["reqId"] },
@@ -411,7 +411,7 @@ struct StateManagerImpl : public StateManager
         proc.SetExePath(_ffmpegPath);
         proc.SetWorkDir(_dataDir);
 
-        proc.AddArg("-i");
+        proc.AddArgs("-y -loglevel warning -i");
         proc.AddArgPath(path);
 
         if (_config.value("embedCoverArt", true)) {
@@ -436,12 +436,11 @@ struct StateManagerImpl : public StateManager
             proc.AddArg(k + "=" + v.get<std::string>());
         }
         proc.AddArgPath(outPath);
-        proc.AddArg("-y");
 
         LogTrace("  ffmpeg args: {}", proc.ToString());
-        int exitCode = proc.Start(true);
+        int exitCode = proc.Start(true, true);
         if (exitCode != 0) {
-            throw std::runtime_error("Conversion failed. (ffmpeg returned " + std::to_string(exitCode) + ")");
+            throw std::runtime_error("FFmpeg exited with code " + std::to_string(exitCode) + ". Check log for details.");
         }
     }
     fs::path CreateCoverMetaBlock(const fs::path& coverPath)

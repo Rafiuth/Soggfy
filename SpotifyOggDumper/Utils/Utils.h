@@ -47,7 +47,7 @@ namespace Utils
 
     /**
      * @brief Prepends "\\?\" to the specified path (for long path support) 
-     *        if it is larger than 256 characters or `force == true`.
+     *        if it is longer than 256 characters or |force == true|.
      */
     fs::path NormalizeToLongPath(const fs::path& path, bool force = false);
 
@@ -69,7 +69,8 @@ public:
 
     void AddArgs(const std::string& str);
 
-    int Start(bool waitForExit = false);
+    //Note: |logStdout| will cause the stdout to be logged on debug level, implies |waitForExit|.
+    int Start(bool waitForExit = false, bool logStdout = false);
 
     std::string ToString();
 };

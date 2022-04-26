@@ -1,4 +1,5 @@
 #include "Utils.h"
+#include "Log.h"
 #include <chrono>
 #include <codecvt>
 #include <shellapi.h>
@@ -333,24 +334,54 @@ void ProcessBuilder::AddArgs(const std::string& str)
     }
     LocalFree(args);
 }
-int ProcessBuilder::Start(bool waitForExit)
+int ProcessBuilder::Start(bool waitForExit, bool logStdout)
 {
     std::wstring filenameW = _exePath.wstring();
     std::wstring cmdLineW = CreateCommandLine(_args, filenameW);
-    std::wstring workDirW = _workDir.wstring();
+    std::wstring workDirW = _workDir.empty() ? L"./" : _workDir.wstring();
 
     DWORD exitCode = 0;
+    HANDLE outPipeW = NULL, outPipeR = NULL;
 
     PROCESS_INFORMATION processInfo = {};
-    STARTUPINFO startInfo = {};
-    startInfo.cb = sizeof(STARTUPINFO);
-    startInfo.dwFlags = STARTF_USESHOWWINDOW;
-    startInfo.wShowWindow = SW_HIDE;
+    STARTUPINFO startInfo = { 
+        .cb = sizeof(STARTUPINFO),
+        .dwFlags = STARTF_USESHOWWINDOW,
+        .wShowWindow = SW_HIDE
+    };
 
-    DWORD flags = CREATE_NEW_CONSOLE;
+    if (logStdout) {
+        //Setup stdout pipe
+        //https://docs.microsoft.com/en-us/windows/win32/procthread/creating-a-child-process-with-redirected-input-and-output
+        SECURITY_ATTRIBUTES saAttr = { .nLength = sizeof(SECURITY_ATTRIBUTES), .bInheritHandle = TRUE };
+        CreatePipe(&outPipeR, &outPipeW, &saAttr, 0);
+        SetHandleInformation(outPipeR, HANDLE_FLAG_INHERIT, 0);
 
-    if (!CreateProcess(filenameW.c_str(), cmdLineW.data(), NULL, NULL, FALSE, flags, NULL, workDirW.c_str(), &startInfo, &processInfo)) {
+        startInfo.hStdOutput = outPipeW;
+        startInfo.hStdError = outPipeW;
+        startInfo.dwFlags |= STARTF_USESTDHANDLES;
+    }
+    
+    if (!CreateProcess(filenameW.c_str(), cmdLineW.data(), NULL, NULL, TRUE, CREATE_NEW_CONSOLE, NULL, workDirW.c_str(), &startInfo, &processInfo)) {
         throw std::runtime_error("Failed to create process " + _exePath.filename().string() + " (error " + std::to_string(GetLastError()) + ")");
+    }
+
+    if (logStdout) {
+        //If we don't close the write pipe, there is no way to recognize that the child process has ended.
+        CloseHandle(outPipeW);
+
+        //Read output to memory and log lines later (this could be more efficient but the output shouldn't be too long)
+        std::string output;
+        char buffer[1024];
+        DWORD bytesRead;
+        while (ReadFile(outPipeR, buffer, sizeof(buffer), &bytesRead, NULL) && bytesRead > 0) {
+            output.append(buffer, bytesRead);
+        }
+        auto logPrefix = _exePath.filename().string();
+        for (auto& line : Utils::Split(output, "\n", false)) {
+            LogDebug("[{}]: {}", logPrefix, line);
+        }
+        CloseHandle(outPipeR);
     }
     if (waitForExit) {
         WaitForSingleObject(processInfo.hProcess, INFINITE);
