@@ -228,7 +228,7 @@ export default class UI
                 UIC.rows(UIC.collapsible("Variables", ...pathVarTags))
             ),
             UIC.section("Misc",
-                UIC.row("Block ads and telemetry",UIC.toggle("blockAds", onChange)),
+                UIC.row("Block telemetry",      UIC.toggle("blockAds", onChange)),
             )
         );
     }

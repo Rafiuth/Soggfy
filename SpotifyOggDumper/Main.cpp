@@ -1,14 +1,21 @@
-#include "Hooks.h"
+#include "pch.h"
 #include <thread>
-#include <MinHook.h>
-#include "AppVersion.h"
 #include "StateManager.h"
 #include "Utils/Log.h"
+#include "Utils/Hooks.h"
 #include "CefUtils.h"
 
 HMODULE _selfModule;
 std::shared_ptr<StateManager> _stateMgr;
 
+template <int... Offsets>
+constexpr char* TraversePointers(void* ptr)
+{
+    for (int offset : { Offsets... }) {
+        ptr = *(char**)((char*)ptr + offset);
+    }
+    return (char*)ptr;
+}
 std::string ToHex(char* data, int length)
 {
     std::string str(length * 2, '\0');
@@ -83,7 +90,7 @@ DETOUR_FUNC(__fastcall, int64_t, SeekTrack, (
     void* ecx, void* edx, int64_t position
 ))
 {
-    auto playerPtr = TraversePointers<0x15B4>(ecx);
+    auto playerPtr = TraversePointers<0x1740>(ecx);
     if (playerPtr) {
         std::string playbackId = ToHex(playerPtr + 0x330, 16);
         LogTrace("SeekTrack {}", playbackId);
@@ -107,7 +114,7 @@ DETOUR_FUNC(__fastcall, void, CloseTrack, (
     void* ecx, void* edx, int param_1, void* param_2, char* reason, int param_4, char param_5
 ))
 {
-    auto playerPtr = TraversePointers<0x15B4>(ecx);
+    auto playerPtr = TraversePointers<0x1740>(ecx);
     if (playerPtr) {
         std::string playbackId = ToHex(playerPtr + 0x330, 16);
         LogTrace("CloseTrack {}, reason={}", playbackId, reason);
@@ -119,71 +126,19 @@ DETOUR_FUNC(__fastcall, void, CloseTrack, (
     }
     CloseTrack_Orig(ecx, edx, param_1, param_2, reason, param_4, param_5);
 }
-static const HookInfo HookTargets[] =
-{
-    HOOK_INFO(
-        DecodeAudioData,
-        Fingerprint(
-            L"Spotify.exe",
-            "\x55\x8B\xEC\x8B\x11\x56\x8B\x75\x10\x57\x8B\x7D\x0C\xFF\x75\x14\x8B\x47\x04\x89\x45\x0C\x8B\x46\x04\x89\x45\x10\x8D\x45\x10\x50\xFF\x36\x8D\x45\x0C\x50\xFF\x37\xFF\x75\x08\xFF\x52\x04\x8B\x55\x0C\x8B\xCA\x29\x57\x04\x8B\x45\x08\xC1\xE1\x02\x01\x0F\x8B\x4D\x10\x01\x0E\x29\x4E\x04\x5F\x5E\x5D\xC2\x10\x00",
-            "\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF"
-        )
-    ),
-    HOOK_INFO(
-        CreateTrackPlayer,
-        Fingerprint(
-            L"Spotify.exe",
-            "\x6A\x74\xB8\x52\xBC\xD9\x00\xE8\x54\x67\x34\x00\x89\x4D\x88\x8B\x45\x18\x33\xDB\x8B\x7D\x08\x8B\x75\x0C\xF2\x0F\x10\x45\x10\x89\x45\x94\x8B\x45\x1C\x89\x45\x98\x8B\x45\x20\x89\x45\x9C\x8B\x45\x24\x89\x7D\x90\x89\x45\x90\x8B\x45\x28\x89\x45\xA0\x8D\x46\x08\x6A\x10\x50\x8D\x45\xCC\xF2\x0F\x11\x45\x80\x50\x89\x5D\x8C\xE8\x1A\x8E\x32\x00\x8D\x45\xCC\x50\x68\x30\xF5\xE8\x00\x53\x68\x19\x01\x00\x00\x68\x70\xC8\xDE\x00\x68\x7A\x42\xDE\x00\x53\x6A\x04\xE8\x83\x42\x32\x00",
-            "\xFF\xFF\xFF\x00\x00\x00\x00\xFF\x00\x00\x00\x00\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\x00\x00\x00\x00\xFF\xFF\xFF\xFF\xFF\x00\x00\x00\x00\xFF\xFF\x00\x00\x00\x00\xFF\x00\x00\x00\x00\xFF\x00\x00\x00\x00\xFF\xFF\xFF\xFF\x00\x00\x00\x00"
-        )
-    ),
-    HOOK_INFO(
-        SeekTrack,
-        Fingerprint(
-            L"Spotify.exe",
-            "\x55\x8B\xEC\x83\xEC\x38\xA1\x18\xB0\x06\x01\x33\xC5\x89\x45\xFC\x56\x8B\xF1\x8B\x8E\xB4\x15\x00\x00\x85\xC9\x75\x04\x32\xC0\xEB\x5D\x8B\x01\x8D\x55\xEC\x52\x8B\x80\x8C\x00\x00\x00\xFF\xD0\x6A\x10\x50\x8D\x45\xC8\x50\xE8\x4C\x6A\x32\x00\x8D\x45\xC8\x50\xFF\x75\x0C\xFF\x75\x08\x68",
-            "\xFF\xFF\xFF\xFF\xFF\xFF\xFF\x00\x00\x00\x00\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\x00\x00\x00\x00\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF"
-        )
-    ),
-    HOOK_INFO(
-        OpenTrack,
-        Fingerprint(
-            L"Spotify.exe",
-            "\x68\x54\x01\x00\x00\xB8\xC7\x6B\xDA\x00\xE8\x29\x7F\x34\x00\x8B\xF1\x89\xB5\xDC\xFE\xFF\xFF\x8B\x45\x08\x33\xFF\x89\x85\xBC\xFE\xFF\xFF\x8B\x45\x10\x89\x85\xB8\xFE\xFF\xFF\x8A\x45\x1C\x88\x85\xC3\xFE\xFF\xFF\x89\xBD\xE4\xFE\xFF\xFF\x89\xBD\xE0\xFE\xFF\xFF\x8B\x4D\x0C\x8D\x55\xE0\x21\x7D\xFC\xFF\x86\x5C\x16\x00\x00\x52\x8B\x01\x8B\x80\x8C\x00\x00\x00\xFF\xD0\x6A\x10\x50\x8D\x45\xBC\x50\xE8\x17\xA4\x32\x00",
-            "\xFF\xFF\xFF\xFF\xFF\xFF\x00\x00\x00\x00\xFF\x00\x00\x00\x00\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\x00\x00\x00\x00"
-        )
-    ),
-    HOOK_INFO(
-        CloseTrack,
-        Fingerprint(
-            L"Spotify.exe",
-            "\x6A\x50\xB8\x05\xBC\xD9\x00\xE8\xE0\x6A\x34\x00\x8B\xF9\x83\xAF\x5C\x16\x00\x00\x01\x8A\x45\x18\x8B\x55\x0C\x8B\x5D\x08\x8B\x75\x10\x89\x55\xAC\x88\x45\xBB\x74\x23\x8A\x0D\xBC\xF3\xE8\x00\x8D\x45\xA8\x88\x4D\xAC\x8B\xCB\x50\xFF\x75\xAC\xC7\x45\xA8\x01\x00\x00\x00\xE8\x84\xEA\xFF\xFF\xE9\x1E\x03\x00\x00\x8B\x8F\xB4\x15\x00\x00\x8D\x55\xE0\x52\x8B\x01\xFF\x90\x8C\x00\x00\x00\x6A\x10\x50\x8D\x45\xBC\x50\xE8\x90\x91\x32\x00\x8D\x45\xBC\x50\x68\x58\xF7\xE8\x00\x6A\x00\x68\xA6\x02\x00\x00\x68\x70\xC8\xDE\x00\x68\x7A\x42\xDE\x00\x6A\x00\x6A\x04\xE8\xF7\x45\x32\x00",
-            "\xFF\xFF\xFF\x00\x00\x00\x00\xFF\x00\x00\x00\x00\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\x00\x00\x00\x00\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\x00\x00\x00\x00\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\xFF\x00\x00\x00\x00\xFF\xFF\xFF\xFF\xFF\x00\x00\x00\x00\xFF\xFF\xFF\x00\x00\x00\x00\xFF\x00\x00\x00\x00\xFF\x00\x00\x00\x00\xFF\xFF\xFF\xFF\xFF\x00\x00\x00\x00"
-        )
-    )
-};
 
 void InstallHooks()
 {
-    MH_Initialize();
-
-    for (auto& hook : HookTargets) {
-        LogTrace("Creating hook {}...", hook.Name);
-        uintptr_t addr = hook.Fingerprint.SearchInModule();
-
-        if (MH_CreateHook((LPVOID)addr, hook.Detour, hook.OrigFunc) != MH_OK) {
-            throw std::runtime_error("Failed to create hook");
-        }
-        LogDebug("Hook created: {} @ {}", hook.Name, (void*)addr);
-    }
-
+    //Signatures for Spotify v1.1.84.716-??
+    CREATE_HOOK_PATTERN(DecodeAudioData,    "Spotify.exe", "55 8B EC 8B 11 56 8B 75 10 57 8B 7D 0C FF 75 14 8B 47 04 89 45 0C 8B 46 04 89 45 10 8D 45 10 50 FF 36 8D 45 0C 50 FF 37 FF 75 08 FF 52 04 8B 55 0C 8B CA 29 57 04 8B 45 08 C1 E1 02 01 0F 8B 4D 10 01 0E 29 4E 04 5F 5E 5D C2 10 00");
+    CREATE_HOOK_PATTERN(CreateTrackPlayer,  "Spotify.exe", "68 9C 00 00 00 B8 ?? ?? ?? ?? E8 ?? ?? ?? ?? 89 8D 60 FF FF FF 8B 45 18 33 DB 8B 7D 08 8B 75 0C F2 0F 10 45 10 89 85 6C FF FF FF 8B 45 1C 89 85 70 FF FF FF 8B 45 20 89 85 74 FF FF FF 8B 45 24 89 BD 68 FF FF FF 89 85 68 FF FF FF 8B 45 28 89 85 78 FF FF FF 8D 46 08 6A 10 50 8D 45 CC F2 0F 11 85 58 FF FF FF 50 89 9D 64 FF FF FF");
+    CREATE_HOOK_PATTERN(SeekTrack,          "Spotify.exe", "55 8B EC 83 EC 38 A1 ?? ?? ?? ?? 33 C5 89 45 FC 56 8B F1 8B 8E 40 17 00 00 85 C9 75 04 32 C0 EB 5D 8B 01 8D 55 EC 52 8B 80 8C 00 00 00 FF D0 6A 10 50 8D 45 C8 50");
+    CREATE_HOOK_PATTERN(OpenTrack,          "Spotify.exe", "68 54 01 00 00 B8 ?? ?? ?? ?? E8 ?? ?? ?? ?? 8B F1 89 B5 DC FE FF FF 8B 45 08 33 FF 89 85 BC FE FF FF 8B 45 10 89 85 B0 FE FF FF 8A 45 1C 88 85 C3 FE FF FF 89 BD E4 FE FF FF 89 BD E0 FE FF FF 8B 4D 0C 8D 55 E0 21 7D FC FF 86 ?? ?? 00 00 52 8B 01 8B 80 8C 00 00 00 FF D0 6A 10 50 8D 45 BC 50");
+    CREATE_HOOK_PATTERN(CloseTrack,         "Spotify.exe", "6A 50 B8 ?? ?? ?? ?? E8 ?? ?? ?? ?? 8B F9 83 AF EC 17 00 00 01 8A 45 18 8B 55 0C 8B 5D 08 8B 75 10 89 55 AC 88 45 BB 74 11 6A 01 8B CB E8 ?? ?? ?? ?? 6A 02 58 E9 19 03 00 00 8B 8F 40 17 00 00 8D 55 E0 52 8B 01 FF 90 8C 00 00 00 6A 10 50 8D 45 BC 50");
+    
     auto urlreqHook = CefUtils::InitUrlBlocker([&](auto url) { return _stateMgr && _stateMgr->IsUrlBlocked(url); });
-    MH_CreateHookApi(L"libcef.dll", "cef_urlrequest_create", urlreqHook.first, urlreqHook.second);
-
-    auto enableResult = MH_EnableHook(MH_ALL_HOOKS);
-    if (enableResult != MH_OK) {
-        throw std::runtime_error("Failed to enable hooks (code " + std::to_string(enableResult) + ")");
-    }
+    Hooks::CreateApi(L"libcef.dll", "cef_urlrequest_create", urlreqHook.first, urlreqHook.second);
+    Hooks::EnableAll();
 }
 
 std::filesystem::path GetModuleFileNameEx(HMODULE module)
@@ -201,12 +156,30 @@ std::filesystem::path GetModuleFileNameEx(HMODULE module)
     return std::filesystem::path(pathBuf.begin(), pathBuf.end());
 }
 
+std::string GetFileVersion(const std::wstring& fn)
+{
+    int versionDataLen = GetFileVersionInfoSize(fn.c_str(), NULL);
+    auto versionData = std::make_unique<uint8_t[]>(versionDataLen);
+    GetFileVersionInfo(fn.c_str(), 0, versionDataLen, versionData.get());
+
+    VS_FIXEDFILEINFO* info;
+    UINT infoLen;
+    VerQueryValue(versionData.get(), L"\\", (LPVOID*)&info, &infoLen);
+
+    return std::format(
+        "{}.{}.{}.{}",
+        HIWORD(info->dwFileVersionMS),
+        LOWORD(info->dwFileVersionMS),
+        HIWORD(info->dwFileVersionLS),
+        LOWORD(info->dwFileVersionLS)
+    );
+}
+
 void Exit()
 {
     LogInfo("Uninstalling...");
 
-    MH_DisableHook(MH_ALL_HOOKS);
-    MH_Uninitialize();
+    Hooks::DisableAll();
 
     _stateMgr->Shutdown();
     _stateMgr = nullptr;
@@ -223,22 +196,32 @@ DWORD WINAPI Init(LPVOID param)
     fs::path logFile = dataDir / "log.txt";
 #if NDEBUG
     logToCon = fs::exists(dataDir / "_debug.txt");
+    LogMinLevel = logToCon ? LogLevel::TRACE : LogLevel::DEBUG;
 #endif
-    InitLogger(logToCon, logFile);
 
-    _stateMgr = StateManager::New(dataDir);
+    std::string spotifyVersion = "<unknown>";
 
     try {
-        auto spotifyVersion = AppVersion::Of(L"Spotify.exe");
-        LogInfo("Spotify version: {}", spotifyVersion.AsString());
+        InitLogger(logToCon, logFile);
+        
+        _stateMgr = StateManager::New(dataDir);
+    
+        spotifyVersion = GetFileVersion(L"Spotify.exe");
+        LogInfo("Spotify version: {}", spotifyVersion);
 
         InstallHooks();
 
         std::thread(&StateManager::RunControlServer, _stateMgr).detach();
     } catch (std::exception& ex) {
-        auto msg = std::string("Failed to install hooks: ") + ex.what() + "\n\nTry updating Soggfy.";
+        auto msg = std::format(
+            "Failed to initialize Soggfy: {}\n\n"
+            "This likely means that the Spotify version you are using ({}) is not supported.\n"
+            "Try updating Soggfy, or downgrading Spotify to the latest supported "
+            "version linked in the readme.",
+            ex.what(), spotifyVersion
+        );
         LogError("{}", msg);
-        if (!logToCon) MessageBoxA(NULL, msg.c_str(), "Soggfy", MB_ICONERROR);
+        MessageBoxA(NULL, msg.c_str(), "Soggfy", MB_ICONERROR);
         Exit();
     }
     LogInfo("Hooks were successfully installed.");
@@ -274,6 +257,8 @@ BOOL APIENTRY DllMain(HMODULE hModule,
 #else
 
 #include "ControlServer.h"
+
+#include "Utils/Utils.h"
 
 int main()
 {

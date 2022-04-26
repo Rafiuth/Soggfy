@@ -40,7 +40,7 @@ export class StatusIndicator
             let dirtyRows = [];
             for (let mut of mutations) {
                 for (let node of mut.addedNodes) {
-                    if (node.parentElement?.matches('div[role="presentation"]:not([class])') && (node as Element).matches('div[role="row"]')) {
+                    if ((node as Element).matches?.('div[role="row"]')) {
                         dirtyRows.push(node.firstChild);
                     }
                 }
