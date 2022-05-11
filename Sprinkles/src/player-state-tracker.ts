@@ -166,7 +166,7 @@ export default class PlayerStateTracker
             date:           date.map(x => Utils.padInt(x, 2)).join('-'), //YYYY-MM-DD,
             publisher:      extraMeta.album.label,
             language:       extraMeta.language_of_performance?.[0],
-            isrc:           extraMeta.external_id.find(v => v.type === "isrc")?.id,
+            isrc:           extraMeta.external_id?.find(v => v.type === "isrc")?.id,
             comment:        Resources.getOpenTrackURL(track.uri),
             explicit:       meta.is_explicit ? "1" : undefined
         };
