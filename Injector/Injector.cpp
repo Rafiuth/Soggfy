@@ -162,7 +162,7 @@ PROCESS_INFORMATION FindTargetProcess()
     target.hProcess = FindMainProcess();
 
     if (!target.hProcess) {
-        std::cout << "Spotify process not found, creating a new one...\n";
+        std::cout << "Launching Spotify...\n";
 
         fs::path exePath;
         if (!FindSpotifyExePath(exePath)) {
@@ -175,6 +175,15 @@ PROCESS_INFORMATION FindTargetProcess()
 
         if (!CreateProcess(exePath.c_str(), NULL, NULL, NULL, false, 0, NULL, workDir.c_str(), &startInfo, &target)) {
             throw std::exception("Could not start Spotify process");
+        }
+        //Wait a bit until the window is open
+        for (int i = 0; i < 30; i++) {
+            HANDLE handle = FindMainProcess();
+            if (handle) {
+                CloseHandle(handle);
+                break;
+            }
+            Sleep(500);
         }
     }
     return target;

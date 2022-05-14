@@ -94,9 +94,9 @@ export default class Utils
 
     static getReactProps(rootElem: Element, targetElem: Element): any
     {
-        const keyof_ReactEventHandlers =
+        const keyof_ReactProps =
             Object.keys(rootElem)
-                  .find(k => k.startsWith("__reactEventHandlers$"));
+                  .find(k => k.startsWith("__reactProps$"));
         
         //find the path from elem to target
         let path = [];
@@ -105,17 +105,17 @@ export default class Utils
             let parent = node.parentElement;
             let index = 0;
             for (let child of parent.children) {
-                if (child[keyof_ReactEventHandlers]) index++;
+                if (child[keyof_ReactProps]) index++;
                 if (child === node) break;
             }
             path.push({ next: node, index: index });
             node = parent;
         }
         //now find the react state
-        let state = node[keyof_ReactEventHandlers];
+        let state = node[keyof_ReactProps];
         for (let i = path.length - 1; i >= 0 && state != null; i--) {
             let loc = path[i];
-            
+
             //find the react state children, ignoring "non element" children
             let childStateIndex = 0;
             let childElemIndex = 0;
@@ -124,7 +124,8 @@ export default class Utils
                 if (isElem && ++childElemIndex === loc.index) break;
                 childStateIndex++;
             }
-            state = state.children[childStateIndex]?.props;
+            let child = state.children[childStateIndex] ?? (childStateIndex === 0 ? state.children : null);
+            state = child?.props;
             node = loc.next;
         }
         return state;

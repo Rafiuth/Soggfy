@@ -115,7 +115,7 @@ namespace Hooks
 
     void CreateApi(const wchar_t* modName, const char* funcName, FuncAddr detour, FuncAddr* orig)
     {
-        MH_Check(MH_CreateHookApi(modName, funcName, detour, orig));
+        MH_Check(MH_CreateHookApi(modName, funcName, detour, orig), funcName);
     }
 
     void CreatePattern(
