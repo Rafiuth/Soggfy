@@ -100,7 +100,7 @@ export default class PlayerStateTracker
                 console.error("Failed to fetch canvas for %s: %s", track.uri, ex);
             }
         }
-        this.fixMetadata(data.metadata, config.outputFormat.ext || "ogg");
+        this.fixMetadata(track, data.metadata, config.outputFormat.ext || "ogg");
         return { info: data, coverData: coverData };
     }
     private getSavePaths(type: string, meta: any, playback: PlayerState)
@@ -130,7 +130,7 @@ export default class PlayerStateTracker
             canvas: path + PathTemplate.render(config.savePaths.canvas, vars)
         };
     }
-    private fixMetadata(meta: any, format: string): any
+    private fixMetadata(track: TrackInfo, meta: any, format: string): any
     {
         //https://wiki.multimedia.cx/index.php?title=FFmpeg_Metadata
         //https://help.mp3tag.de/main_tags.html
@@ -141,6 +141,10 @@ export default class PlayerStateTracker
             meta.disc = `${meta.disc}/${meta.totaldiscs}`;
             delete meta.totaltracks;
             delete meta.totaldiscs;
+        }
+        let albumArtist = track.metadata.album_artist_name;
+        if (albumArtist) {
+            meta.album_artist = albumArtist;
         }
     }
     private async getTrackMetaProps(track: TrackInfo)
