@@ -105,7 +105,7 @@ export default class UI
         let data = await this._conn.request(MessageType.DOWNLOAD_STATUS, {
             searchTree: tree.root,
             basePath: config.savePaths.basePath
-        });
+        }, null, -1);
         let results = data.payload.results;
         let plData = `#EXTM3U\n#PLAYLIST:${info.name}\n\n`;
         let numExported = 0;
