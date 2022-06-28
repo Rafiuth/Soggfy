@@ -273,6 +273,9 @@ struct StateManagerImpl : public StateManager
     }
     bool IsUrlBlocked(std::wstring_view url)
     {
+        if (url.starts_with(L"https://upgrade.scdn.co/")) {
+            return true;
+        }
         if (_config.value("blockAds", true)) {
             //https://github.com/abba23/spotify-adblock/blob/main/config.toml#L73
             return url.starts_with(L"https://spclient.wg.spotify.com/ads/") ||

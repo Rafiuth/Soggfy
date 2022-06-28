@@ -54,13 +54,26 @@ void EnumProcessesEx(std::function<void(PROCESSENTRY32&)> visitor)
     }
     CloseHandle(snapshot);
 }
-void EnumWindowsEx(std::function<BOOL(HWND)> visitor)
+bool HasOpenWindow(DWORD procId)
 {
-    EnumWindows([](HWND hwnd, LPARAM param) -> BOOL {
-        return (*(std::function<BOOL(HWND)>*)param)(hwnd);
-    }, (LPARAM)&visitor);
-}
+    struct Data { DWORD ProcId; HWND Win; };
+    Data data = { procId, 0 };
 
+    EnumWindows([](HWND hwnd, LPARAM param) -> BOOL {
+        auto data = (Data*)param;
+        DWORD parentProcId;
+        GetWindowThreadProcessId(hwnd, &parentProcId);
+
+        if (parentProcId == data->ProcId && GetWindow(hwnd, GW_OWNER) == 0 && IsWindowVisible(hwnd)) {
+            data->Win = hwnd;
+            return false;
+        }
+        return true;
+    }, (LPARAM)&data);
+
+    return data.Win != 0;
+}
+//Note: this will only work if both processes have the same word size (64 vs 32)
 std::wstring GetProcessCommandLine(HANDLE hProc)
 {
     typedef NTSTATUS(NTAPI* NtQueryInformationProcess_FuncType)(
@@ -86,129 +99,87 @@ std::wstring GetProcessCommandLine(HANDLE hProc)
     return cmdLine;
 }
 
-void KillCrashpadProcess()
-{
-    EnumProcessesEx([&](auto proc) {
-        if (_wcsicmp(proc.szExeFile, L"Spotify.exe") == 0) {
-            DWORD accFlags =
-                PROCESS_TERMINATE | PROCESS_QUERY_INFORMATION |
-                PROCESS_VM_OPERATION | PROCESS_VM_READ | PROCESS_VM_WRITE;
-            HANDLE hProc = OpenProcess(accFlags, false, proc.th32ProcessID);
-            std::wstring cmdLine = GetProcessCommandLine(hProc);
-            if (cmdLine.find(L"--type=crashpad-handler") != std::wstring::npos) {
-                TerminateProcess(hProc, 0);
-                std::cout << "Spotify crash reporter process killed successfully (" << proc.th32ProcessID << ")\n";
-            }
-            CloseHandle(hProc);
-        }
-    });
-}
-
-HANDLE FindMainProcess()
-{
-    //Find spotify processes
-    std::unordered_set<DWORD> possibleProcs;
-    EnumProcessesEx([&](auto proc) {
-        if (_wcsicmp(proc.szExeFile, L"Spotify.exe") == 0) {
-            possibleProcs.emplace(proc.th32ProcessID);
-        }
-    });
-    //Find the process with a open window
-    DWORD actualProcId = 0;
-    EnumWindowsEx([&](HWND hwnd) {
-        DWORD procId;
-        GetWindowThreadProcessId(hwnd, &procId);
-
-        if (possibleProcs.find(procId) != possibleProcs.end()) {
-            actualProcId = procId;
-            return false;
-        }
-        return true;
-    });
-
-    if (!actualProcId) {
-        return NULL;
-    }
-    return OpenProcess(
-        PROCESS_QUERY_INFORMATION | 
-        PROCESS_CREATE_THREAD |
-        PROCESS_VM_OPERATION | 
-        PROCESS_VM_READ | 
-        PROCESS_VM_WRITE, 
-        false, actualProcId
-    );
-}
-bool FindSpotifyExePath(fs::path& exePath)
-{
-    //Check current directory
-    if (fs::exists(exePath.c_str())) {
-        return true;
-    }
-    //Check %appdata%/Spotify/Spotify.exe
-    PWSTR appdataPath;
-    SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, NULL, &appdataPath);
-    exePath = std::wstring(appdataPath) + L"\\Spotify\\Spotify.exe";
-    CoTaskMemFree(appdataPath);
-
-    if (fs::exists(exePath)) {
-        return true;
-    }
-    return false;
-}
-
-PROCESS_INFORMATION FindTargetProcess()
-{
-    PROCESS_INFORMATION target = {};
-    target.hProcess = FindMainProcess();
-
-    if (!target.hProcess) {
-        std::cout << "Launching Spotify...\n";
-
-        fs::path exePath;
-        if (!FindSpotifyExePath(exePath)) {
-            throw std::exception("Could not find Spotify exe path");
-        }
-        fs::path workDir = exePath.parent_path();
-
-        STARTUPINFO startInfo = {};
-        startInfo.cb = sizeof(STARTUPINFO);
-
-        if (!CreateProcess(exePath.c_str(), NULL, NULL, NULL, false, 0, NULL, workDir.c_str(), &startInfo, &target)) {
-            throw std::exception("Could not start Spotify process");
-        }
-        //Wait a bit until the window is open
-        for (int i = 0; i < 30; i++) {
-            HANDLE handle = FindMainProcess();
-            if (handle) {
-                CloseHandle(handle);
-                break;
-            }
-            Sleep(500);
-        }
-    }
-    return target;
-}
-void CloseProcess(PROCESS_INFORMATION& target)
-{
-    if (target.hThread) {
-        CloseHandle(target.hThread);
-    }
-    if (target.hProcess) {
-        CloseHandle(target.hProcess);
-    }
-}
-
 #define COL_RED     "\033[1;91m"
 #define COL_GREEN   "\033[1;92m"
 #define COL_YELLOW  "\033[1;93m"
 #define COL_BLUE    "\033[1;94m"
 #define COL_RESET   "\033[0m"
-void EnableAnsiParsing()
+
+HANDLE FindSpotifyProcess()
 {
-    HANDLE handle = GetStdHandle(STD_OUTPUT_HANDLE);
-    DWORD currMode;
-    GetConsoleMode(handle, &currMode);
-    SetConsoleMode(handle, currMode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+    DWORD procId = 0;
+    
+    EnumProcessesEx([&](auto proc) {
+        if (_wcsicmp(proc.szExeFile, L"Spotify.exe") == 0 && HasOpenWindow(proc.th32ProcessID)) {
+            procId = proc.th32ProcessID;
+        }
+    });
+    if (procId == 0) {
+        throw std::exception("Couldn't find target process");
+    }
+    return OpenProcess(
+        PROCESS_QUERY_INFORMATION | PROCESS_CREATE_THREAD |
+        PROCESS_VM_OPERATION |  PROCESS_VM_READ |  PROCESS_VM_WRITE, 
+        false, procId
+    );
+}
+HANDLE LaunchSpotifyProcess(bool enableRemoteDebug)
+{
+    fs::path exePath = fs::absolute("Spotify/Spotify.exe");
+    fs::path workDir = exePath.parent_path();
+    if (!fs::exists(exePath)) {
+        throw std::exception("Spotify installation not found. Run Install.ps1 and try again.");
+    }
+    std::cout << "Launching Spotify...\n";
+
+    PROCESS_INFORMATION proc = {};
+    STARTUPINFO startInfo = {};
+    startInfo.cb = sizeof(STARTUPINFO);
+
+    std::wstring cmdLine = L"\"" + exePath.wstring() + L"\" ";
+    if (enableRemoteDebug) {
+        cmdLine += L" --remote-debugging-port=9222";
+    }
+
+    if (!CreateProcess(exePath.c_str(), cmdLine.data(), NULL, NULL, false, 0, NULL, workDir.c_str(), &startInfo, &proc)) {
+        throw std::exception("Could not start Spotify process");
+    }
+    //Wait a bit until the window is open
+    for (int i = 0; !HasOpenWindow(proc.dwProcessId); i++) {
+        if (i >= 30) { //15s
+            std::cout << COL_YELLOW << "Spotify is taking too long to open. Try re-injecting if Soggfy doesn't load properly.\n" COL_RESET;
+            break;
+        }
+        Sleep(500);
+    }
+    CloseHandle(proc.hThread);
+    return proc.hProcess;
+}
+
+void KillSpotifyProcesses()
+{
+    EnumProcessesEx([&](auto proc) {
+        if (_wcsicmp(proc.szExeFile, L"Spotify.exe") != 0) return;
+
+        auto handle = OpenProcess(PROCESS_TERMINATE, false, proc.th32ProcessID);
+        TerminateProcess(handle, 0);
+        WaitForSingleObject(handle, 3000);
+        CloseHandle(handle);
+    });
+}
+//Delete `%localappdata%/Spotify/Update` to prevent Spotify from auto updating
+void DeleteSpotifyUpdate()
+{
+    PWSTR localAppData;
+    SHGetKnownFolderPath(FOLDERID_LocalAppData, 0, NULL, &localAppData);
+
+    auto updateDir = fs::path(localAppData) / "Spotify/Update";
+    std::error_code errCode;
+    //remove_all() returns 0 if the path doesn't exist, -1 on error.
+    if (fs::remove_all(updateDir, errCode) == static_cast<uintmax_t>(-1)) {
+        std::cout << COL_YELLOW "Warn: Failed to delete Spotify update (%localappdata%/Spotify/Update). You may need to re-run Install.ps1 to downgrade.\n" COL_RESET;
+    }
+    CoTaskMemFree(localAppData);
 }
 bool IsFFmpegInstalled()
 {
@@ -224,31 +195,50 @@ bool IsFFmpegInstalled()
     }
     return false;
 }
-
-int main()
+void EnableAnsiColoring()
 {
-    EnableAnsiParsing();
-    PROCESS_INFORMATION targetProc = {};
+    HANDLE handle = GetStdHandle(STD_OUTPUT_HANDLE);
+    DWORD currMode;
+    GetConsoleMode(handle, &currMode);
+    SetConsoleMode(handle, currMode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+}
+
+int main(int argc, char* argv[])
+{
+    bool attach = false;
+    bool enableRemoteDebug = false;
+    for (int i = 0; i < argc; i++) {
+        attach |= strcmp(argv[i], "-a") == 0;
+        enableRemoteDebug |= strcmp(argv[i], "-d") == 0;
+    }
+    
+    EnableAnsiColoring();
 
     try {
-        targetProc = FindTargetProcess();
+        HANDLE targetProc;
+        if (attach) {
+            targetProc = FindSpotifyProcess();
+        } else {
+            KillSpotifyProcesses();
+            DeleteSpotifyUpdate();
+            targetProc = LaunchSpotifyProcess(enableRemoteDebug);
+        }
+        std::cout << "Injecting dumper dll into Spotify process (" << GetProcessId(targetProc) << ")...\n";
 
-        std::cout << "Injecting dumper dll into process " << GetProcessId(targetProc.hProcess) << "...\n";
-
-        InjectDll(targetProc.hProcess, L"SpotifyOggDumper.dll");
-        KillCrashpadProcess();
+        InjectDll(targetProc, L"SpotifyOggDumper.dll");
+        CloseHandle(targetProc);
+        
         std::cout << COL_GREEN "Injection succeeded!\n" COL_RESET;
 
         if (!IsFFmpegInstalled()) {
-            std::cout << COL_YELLOW "FFmpeg not found, songs won't be tagged nor converted.\n";
-            std::cout << COL_YELLOW "Run DownloadFFmpeg.ps1 or add ffmpeg to the PATH environment variable.\n" COL_RESET;
+            std::cout << COL_YELLOW "Note: FFmpeg binaries were not found, songs won't be tagged nor converted.\n";
+            std::cout << COL_YELLOW "Run Install.ps1 or add ffmpeg to the PATH environment variable.\n" COL_RESET;
         }
     } catch (std::exception& ex) {
         std::cout << COL_RED "Error: " << ex.what() << "\n" COL_RESET;
     }
-    CloseProcess(targetProc);
     
-    for (int i = 3; i > 0; i--) {
+    for (int i = 5; i > 0; i--) {
         std::cout << "Exiting in " << i << "s...\r";
         Sleep(1000);
     }
