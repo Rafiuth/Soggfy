@@ -38,6 +38,7 @@ export default class UI
 
     private _bodyObs: MutationObserver;
     private _ctxMenuHooks: ContextMenuItemFactory[] = [];
+    private _adblockStyleAdded = false;
 
     constructor(conn: Connection)
     {
@@ -266,6 +267,14 @@ export default class UI
                     obs.observe(elem, { childList: true, subtree: true });
                 }
             }
+        }
+        let adLeaderboardDom = Platform.getAdManagers()?.leaderboard?.domTarget;
+        if (adLeaderboardDom && !this._adblockStyleAdded) {
+            this._adblockStyleAdded = true;
+            
+            let style = document.createElement("style");
+            style.innerHTML = `.${adLeaderboardDom.className} { display: none !important; }`;
+            document.body.appendChild(style);
         }
     }
 
