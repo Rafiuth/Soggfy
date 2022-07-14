@@ -65,7 +65,7 @@ export default class UI
                 let isTarget = props && (
                     (props.contextUri && props.highlightedUri) ||               //Track: Show credits
                     (props.uri && props.hasOwnProperty("onRemoveCallback")) ||  //Album: Add/remove to library
-                    (props.uri && props.isPublished != null)                    //Playlist: Add/remove to profile
+                    (props.uri && props.description != null)                    //Playlist: Go to playlist radio
                 );
                 if (isTarget) {
                     let uri = props.contextUri ?? props.uri;
