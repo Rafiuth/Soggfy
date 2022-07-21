@@ -3,7 +3,6 @@
 # Soggfy - SpotifyOggDumper
 
 A music downloader mod for the Windows Spotify client
-[![Discord](https://discord.com/api/guilds/897274718942531594/widget.png)](https://discord.gg/syc9aMDVBf)
 
 <img align="right" src="https://user-images.githubusercontent.com/53208252/147526053-a62850c2-9ee9-471f-83c1-481f2f0dca32.png" width="250" />
 </div>
@@ -14,14 +13,13 @@ A music downloader mod for the Windows Spotify client
 - Generate M3U for albums and playlists
 - Automatic conversion to MP3 and many other formats
 
-# Usage
+# Installation and Usage
 1. Download and extract the `.zip` package of the [latest release](https://github.com/Rafiuth/Soggfy/releases/latest)
-2. Right click the `DownloadFFmpeg.ps1` file, and select "Run with PowerShell". If it prompts about execution policy, press A to allow, then wait for it to finish.
-3. Open Spotify, then run `Injector.exe`. Shortly after it loads, a download button should appear on Spotify's navigation bar (you may click on it to change settings).
-4. After that, any song you play will be downloaded to the selected save path.
+2. Right click the `Install.ps1` file, then select "Run with PowerShell". If it prompts about execution policy, press A to allow. Wait for it to finish.
+3. Run `Injector.exe`, and wait for Spotify to open.
+4. Play the songs you want to download.
 
-Last tested Spotify version: [1.1.87.612](https://upgrade.scdn.co/upgrade/client/win32-x86/spotify_installer-1.1.87.612.gf8d110e2-19.exe)  
-_If tracks are not being downloaded or Spotify is crashing, try downgrading to this version and running the `BlockSpotifyUpdates.bat` script._
+Clicking on the download button in the navigation bar will reveal the settings dialog, which includes playback speed, and the save path.
 
 You may need to disable or whitelist Soggfy in your anti-virus for it to work.
 
@@ -30,8 +28,11 @@ If the injector crashes because of missing DLLs, you need to install the [MSVC R
 # Notes
 - Songs are only downloaded if you play them from start to finish, without seeking (pausing is fine).
 - Quality depends on the account you are using: _160Kb/s_ or _320Kb/s_ for _free_ and _premium_ plans respectively. You may need to change the streaming quality to "Very high" on Spotify settings to get _320Kb/s_ files.
-- If you are _converting_ to AAC and care about quality, read this: [High quality AAC](/USAGE.md#high-quality-aac)
+- If you are _converting_ to AAC and care about quality, see [High quality AAC](/USAGE.md#high-quality-aac).
 - **Your account could get banned by using this. Consider using alt accounts or keeping backups (see [Exportify](https://github.com/watsonbox/exportify) and [SpotMyBackup](http://www.spotmybackup.com)).**
+
+# Manual Install
+If you are having issues with the install script, you can manually download and install Spotify using the link inside the script, then copy the `%appdata%/Spotify` folder to `Soggfy/Spotify`. You'll also need to [download ffmpeg](/USAGE.md#high-quality-aac).
 
 # How it works
 Soggfy works by hijacking/intercepting functions used by Spotify to decode OGG files, which receives the data in plaintext chunks throughout playback.
