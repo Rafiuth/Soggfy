@@ -5,7 +5,13 @@ async function getPlatform(): Promise<any>
         let reactRoot = (document.querySelector("#main") as any)?._reactRootContainer?._internalRoot;
         if (!reactRoot) return null;
         
-        let platform = reactRoot.current?.child?.child?.stateNode?.props?.children?.props?.children?.props?.children?.props?.platform;
+        //1.1.90+
+        let platform = reactRoot.containerInfo[Object.keys(reactRoot.containerInfo).find(k => k.startsWith("__reactContainer$"))]
+            ?.child?.child?.stateNode?._reactInternals?.return?.return?.updateQueue?.baseState?.element?.props?.platform;
+        
+        //1.1.7x+
+        platform ??= reactRoot.current?.child?.child?.stateNode?.props?.children?.props?.children?.props?.children?.props?.platform;
+        
         if (!platform) throw Error("Can't find Spotify platform object");
         
         return platform;

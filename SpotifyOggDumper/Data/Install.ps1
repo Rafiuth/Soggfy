@@ -1,5 +1,5 @@
-$SpotifyInstallerUrl = "https://upgrade.scdn.co/upgrade/client/win32-x86/spotify_installer-1.1.87.612.gf8d110e2-19.exe"
-$SpotifyVersion = "1.1.87.612"
+$SpotifyInstallerUrl = "https://upgrade.scdn.co/upgrade/client/win32-x86/spotify_installer-1.1.90.855.ga73cc2ce-7.exe"
+$SpotifyVersion = "1.1.90.855"
 $BtsUrl = "https://github.com/mrpond/BlockTheSpot/releases/download/2021.10.29.44/chrome_elf.zip"
 
 function InstallSpotify

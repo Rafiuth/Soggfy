@@ -47,6 +47,7 @@ jobs:
         } else {
           $ver = $Env:GITHUB_SHA.Substring(0, 8) + "-pre";
         }
+        git bundle create ./build/Release/Source.git_bundle HEAD
         Rename-Item -Path ./build/Release -NewName Soggfy-$ver
         7z a "-xr!*.lib" "-xr!*.exp" "-xr!*.pdb" build/Soggfy-$ver.zip ./build/Soggfy-$ver
 
