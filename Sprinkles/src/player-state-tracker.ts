@@ -10,16 +10,15 @@ export default class PlayerStateTracker
     private _playbacks = new Map<string, PlayerState>();
     private _conn: Connection;
 
-    constructor(conn: Connection, stateChanged?: (newState: PlayerState, oldState?: PlayerState) => void)
+    constructor(conn: Connection)
     {
         this._conn = conn;
 
         Player.getEvents().addListener("update", ({data}) => {
             if (!data.playbackId) return;
             
-            if (stateChanged) {
-                let oldState = this._playbacks.get(data.playbackId);
-                stateChanged?.(data, oldState);
+            if (!this._playbacks.has(data.playbackId)) {
+                conn.send(MessageType.DOWNLOAD_STATUS, { playbackId: data.playbackId });
             }
             this._playbacks.set(data.playbackId, data);
         });

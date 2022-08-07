@@ -32,57 +32,31 @@ export const Icons = {
 
 export default class UI
 {
-    private _styleElement: HTMLStyleElement;
-    private _settingsButton: HTMLButtonElement;
     private _conn: Connection;
 
-    private _bodyObs: MutationObserver;
-    private _ctxMenuHooks: ContextMenuItemFactory[] = [];
     private _adblockStyleAdded = false;
 
     constructor(conn: Connection)
     {
         this._conn = conn;
-        this._styleElement = document.createElement("style");
-        this._styleElement.innerHTML = MergedStyles;
-
-        this._bodyObs = new MutationObserver(this.onDocBodyChanged.bind(this));
-        this._bodyObs.observe(document.body, { childList: true });
     }
 
     install()
     {
-        document.head.appendChild(this._styleElement);
-        this._settingsButton = UIC.addTopbarButton(
+        let style = document.createElement("style");
+        style.innerHTML = MergedStyles;
+        document.head.appendChild(style);
+
+        UIC.addTopbarButton(
             "Soggfy",
             //TODO: design a icon for this
             //https://fonts.google.com/icons?selected=Material+Icons:settings&icon.query=down
             `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M18,15v3H6v-3H4v3c0,1.1,0.9,2,2,2h12c1.1,0,2-0.9,2-2v-3H18z M17,11l-1.41-1.41L13,12.17V4h-2v8.17L8.41,9.59L7,11l5,5 L17,11z"></path></svg>`,
             () => document.body.append(this.createSettingsDialog())
         );
-        this.addContextMenuHook(menuList => {
-            for (let item of menuList.children) {
-                let props = Utils.getReactProps(menuList, item);
-                let isTarget = props && (
-                    (props.contextUri && props.highlightedUri) ||               //Track: Show credits
-                    (props.uri && props.hasOwnProperty("onRemoveCallback")) ||  //Album: Add/remove to library
-                    (props.uri && props.description != null)                    //Playlist: Go to playlist radio
-                );
-                if (isTarget) {
-                    let uri = props.contextUri ?? props.uri;
-                    return {
-                        text: "Export M3U",
-                        location: item as HTMLLIElement,
-                        locationOffset: "beforebegin",
-                        onClick: () => this.createM3U(uri)
-                    };
-                }
-            }
-        });
-    }
-    setEnabled(enabled: boolean)
-    {
-        this._settingsButton.disabled = !enabled;
+
+        let bodyObs = new MutationObserver(this.onDocBodyChanged.bind(this));
+        bodyObs.observe(document.body, { childList: true });
     }
 
     private async createM3U(uri: string)
@@ -246,27 +220,11 @@ export default class UI
         UIC.notification(node, anchor, "up", false, 3);
     }
 
-    private onDocBodyChanged(records: MutationRecord[])
+    private onDocBodyChanged()
     {
-        for (let record of records) {
-            for (let node of record.addedNodes) {
-                let elem = node as HTMLElement;
-
-                if (!elem.querySelector("#context-menu")) continue;
-                
-                if (elem.querySelector("ul")) {
-                    this.onContextMenuOpened(elem);
-                } else {
-                    //the ... popup has a delay before being populated
-                    let obs = new MutationObserver(() => {
-                        if (elem.querySelector("ul")) {
-                            this.onContextMenuOpened(elem);
-                        }
-                        obs.disconnect();
-                    });
-                    obs.observe(elem, { childList: true, subtree: true });
-                }
-            }
+        let menuList = document.querySelector("#context-menu ul");
+        if (menuList !== null && !menuList["_sgf_handled"]) {
+            this.onContextMenuOpened(menuList);
         }
         let adLeaderboardDom = Platform.getAdManagers()?.leaderboard?.domTarget;
         if (adLeaderboardDom && !this._adblockStyleAdded) {
@@ -278,27 +236,41 @@ export default class UI
         }
     }
 
-    public addContextMenuHook(itemFactory: ContextMenuItemFactory)
+    private onContextMenuOpened(menuList: Element)
     {
-        this._ctxMenuHooks.push(itemFactory);
-    }
-    private onContextMenuOpened(popdiv: HTMLElement)
-    {
-        let list = popdiv.querySelector("ul");
+        const HookDescs = [
+            (uri) => ({
+                text: "Export M3U",
+                offset: "beforebegin",
+                onClick: () => this.createM3U(uri)
+            })
+        ];
 
-        for (let factory of this._ctxMenuHooks) {
-            let desc = factory(list);
-            if (!desc) continue;
+        for (let menuItem of menuList.children) {
+            let props = Utils.getReactProps(menuList, menuItem);
+            let isTarget = props && (
+                (props.contextUri && props.highlightedUri) ||               //Track: Show credits
+                (props.uri && props.hasOwnProperty("onRemoveCallback")) ||  //Album: Add/remove to library
+                (props.uri && props.description != null)                    //Playlist: Go to playlist radio
+            );
+            if (isTarget) {
+                let uri = props.contextUri ?? props.uri;
 
-            let itemTemplate = list.querySelector("li button[aria-disabled='false'] span").parentElement.parentElement;
-            let item = itemTemplate.cloneNode(true) as HTMLLIElement;
-            item.querySelector("span").innerText = desc.text;
-            item.querySelector("button").onclick = () => {
-                desc.onClick();
-                popdiv["_tippy"]?.props?.onClickOutside(); //based on Spicetify code
-            };
-            if (!list.contains(desc.location)) throw Error("Location must be inside list");
-            desc.location.insertAdjacentElement(desc.locationOffset ?? "afterend", item);
+                for (let descFactory of HookDescs) {
+                    var desc = descFactory(uri);
+
+                    let itemTemplate = menuList.querySelector("li button[aria-disabled='false'] span").parentElement.parentElement;
+                    let item = itemTemplate.cloneNode(true) as HTMLLIElement;
+                    item.querySelector("span").innerText = desc.text;
+                    item.querySelector("button").onclick = () => {
+                        desc.onClick();
+                        menuList.parentElement.parentElement["_tippy"]?.props?.onClickOutside();
+                    };
+                    menuItem.insertAdjacentElement(desc.offset as any ?? "afterend", item);
+                }
+                menuList["_sgf_handled"] = true; //add mark to prevent this method from being fired multiple times
+                break;
+            }
         }
     }
 
@@ -314,16 +286,6 @@ export default class UI
         }
         return finalValue;
     }
-}
-
-type ContextMenuItemFactory = (menuList: HTMLUListElement) => ContextMenuItemDesc | null;
-interface ContextMenuItemDesc
-{
-    text: string;
-    location?: HTMLLIElement;
-    locationOffset?: "beforebegin" | "afterend";
-
-    onClick: () => void;
 }
 
 /**

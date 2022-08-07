@@ -3,34 +3,17 @@ import PlayerStateTracker from "./player-state-tracker";
 import { StatusIndicator, DownloadStatus, TrackStatus } from "./ui/status-indicator";
 import UI from "./ui/ui";
 import config from "./config";
-import { PlayerState } from "./spotify-apis";
 import Utils from "./utils";
 
 let conn = new Connection(onMessage);
-let playbackTracker = new PlayerStateTracker(conn, onPlayerStateChanged);
+let playbackTracker = new PlayerStateTracker(conn);
 let ui = new UI(conn);
 let statusIndicator = new StatusIndicator(conn);
 ui.install();
 
-function onPlayerStateChanged(newState: PlayerState, oldState?: PlayerState)
-{
-    if (newState.playbackId !== oldState?.playbackId) {
-        conn.send(MessageType.DOWNLOAD_STATUS, { playbackId: newState.playbackId });
-    }
-}
 function onMessage(type: MessageType, payload: any)
 {
     switch (type) {
-        case MessageType.READY: {
-            ui.setEnabled(true);
-            break;
-        }
-        case MessageType.CLOSED: {
-            if (PRODUCTION) {
-                ui.setEnabled(false);
-            }
-            break;
-        }
         case MessageType.SYNC_CONFIG: {
             Utils.deepMerge(config, payload);
             conn.send(MessageType.SYNC_CONFIG, config);
