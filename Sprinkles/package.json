@@ -1,5 +1,5 @@
 {
-  "name": "Sprinkles",
+  "name": "soggfy-uic",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
@@ -8,7 +8,6 @@
     "build": "webpack"
   },
   "keywords": [],
-  "author": "",
   "license": "ISC",
   "dependencies": {
     "css-loader": "^6.5.1",

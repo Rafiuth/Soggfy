@@ -10,9 +10,11 @@ jobs:
     runs-on: windows-2019
 
     steps:
-    - uses: actions/checkout@v2
-    - uses: microsoft/setup-msbuild@v1.0.3
-    - uses: actions/setup-node@v2
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+    - uses: microsoft/setup-msbuild@v1.1
+    - uses: actions/setup-node@v3
       with:
         node-version: 16
         cache: 'npm'
