@@ -60,20 +60,6 @@ export default class Components
         };
         return node;
     }
-    
-    static addTopbarButton(title: string, icon: string, callback: () => void)
-    {
-        let backButton = document.querySelector(".Root__top-bar").querySelector("button");
-        let topbarContainer = backButton.parentElement;
-
-        let button = document.createElement("button");
-        button.className = backButton.classList[0];
-        button.innerHTML = icon;
-        button.onclick = callback;
-        topbarContainer.append(button);
-
-        return button;
-    }
 
     static toggle(key: string, callback: ComponentValueCallback<boolean>)
     {

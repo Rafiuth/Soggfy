@@ -1,5 +1,6 @@
 let config = {
     playbackSpeed: 1.0,
+    downloaderEnabled: true,
     skipDownloadedTracks: false,
     embedLyrics: true,
     saveLyrics: true,

@@ -250,6 +250,26 @@
     font-size: 14px;
 }
 
+.sgf-topbar-retractor {
+    display: block;
+    width: 32px;
+    height: 32px;
+    margin-right: 8px;
+    border-radius: 32px;
+    background: rgba(0, 0, 0, 0.4);
+    overflow: hidden;
+    transition: width 0.15s ease;
+}
+.sgf-topbar-retractor:hover {
+    display: flex;
+    width: calc(32px * 2 + 4px);
+    gap: 4px;
+}
+.sgf-topbar-retractor button {
+    margin-right: 0 !important;
+    flex-shrink: 0;
+}
+
 /* Hover effects */
 .sgf-select, .sgf-text-input, .sgf-button, .sgf-collapsible > summary {
     transition: background-color 0.1s ease-in-out;

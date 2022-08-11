@@ -13,10 +13,6 @@ import { PathTemplate, TemplatedSearchTree } from "../path-template";
 const MergedStyles = [ComponentsStyle, SettingsStyle, StatusIndicatorStyle].join('\n'); //TODO: find a better way to do this
 
 export const Icons = {
-    Apps: `<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M4 8h4V4H4v4zm6 12h4v-4h-4v4zm-6 0h4v-4H4v4zm0-6h4v-4H4v4zm6 0h4v-4h-4v4zm6-10v4h4V4h-4zm-6 4h4V4h-4v4zm6 6h4v-4h-4v4zm0 6h4v-4h-4v4z"/></svg>`,
-    Album: `<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 14.5c-2.49 0-4.5-2.01-4.5-4.5S9.51 7.5 12 7.5s4.5 2.01 4.5 4.5-2.01 4.5-4.5 4.5zm0-5.5c-.55 0-1 .45-1 1s.45 1 1 1 1-.45 1-1-.45-1-1-1z"/></svg>`,
-    List: `<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M2 17h2v.5H3v1h1v.5H2v1h3v-4H2v1zm1-9h1V4H2v1h1v3zm-1 3h1.8L2 13.1v.9h3v-1H3.2L5 10.9V10H2v1zm5-6v2h14V5H7zm0 14h14v-2H7v2zm0-6h14v-2H7v2z"/></svg>`,
-    MagicWand: `<svg width="24" height="24" viewBox="-2 -2 28 28" fill="currentColor"><path d="M7.5 5.6L10 7 8.6 4.5 10 2 7.5 3.4 5 2l1.4 2.5L5 7zm12 9.8L17 14l1.4 2.5L17 19l2.5-1.4L22 19l-1.4-2.5L22 14zM22 2l-2.5 1.4L17 2l1.4 2.5L17 7l2.5-1.4L22 7l-1.4-2.5zm-7.63 5.29c-.39-.39-1.02-.39-1.41 0L1.29 18.96c-.39.39-.39 1.02 0 1.41l2.34 2.34c.39.39 1.02.39 1.41 0L16.7 11.05c.39-.39.39-1.02 0-1.41l-2.33-2.35zm-1.03 5.49l-2.12-2.12 2.44-2.44 2.12 2.12-2.44 2.44z"></path></svg>`,
     Folder: `<svg width="24px" height="24px" viewBox="0 0 24 24" fill="currentColor"><path d="M10 4H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"></path></svg>`,
     Sliders: `<svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor"><path d="M3 17v2h6v-2H3zM3 5v2h10V5H3zm10 16v-2h8v-2h-8v-2h-2v6h2zM7 9v2H3v2h4v2h2V9H7zm14 4v-2H11v2h10zm-6-4h2V7h4V5h-4V3h-2v6z"></path></svg>`,
     
@@ -27,9 +23,11 @@ export const Icons = {
     Warning: `<svg width="18" height="18" viewBox="0 0 24 24" fill="#fbd935"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>`,
     
     DoneBig: `<svg width="24" height="24" viewBox="0 0 24 24" fill="#3f3"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>`,
-    ErrorBig: `<svg width="24" height="24" viewBox="0 0 24 24" fill="#f22"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/></svg>`
-};
+    ErrorBig: `<svg width="24" height="24" viewBox="0 0 24 24" fill="#f22"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12 19 6.41z"/></svg>`,
 
+    FileDownload: `<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M18,15v3H6v-3H4v3c0,1.1,0.9,2,2,2h12c1.1,0,2-0.9,2-2v-3H18z M17,11l-1.41-1.41L13,12.17V4h-2v8.17L8.41,9.59L7,11l5,5 L17,11z"></path></svg>`,
+    FileDownloadOff: `<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M16 18 17.15 20H6Q5.175 20 4.588 19.413 4 18.825 4 18V15H6V18M12.575 15.425 12 16 7 11 7.575 10.425ZM15.6 9.55 17 11 15.425 12.575 14 11.15ZM13 4V10.15L11 8.15V4Z"/><path d="M2.8 2.8 21.2 21.2 19.775 22.625 1.375 4.225Z" fill="#e91429"/></svg>`,
+};
 export default class UI
 {
     private _conn: Connection;
@@ -47,16 +45,37 @@ export default class UI
         style.innerHTML = MergedStyles;
         document.head.appendChild(style);
 
-        UIC.addTopbarButton(
-            "Soggfy",
-            //TODO: design a icon for this
-            //https://fonts.google.com/icons?selected=Material+Icons:settings&icon.query=down
-            `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M18,15v3H6v-3H4v3c0,1.1,0.9,2,2,2h12c1.1,0,2-0.9,2-2v-3H18z M17,11l-1.41-1.41L13,12.17V4h-2v8.17L8.41,9.59L7,11l5,5 L17,11z"></path></svg>`,
-            () => document.body.append(this.createSettingsDialog())
-        );
+        this.addTopbarButtons();
 
         let bodyObs = new MutationObserver(this.onDocBodyChanged.bind(this));
         bodyObs.observe(document.body, { childList: true });
+    }
+
+    private addTopbarButtons()
+    {
+        let backButton = document.querySelector(".Root__top-bar").querySelector("button");
+        let topbarContainer = backButton.parentElement;
+        let buttonClass = backButton.classList[0];
+
+        let div = document.createElement("div");
+        div.className = "sgf-topbar-retractor";
+        div.innerHTML = `
+<button class=${buttonClass}>${config.downloaderEnabled ? Icons.FileDownload : Icons.FileDownloadOff}</button>
+<button class=${buttonClass}>${Icons.Sliders}</button>`;
+        
+        //@ts-ignore
+        div.children[0].onclick = () => {
+            this.updateConfig("downloaderEnabled", !config.downloaderEnabled);
+            div.children[0].innerHTML = config.downloaderEnabled ? Icons.FileDownload : Icons.FileDownloadOff;
+            //reset track (when enabling), or speed (when disabling)
+            SpotifyUtils.resetCurrentTrack(!config.downloaderEnabled && config.playbackSpeed === 1.0);
+        };
+        //@ts-ignore
+        div.children[1].onclick = () => {
+            document.body.append(this.createSettingsDialog());
+        };
+        topbarContainer.append(div);
+        return div;
     }
 
     private async createM3U(uri: string)
@@ -100,7 +119,7 @@ export default class UI
     private createSettingsDialog()
     {
         //TODO: refactor (+ react port?)
-        let onChange = this.configAccessor.bind(this);
+        let onChange = this.updateConfig.bind(this);
 
         let speedSlider = UIC.slider(
             "playbackSpeed",
@@ -274,7 +293,7 @@ export default class UI
         }
     }
 
-    private configAccessor(key: string, newValue?: any)
+    private updateConfig(key: string, newValue?: any)
     {
         let finalValue = Utils.accessObjectPath(config, key.split('.'), newValue);
 

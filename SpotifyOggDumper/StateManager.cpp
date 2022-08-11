@@ -102,6 +102,14 @@ struct StateManagerImpl : public StateManager
                     _config[key] = val;
                 }
                 std::ofstream(_configPath) << _config.dump(4);
+
+                if (!_config.value("downloaderEnabled", true)) {
+                    std::lock_guard<std::mutex> lock(_mutex);
+
+                    for (auto& [id, pb] : _playbacks) {
+                        DiscardTrack(*pb, "Listen mode was toggled");
+                    }
+                }
                 break;
             }
             case MessageType::TRACK_META: {
@@ -226,6 +234,8 @@ struct StateManagerImpl : public StateManager
 
     void OnTrackCreated(const std::string& playbackId, double& speed)
     {
+        if (!_config.value("downloaderEnabled", true)) return;
+
         CreatePlayback(playbackId);
 
         double newSpeed = _config.value("playbackSpeed", 0.0);
