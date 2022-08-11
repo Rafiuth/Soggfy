@@ -30,7 +30,7 @@ function onMessage(type: MessageType, payload: any)
                         failed: true,
                         message: ex.message
                     });
-                    setPlaybackStatusInd(payload.playbackId, { status: DownloadStatus.ERROR, message: ex.message });
+                    setPlaybackStatusInd(payload.playbackId, { status: DownloadStatus.Error, message: ex.message });
                 })
                 .finally(() => {
                     playbackTracker.remove(payload.playbackId);
@@ -48,7 +48,7 @@ function onMessage(type: MessageType, payload: any)
 
                     let val = {
                         ...results[key],
-                        status: DownloadStatus.WARN,
+                        status: DownloadStatus.Warn,
                         message: "Different tracks mapping to the same file name"
                     };
                     for (let subkey of key.split(',')) {
@@ -68,7 +68,7 @@ function setPlaybackStatusInd(playbackId: string, data: TrackStatus)
     if (info) {
         statusIndicator.updateRows({ [info.uri]: data });
     }
-    if (data.status === DownloadStatus.ERROR || data.status === DownloadStatus.DONE) {
+    if (data.status === DownloadStatus.Error || data.status === DownloadStatus.Done) {
         playbackTracker.remove(playbackId);
     }
 }

@@ -38,17 +38,23 @@ struct StateManagerImpl : public StateManager
         _dataDir(dataDir),
         _ctrlSv(std::bind(&StateManagerImpl::HandleMessage, this, std::placeholders::_1, std::placeholders::_2))
     {
-        _configPath = Utils::GetAppDataFolder() / "Soggfy/config.json";
+        _configPath = _dataDir / "config.json";
 
-        fs::path currConfigPath = _dataDir / "config.json";
-        std::ifstream configFile(fs::exists(currConfigPath) ? currConfigPath : _configPath);
+        auto appDataConfigPath = Utils::GetAppDataFolder() / "Soggfy/config.json";
+        if (fs::exists(appDataConfigPath)) {
+            fs::copy_file(appDataConfigPath, _configPath);
 
+            std::error_code error;
+            fs::remove_all(appDataConfigPath.parent_path(), error);
+        }
+
+        std::ifstream configFile(_configPath);
         if (configFile.good()) {
             _config = json::parse(configFile, nullptr, true, true);
         } else {
             _config = json::object();
-            fs::create_directories(_configPath.parent_path());
         }
+
         fs::path baseSavePath = _config.value("/savePaths/basePath"_json_pointer, fs::path());
         if (!fs::exists(baseSavePath)) {
             baseSavePath = Utils::GetMusicFolder() / "Soggfy";
@@ -133,6 +139,9 @@ struct StateManagerImpl : public StateManager
                     auto playback = GetPlayback(content["playbackId"]);
                     if (!playback) break;
 
+                    if (content.value("ignore", false)) {
+                        DiscardTrack(*playback, "Ignored");
+                    }
                     conn->Send(MessageType::DOWNLOAD_STATUS, {
                         { "playbackId", playback->Id },
                         { "status", playback->Status.first },

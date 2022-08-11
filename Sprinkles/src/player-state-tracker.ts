@@ -1,7 +1,7 @@
 import Utils from "./utils";
 import { Player, PlayerState, TrackInfo, SpotifyUtils } from "./spotify-apis";
 import Resources from "./resources";
-import config from "./config";
+import config, { isTrackIgnored } from "./config";
 import { PathTemplate, TemplatedSearchTree } from "./path-template";
 import { Connection, MessageType } from "./connection";
 
@@ -18,7 +18,7 @@ export default class PlayerStateTracker
             if (!data.playbackId) return;
             
             if (!this._playbacks.has(data.playbackId)) {
-                conn.send(MessageType.DOWNLOAD_STATUS, { playbackId: data.playbackId });
+                conn.send(MessageType.DOWNLOAD_STATUS, { playbackId: data.playbackId, ignore: isTrackIgnored(data.item) });
             }
             this._playbacks.set(data.playbackId, data);
         });

@@ -1,16 +1,17 @@
-import config from "../config"
+import config, { isTrackIgnored } from "../config"
 import { Connection, MessageType } from "../connection";
 import { Icons, Selectors } from "./ui";
 import Utils from "../utils";
 import { TemplatedSearchTree } from "../path-template";
 
-export enum DownloadStatus
+export const enum DownloadStatus
 {
-    ERROR       = "ERROR",
-    IN_PROGRESS = "IN_PROGRESS",
-    CONVERTING  = "CONVERTING",
-    WARN        = "WARN",
-    DONE        = "DONE"
+    Error       = "ERROR",
+    InProgress  = "IN_PROGRESS",
+    Converting  = "CONVERTING",
+    Warn        = "WARN",
+    Done        = "DONE",
+    Ignored     = "IGNORED",
 }
 export interface TrackStatus
 {
@@ -18,13 +19,13 @@ export interface TrackStatus
     path?: string; //if status == DONE
     message?: string;
 }
-//From https://fonts.google.com/icons
 const StatusIcons = {
-    [DownloadStatus.ERROR]: Icons.Error,
-    [DownloadStatus.IN_PROGRESS]: Icons.InProgress,
-    [DownloadStatus.CONVERTING]: Icons.Processing,
-    [DownloadStatus.WARN]: Icons.Warning,
-    [DownloadStatus.DONE]: Icons.Done
+    [DownloadStatus.Error]: Icons.Error,
+    [DownloadStatus.InProgress]: Icons.InProgress,
+    [DownloadStatus.Converting]: Icons.Processing,
+    [DownloadStatus.Warn]: Icons.Warning,
+    [DownloadStatus.Done]: Icons.Done,
+    [DownloadStatus.Ignored]: Icons.SyncDisabled
 };
 
 export class StatusIndicator
@@ -69,6 +70,10 @@ export class StatusIndicator
             let row = rowWrapper.firstElementChild;
             let trackInfo = this.getRowTrackInfo(row, listSection);
             let info = map[trackInfo?.uri];
+
+            if (!info && trackInfo && isTrackIgnored(trackInfo.extraProps)) {
+                info = { status: DownloadStatus.Ignored, message: "Ignored" };
+            }
             if (!info) continue;
             
             let node = row["__sgf_status_ind"] ??= document.createElement("div");
@@ -80,7 +85,7 @@ export class StatusIndicator
             node.className = "sgf-status-indicator";
             node.innerHTML = `
 <div class="sgf-status-indicator-card">
-${info.status == DownloadStatus.DONE
+${info.status == DownloadStatus.Done
     ? `
     <div class="sgf-status-browse-button">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="#ddd">
@@ -138,6 +143,7 @@ ${StatusIcons[info.status]}`;
 
         return {
             uri: extraProps.uri,
+            extraProps,
             vars: {
                 track_name: row.querySelector(Selectors.rowTitle).innerText,
                 artist_name: extraProps.artists[0].name,
