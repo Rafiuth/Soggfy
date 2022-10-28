@@ -142,7 +142,11 @@ struct StateManagerImpl : public StateManager
                 }
                 else if (content.contains("searchTree")) {
                     json results = json::object();
-                    SearchPathTree(results, content["searchTree"], Utils::NormalizeToLongPath(content["basePath"], true));
+                    auto basePath = Utils::NormalizeToLongPath(content["basePath"], true);
+                    auto relativeTo = content.contains("relativeTo") 
+                        ? Utils::NormalizeToLongPath(content["relativeTo"], true)
+                        : fs::path();
+                    SearchPathTree(results, content["searchTree"], basePath, relativeTo);
 
                     conn->Send(MessageType::DOWNLOAD_STATUS, { 
                         { "reqId", content["reqId"] },
@@ -349,7 +353,7 @@ struct StateManagerImpl : public StateManager
             SendTrackStatus(trackUri, "ERROR", ex.what());
         }
     }
-    void SearchPathTree(json& results, const json& node, const fs::path& currPath = {}, bool currPathExists = false)
+    void SearchPathTree(json& results, const json& node, const fs::path& currPath, const fs::path& relativeTo = {}, bool currPathExists = false)
     {
         if (!currPath.empty() && !(currPathExists || fs::exists(currPath))) return;
 
@@ -357,7 +361,7 @@ struct StateManagerImpl : public StateManager
         if (children.empty() && node.contains("id")) {
             std::string id = node["id"];
             results[id] = {
-                { "path", currPath },
+                { "path", relativeTo.empty() ? currPath : fs::proximate(currPath, relativeTo) },
                 { "status", "DONE" }
             };
             return;
@@ -367,7 +371,7 @@ struct StateManagerImpl : public StateManager
         for (auto& child : children) {
             std::string pattern = child["pattern"];
             if (child.value("literal", false)) {
-                SearchPathTree(results, child, currPath / fs::u8path(pattern));
+                SearchPathTree(results, child, currPath / fs::u8path(pattern), relativeTo);
             } else {
                 std::regex regex(pattern, std::regex::ECMAScript | std::regex::icase);
                 regexChildren.emplace_back(&child, regex, child.value("maxDepth", 1));
@@ -387,7 +391,7 @@ struct StateManagerImpl : public StateManager
 
                 for (auto& [node, pattern, maxDepth] : regexChildren) {
                     if (depth < maxDepth && std::regex_match(name, pattern)) {
-                        SearchPathTree(results, *node, entry.path(), true);
+                        SearchPathTree(results, *node, entry.path(), relativeTo, true);
                     }
                     if (entry.is_directory() && depth + 1 < maxDepth) {
                         pending.emplace_back(entry.path(), depth + 1);

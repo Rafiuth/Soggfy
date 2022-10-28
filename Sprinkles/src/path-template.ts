@@ -159,20 +159,16 @@ export class PathTemplate {
     }
 
     static replaceExt(path: string, newExt: string) {
-        //https://github.com/dotnet/runtime/blob/e7312999cad22236211c654ff0dd9efb00b3e101/src/libraries/System.Private.CoreLib/src/System/IO/Path.cs#L42
-        let subLen = path.length;
-        for (let i = path.length - 1; i >= 0; i--) {
-            let ch = path[i];
-
-            if (ch === '.') {
-                subLen = i;
-                break;
-            }
-            if (ch === '/' || ch === '\\') break;
+        if (!newExt.startsWith('.')) {
+            newExt = '.' + newExt;
         }
-        path = path.substring(0, subLen);
-        if (!newExt.startsWith('.')) path += '.';
-        return path + newExt;
+        return path.replace(/(?:\.[^\\\/\.]*)?$/, newExt);
+    }
+
+    // a/b/c.txt | a/b/c  ->  a/b
+    static getParentPath(path: string) {
+        let index = path.replaceAll('\\', '/').lastIndexOf('/');
+        return index < 0 ? path : path.substring(0, index);
     }
 }
 

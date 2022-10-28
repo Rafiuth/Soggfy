@@ -72,7 +72,6 @@ export default class UI {
             initialPath: config.savePaths.basePath + `/${PathTemplate.escapePath(info.name)}.m3u8`,
             fileTypes: ["M3U Playlist|*.m3u8"]
         });
-        let savePath = saveResult.path;
         if (!saveResult.success) return;
 
         let tree = new TemplatedSearchTree(config.savePaths.track);
@@ -80,10 +79,10 @@ export default class UI {
             if (trackUris?.length >= 2 && !trackUris.includes(track.uri)) continue;
             tree.add(track.uri, track.vars);
         }
-
         let statusResp = await this.conn.request(MessageType.DOWNLOAD_STATUS, {
             searchTree: tree.root,
-            basePath: config.savePaths.basePath
+            basePath: config.savePaths.basePath,
+            relativeTo: PathTemplate.getParentPath(saveResult.path)
         });
         let data = `#EXTM3U\n#PLAYLIST:${info.name}\n\n`;
         let numExported = 0;
@@ -93,10 +92,10 @@ export default class UI {
             if (!loc) continue;
             
             data += `#EXTINF:${(track.durationMs / 1000).toFixed(0)},${track.vars.artist_name} - ${track.vars.track_name}\n`;
-            data += `${loc.path}\n\n`;
+            data += `${loc.path.replaceAll('\\', '/')}\n\n`;
             numExported++;
         }
-        this.conn.send(MessageType.WRITE_FILE, { path: savePath, mode: "replace", text: data });
+        this.conn.send(MessageType.WRITE_FILE, { path: saveResult.path, mode: "replace", text: data });
         this.showNotification(Icons.DoneBig, `Exported ${numExported} tracks`);
     }
 
