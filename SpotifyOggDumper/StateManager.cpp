@@ -40,14 +40,6 @@ struct StateManagerImpl : public StateManager
     {
         _configPath = _dataDir / "config.json";
 
-        auto appDataConfigPath = Utils::GetAppDataFolder() / "Soggfy/config.json";
-        if (fs::exists(appDataConfigPath)) {
-            fs::copy_file(appDataConfigPath, _configPath);
-
-            std::error_code error;
-            fs::remove_all(appDataConfigPath.parent_path(), error);
-        }
-
         std::ifstream configFile(_configPath);
         if (configFile.good()) {
             _config = json::parse(configFile, nullptr, true, true);
@@ -267,7 +259,7 @@ struct StateManagerImpl : public StateManager
             return;
         }
         if (playback->ActualExt.empty()) {
-            LogWarn("Unrecognized audio codec in playback {}, aborting download. This is a bug, please report.", playbackId);
+            LogWarn("Unrecognized audio codec in playback {}. Try changing streaming quality.", playbackId);
             SendTrackStatus(playback->Id, "ERROR", "Unrecognized audio codec");
             return;
         }

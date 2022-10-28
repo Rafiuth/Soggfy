@@ -246,11 +246,11 @@ export default class PlayerStateTracker {
             }
         }
         if (!tree.isEmpty) {
-            let data = await this.conn.request(MessageType.DOWNLOAD_STATUS, {
+            let statusResp = await this.conn.request(MessageType.DOWNLOAD_STATUS, {
                 searchTree: tree.root,
                 basePath: config.savePaths.basePath
             });
-            for (let track in data.payload.results) {
+            for (let track in statusResp.results) {
                 statusCache.set(track, true);
             }
         }

@@ -1,7 +1,5 @@
-import { DeferredPromise } from "./utils";
-
 //Client: JS, Server: C++
-enum MessageType {
+export const enum MessageType {
     /**
      * [S->C] Once the connection is established.
      * [C->S] To update a toplevel config field.
@@ -39,27 +37,21 @@ enum MessageType {
     READY = -1, //Internal
     CLOSED = -2, //Internal
 }
-type MessageHandler = (type: MessageType, payload: any, payloadPayload?: ArrayBuffer) => void;
+type MessageHandler = (type: MessageType, payload: any, binaryPayload?: ArrayBuffer) => void;
 
-type Message = {
-    type: MessageType,
-    payload: any,
-    binaryPayload?: Uint8Array
+type RequestPromiseFulfiller = {
+    resolve: (response: any) => void;
+    reject: (reason: any) => void;
 }
 
-type RequestInfo = {
-    id: number;
-    promise?: DeferredPromise<Message>;
-}
-
-class Connection {
+export class Connection {
     private ws: WebSocket;
     private textEnc = new TextEncoder();
     private textDec = new TextDecoder();
     private msgHandler: MessageHandler;
     private connAttempts = 0;
 
-    private pendingReqs: RequestInfo[] = [];
+    private pendingReqs = new Map<number, RequestPromiseFulfiller>();
     private nextReqId = 1;
 
     get isConnected() {
@@ -71,16 +63,10 @@ class Connection {
         this.reconnect();
     }
 
-    /**
-     * @param {number} type
-     * @param {any} payload
-     * @param {ArrayBuffer} binaryPayload
-     */
     send(type: MessageType, payload: any, binaryPayload?: ArrayBuffer) {
         if (!this.isConnected) return;
 
-        let payloadStr = JSON.stringify(payload);
-        let payloadData = this.textEnc.encode(payloadStr);
+        let payloadData = this.textEnc.encode(JSON.stringify(payload));
         let data = new Uint8Array(5 + payloadData.length + (binaryPayload?.byteLength ?? 0));
         let view = new DataView(data.buffer);
         view.setUint8(0, type);
@@ -95,34 +81,18 @@ class Connection {
     /**
      * Sends an message with an "reqId" field and waits for the response.
      * @param payload The message to send. Will be mutated with the "reqId" field.
-     * @param timeoutMs How long to wait before failing the promise. Values <= 0 indicate infinite.
+     * @returns The payload from the response message.
      */
-    async request(type: MessageType, payload: any, binaryPayload?: ArrayBuffer, timeoutMs = 15000) {
+    async request(type: MessageType, payload: any, binaryPayload?: ArrayBuffer) {
         if (!this.isConnected) throw Error("Can't send request in disconnected state.");
 
-        let info: RequestInfo = {
-            id: this.nextReqId++
-        };
-        let index = this.pendingReqs.push(info);
-        info.promise = new DeferredPromise<Message>(() => {
-            this.pendingReqs.splice(index);
-        }, timeoutMs);
+        return new Promise<any>((resolve, reject) => {
+            let id = this.nextReqId++;
 
-        payload.reqId = info.id;
-        this.send(type, payload, binaryPayload);
-
-        return info.promise;
-    }
-    private handleResponse(id: number, msg: Message) {
-        let reqs = this.pendingReqs;
-        for (let i = 0; i < reqs.length; i++) {
-            if (reqs[i].id === id) {
-                reqs[i].promise.resolve(msg);
-                reqs.splice(i);
-                return;
-            }
-        }
-        console.warn(`Response for unknown request '${id}'`, msg.type, msg.payload);
+            payload.reqId = id;
+            this.send(type, payload, binaryPayload);
+            this.pendingReqs.set(id, { resolve, reject });
+        });
     }
 
     private onMessage(ev: MessageEvent<ArrayBuffer>) {
@@ -131,20 +101,18 @@ class Connection {
         let payloadLen = view.getInt32(1, true);
         let payloadData = new Uint8Array(ev.data, 5, payloadLen);
         let binaryPayload = new Uint8Array(ev.data, 5 + payloadLen);
+        let payload = JSON.parse(this.textDec.decode(payloadData));
 
-        let payloadStr = this.textDec.decode(payloadData);
-        let payload = JSON.parse(payloadStr);
+        if (payload.reqId) {
+            let promise = this.pendingReqs.get(payload.reqId);
+            promise?.resolve(payload);
 
-        let reqId = payload["reqId"];
-        if (reqId) {
-            this.handleResponse(reqId, {
-                type: type,
-                payload: payload,
-                binaryPayload: binaryPayload
-            });
-            return;
+            if (!promise) {
+                console.warn(`Response for unknown request '${payload.reqId}'`, type, payload);
+            }
+        } else {
+            this.msgHandler(type, payload, binaryPayload);
         }
-        this.msgHandler(type, payload, binaryPayload);
     }
 
     private reconnect() {
@@ -156,10 +124,10 @@ class Connection {
             this.connAttempts = 0;
         };
         this.ws.onclose = (ev) => {
-            for (let req of this.pendingReqs) {
-                req.promise.reject("Connection lost");
+            for (let [id, promise] of this.pendingReqs) {
+                promise.reject("Connection lost");
             }
-            this.pendingReqs = [];
+            this.pendingReqs.clear();
 
             this.msgHandler(MessageType.CLOSED, {
                 code: ev.code,
@@ -172,9 +140,4 @@ class Connection {
             }
         };
     }
-}
-
-export {
-    Connection,
-    MessageType
 }

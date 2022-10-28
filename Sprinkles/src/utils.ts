@@ -1,25 +1,4 @@
-type Detour = (stage: "pre" | "post", args: any[], ret?: any) => void;
-
 export default class Utils {
-    static createHook(obj: any, funcName: string, detour: Detour) {
-        //https://stackoverflow.com/a/62333813
-        let originalFunc = obj[funcName];
-        obj[funcName] = function (...args: any[]) {
-            detour("pre", args);
-
-            let ret = originalFunc.apply(this, args);
-
-            if (ret instanceof Promise) {
-                return ret.then(val => {
-                    detour("post", args, val);
-                    return val;
-                });
-            } else {
-                detour("post", args, ret);
-                return ret;
-            }
-        }
-    }
     static padInt(x: number, digits = 2) {
         return Math.floor(x).toString().padStart(digits, '0');
     }
@@ -121,54 +100,5 @@ export default class Utils {
             node = loc.next;
         }
         return state;
-    }
-}
-
-export class DeferredPromise<T> extends Promise<T>
-{
-    onresolve?: (self: this) => void;
-
-    private resolveCb: (value?: T) => void;
-    private rejectCb: (reason?: any) => void;
-    private timeout: any;
-
-    /**
-     * @param timeoutMs Time (in milliseconds, up to INT_MAX) to wait before failing the promise. Will be disabled if `<= 0`.
-     */
-    constructor(onresolve?: (self: DeferredPromise<T>) => void, timeoutMs?: number) {
-        let tmpResolve, tmpReject; //can't access this from inside the callback
-        super((resolve, reject) => {
-            tmpResolve = resolve;
-            tmpReject = reject;
-        });
-        this.resolveCb = tmpResolve;
-        this.rejectCb = tmpReject;
-        this.onresolve = onresolve;
-        if (timeoutMs > 0) {
-            this.timeout = setTimeout(() => this.rejectCb("Timeout"), timeoutMs);
-        }
-    }
-
-    public resolve(result?: T) {
-        this.cleanup();
-        this.resolveCb(result);
-    }
-    public reject(reason?: any) {
-        this.cleanup();
-        this.rejectCb(reason);
-    }
-
-    private cleanup() {
-        if (this.timeout) {
-            clearTimeout(this.timeout);
-        }
-    }
-
-    //https://stackoverflow.com/a/65669070
-    get [Symbol.toStringTag]() {
-        return "DeferredPromise";
-    }
-    static get [Symbol.species]() {
-        return Promise;
     }
 }

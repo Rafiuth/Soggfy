@@ -25,30 +25,21 @@ async function getPlatform(): Promise<any> {
     return new Promise(callback);
 }
 
-let platform = await getPlatform();
-let player: PlayerAPI = platform.getPlayerAPI();
-let cosmos = player._cosmos;
-let webApi = platform?.getAdManagers()?.hpto?.hptoApi?.webApi; //TODO: this api reports telemetry, is it a good idea to use it?
-let user = await platform.getUserAPI().getUser();
+export const
+    Platform = await getPlatform(),
+    Player = Platform.getPlayerAPI() as PlayerAPI,
+    CosmosAsync = Player._cosmos,
+    WebAPI = Platform?.getAdManagers()?.hpto?.hptoApi?.webApi; //TODO: this api reports telemetry, is it a good idea to use it?
 
-export {
-    platform as Platform,
-    player as Player,
-    cosmos as CosmosAsync,
-    webApi as WebAPI,
-
-    PlayerAPI,
-    PlayerState,
-    TrackInfo
-};
+let user = await Platform.getUserAPI().getUser();
 
 export class SpotifyUtils {
     /** Resets the current track (this method creates a new playback id) */
     static async resetCurrentTrack(preservePosition = true) {
-        let state = player.getState();
+        let state = Player.getState();
         let position = (Date.now() - state.timestamp) * state.speed + state.positionAsOfTimestamp;
 
-        let queue = player._queue;
+        let queue = Player._queue;
         let queuedTracks = queue.getQueue().queued;
 
         let tracks = [{ uri: state.item.uri }];
@@ -57,10 +48,10 @@ export class SpotifyUtils {
         } else {
             await queue.addToQueue(tracks);
         }
-        await player.skipToNext();
+        await Player.skipToNext();
 
         if (preservePosition) {
-            await player.seekTo(position);
+            await Player.seekTo(position);
         }
     }
     static getLocalStorageItem(key: string, prependUsername = true) {
@@ -85,7 +76,7 @@ export class SpotifyUtils {
     }
 }
 
-interface PlayerAPI {
+export interface PlayerAPI {
     _cosmos: any;
     _events: any;
     _client: any;
@@ -99,7 +90,7 @@ interface PlayerAPI {
 
     removeFromQueue(tracks: { uri: string, uid?: string }[]): Promise<void>;
 }
-interface PlayerState {
+export interface PlayerState {
     playbackId: string;
     timestamp: number,
     positionAsOfTimestamp: number,
@@ -115,7 +106,7 @@ interface PlayerState {
         itemIndex?: number;
     }
 }
-interface TrackInfo {
+export interface TrackInfo {
     type: "track" | "episode",
     uri: string,
     isLocal: boolean,

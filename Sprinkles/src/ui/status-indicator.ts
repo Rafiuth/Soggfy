@@ -1,6 +1,6 @@
 import config, { isTrackIgnored } from "../config"
 import { Connection, MessageType } from "../connection";
-import { Icons, Selectors } from "./ui";
+import { Icons, Selectors } from "./ui-assets";
 import Utils from "../utils";
 import { TemplatedSearchTree } from "../path-template";
 

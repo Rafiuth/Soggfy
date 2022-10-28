@@ -1,6 +1,6 @@
 import { Connection, MessageType } from "./connection";
 import PlayerStateTracker from "./player-state-tracker";
-import { StatusIndicator, DownloadStatus, TrackStatus } from "./ui/status-indicator";
+import { DownloadStatus, TrackStatus } from "./ui/status-indicator";
 import UI from "./ui/ui";
 import config from "./config";
 import Utils from "./utils";
@@ -8,8 +8,6 @@ import Utils from "./utils";
 let conn = new Connection(onMessage);
 let playbackTracker = new PlayerStateTracker(conn);
 let ui = new UI(conn);
-let statusIndicator = new StatusIndicator(conn);
-ui.install();
 
 function onMessage(type: MessageType, payload: any) {
     switch (type) {
@@ -54,7 +52,7 @@ function onMessage(type: MessageType, payload: any) {
                         results[subkey] = val;
                     }
                 }
-                statusIndicator.updateRows(results);
+                ui.statusIndicator.updateRows(results);
             }
             break;
         }
@@ -64,7 +62,7 @@ function onMessage(type: MessageType, payload: any) {
 function setPlaybackStatusInd(playbackId: string, data: TrackStatus) {
     let info = playbackTracker.getTrackInfo(playbackId);
     if (info) {
-        statusIndicator.updateRows({ [info.uri]: data });
+        ui.statusIndicator.updateRows({ [info.uri]: data });
     }
     if (data.status === DownloadStatus.Error || data.status === DownloadStatus.Done) {
         playbackTracker.remove(playbackId);
