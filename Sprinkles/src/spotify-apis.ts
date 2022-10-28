@@ -1,23 +1,20 @@
-async function getPlatform(): Promise<any>
-{
-    function tryGet()
-    {
+async function getPlatform(): Promise<any> {
+    function tryGet() {
         let reactRoot = (document.querySelector("#main") as any)?._reactRootContainer?._internalRoot;
         if (!reactRoot) return null;
-        
+
         //1.1.90+
         let platform = reactRoot.containerInfo[Object.keys(reactRoot.containerInfo).find(k => k.startsWith("__reactContainer$"))]
             ?.child?.child?.stateNode?._reactInternals?.return?.return?.updateQueue?.baseState?.element?.props?.platform;
-        
+
         //1.1.7x+
         platform ??= reactRoot.current?.child?.child?.stateNode?.props?.children?.props?.children?.props?.children?.props?.platform;
-        
+
         if (!platform) throw Error("Can't find Spotify platform object");
-        
+
         return platform;
     }
-    function callback(resolve)
-    {
+    function callback(resolve) {
         let apis = tryGet();
         if (apis) {
             resolve(apis);
@@ -45,11 +42,9 @@ export {
     TrackInfo
 };
 
-export class SpotifyUtils
-{
+export class SpotifyUtils {
     /** Resets the current track (this method creates a new playback id) */
-    static async resetCurrentTrack(preservePosition = true)
-    {
+    static async resetCurrentTrack(preservePosition = true) {
         let state = player.getState();
         let position = (Date.now() - state.timestamp) * state.speed + state.positionAsOfTimestamp;
 
@@ -58,25 +53,23 @@ export class SpotifyUtils
 
         let tracks = [{ uri: state.item.uri }];
         if (queuedTracks.length > 0) {
-            await queue.insertIntoQueue(tracks, { before: queuedTracks[0] }); 
+            await queue.insertIntoQueue(tracks, { before: queuedTracks[0] });
         } else {
             await queue.addToQueue(tracks);
         }
         await player.skipToNext();
-        
+
         if (preservePosition) {
             await player.seekTo(position);
         }
     }
-    static getLocalStorageItem(key: string, prependUsername = true)
-    {
+    static getLocalStorageItem(key: string, prependUsername = true) {
         if (prependUsername) {
             key = `${user.username}:${key}`;
         }
         return JSON.parse(localStorage.getItem(key));
     }
-    static getPlaylistSortState(uri: string)
-    {
+    static getPlaylistSortState(uri: string) {
         const SortOrders = {
             0: "NONE",
             1: "ASC",
@@ -92,13 +85,12 @@ export class SpotifyUtils
     }
 }
 
-interface PlayerAPI
-{
+interface PlayerAPI {
     _cosmos: any;
     _events: any;
     _client: any;
     _queue: any;
-    
+
     getEvents();
     getState(): PlayerState;
     skipToNext(): Promise<void>;
@@ -107,8 +99,7 @@ interface PlayerAPI
 
     removeFromQueue(tracks: { uri: string, uid?: string }[]): Promise<void>;
 }
-interface PlayerState
-{
+interface PlayerState {
     playbackId: string;
     timestamp: number,
     positionAsOfTimestamp: number,
@@ -124,8 +115,7 @@ interface PlayerState
         itemIndex?: number;
     }
 }
-interface TrackInfo
-{
+interface TrackInfo {
     type: "track" | "episode",
     uri: string,
     isLocal: boolean,

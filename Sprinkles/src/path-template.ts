@@ -1,8 +1,7 @@
 import config from "./config";
 import { PlayerState } from "./spotify-apis";
 
-interface PathVar
-{
+interface PathVar {
     name: string;
     desc: string;
     pattern: string;
@@ -12,16 +11,14 @@ interface PathVar
 
 export type PathTemplateVars = Record<string, string>;
 
-function createVarMap(vars: PathVar[])
-{
+function createVarMap(vars: PathVar[]) {
     for (let entry of vars) {
         vars[entry.name] = entry;
     }
     return vars as PathVar[] & Record<string, PathVar>;
 }
 
-export class PathTemplate
-{
+export class PathTemplate {
     static readonly Vars = createVarMap([
         {
             name: "track_name",
@@ -84,7 +81,7 @@ export class PathTemplate
             pattern: `.+`,
             getValue: (m, s) => {
                 let name = s.index.itemIndex != null && s.context.uri.startsWith("spotify:playlist:")
-                            ? s.context.metadata.context_description : null;
+                    ? s.context.metadata.context_description : null;
                 return name ?? "unknown";
             }
         },
@@ -111,8 +108,7 @@ export class PathTemplate
         }
     ]);
 
-    static getVarsFromMetadata(meta: any, playback: PlayerState)
-    {
+    static getVarsFromMetadata(meta: any, playback: PlayerState) {
         let vals: PathTemplateVars = {};
         for (let pv of PathTemplate.Vars) {
             vals[pv.name] = pv.getValue(meta, playback);
@@ -120,8 +116,7 @@ export class PathTemplate
         return vals;
     }
 
-    static render(template: string, vars: PathTemplateVars)
-    {
+    static render(template: string, vars: PathTemplateVars) {
         return template.replace(/{(.+?)}/g, (g0, g1) => {
             let val = vars[g1];
             if (val == null) {
@@ -133,8 +128,7 @@ export class PathTemplate
             return val;
         });
     }
-    static escapePath(str: string)
-    {
+    static escapePath(str: string) {
         //https://docs.microsoft.com/en-us/windows/win32/fileio/naming-a-file
         const ReplacementChars = {
             '\\': '＼',
@@ -164,8 +158,7 @@ export class PathTemplate
         return str;
     }
 
-    static replaceExt(path: string, newExt: string)
-    {
+    static replaceExt(path: string, newExt: string) {
         //https://github.com/dotnet/runtime/blob/e7312999cad22236211c654ff0dd9efb00b3e101/src/libraries/System.Private.CoreLib/src/System/IO/Path.cs#L42
         let subLen = path.length;
         for (let i = path.length - 1; i >= 0; i--) {
@@ -183,8 +176,7 @@ export class PathTemplate
     }
 }
 
-interface TemplateNode
-{
+interface TemplateNode {
     children: TemplateNode[];
     pattern: string;
     literal: boolean;
@@ -195,35 +187,31 @@ interface TemplateNode
 }
 
 const EXT_REGEX = /\.(mp3|m4a|mp4|ogg|opus)$/i;
-    
-export class TemplatedSearchTree
-{
+
+export class TemplatedSearchTree {
     root: TemplateNode = {
         children: [],
         pattern: "",
         literal: true
     };
-    private _collator = new Intl.Collator(undefined, { sensitivity: "accent", usage: "search" });
-    private _template: string[];
-    
-    constructor(template: string)
-    {
-        this._template = template.replace(EXT_REGEX, "{_ext}").split(/[\/\\]/);
+    private collator = new Intl.Collator(undefined, { sensitivity: "accent", usage: "search" });
+    private template: string[];
+
+    constructor(template: string) {
+        this.template = template.replace(EXT_REGEX, "{_ext}").split(/[\/\\]/);
     }
 
-    get isEmpty()
-    {
+    get isEmpty() {
         return this.root.children.length === 0;
     }
-    
-    add(id: string, vars: PathTemplateVars)
-    {
+
+    add(id: string, vars: PathTemplateVars) {
         let node = this.root;
-        for (let part of this._template) {
+        for (let part of this.template) {
             let pattern = PathTemplate.render(part, vars);
             let literal = !/{(.+?)}/.test(pattern);
             let mayBranch = pattern.includes("{multi_disc_path}"); //still fucked if included more than once, but that's enough for now.
-            
+
             if (!literal) { //placeholder is keept for unknown variables
                 pattern = pattern.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
                 pattern = pattern.replace(/\\{(.+?)\\}/g, (g0, g1) => {
@@ -242,11 +230,10 @@ export class TemplatedSearchTree
             node.id += id;
         }
     }
-    
-    private findOrAddChild(node: TemplateNode, pattern: string, isLiteral: boolean)
-    {
+
+    private findOrAddChild(node: TemplateNode, pattern: string, isLiteral: boolean) {
         for (let child of node.children) {
-            if (child.literal === isLiteral && this._collator.compare(child.pattern, pattern) === 0) {
+            if (child.literal === isLiteral && this.collator.compare(child.pattern, pattern) === 0) {
                 return child;
             }
         }

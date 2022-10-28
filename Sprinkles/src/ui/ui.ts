@@ -33,17 +33,12 @@ export const Icons = {
     FileDownload: `<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M18,15v3H6v-3H4v3c0,1.1,0.9,2,2,2h12c1.1,0,2-0.9,2-2v-3H18z M17,11l-1.41-1.41L13,12.17V4h-2v8.17L8.41,9.59L7,11l5,5 L17,11z"></path></svg>`,
     FileDownloadOff: `<svg viewBox="0 0 24 24" width="24" height="24" fill="currentColor"><path d="M16 18 17.15 20H6Q5.175 20 4.588 19.413 4 18.825 4 18V15H6V18M12.575 15.425 12 16 7 11 7.575 10.425ZM15.6 9.55 17 11 15.425 12.575 14 11.15ZM13 4V10.15L11 8.15V4Z"/><path d="M2.8 2.8 21.2 21.2 19.775 22.625 1.375 4.225Z" fill="#e91429"/></svg>`,
 };
-export default class UI
-{
-    private _conn: Connection;
+export default class UI {
+    constructor(
+        private conn: Connection
+    ) { }
 
-    constructor(conn: Connection)
-    {
-        this._conn = conn;
-    }
-
-    install()
-    {
+    install() {
         let style = document.createElement("style");
         style.innerHTML = MergedStyles;
         document.head.appendChild(style);
@@ -59,8 +54,7 @@ export default class UI
         bodyObs.observe(document.body, { childList: true });
     }
 
-    private addTopbarButtons()
-    {
+    private addTopbarButtons() {
         let fwdButton = document.querySelector("[data-testid='top-bar-forward-button']");
         let topbarContainer = fwdButton.parentElement;
         let buttonClass = fwdButton.classList[0];
@@ -86,15 +80,14 @@ export default class UI
         return div;
     }
 
-    private async createM3U(uri: string, trackUris?: string[])
-    {
+    private async createM3U(uri: string, trackUris?: string[]) {
         let info = await Resources.getTracks(uri);
         let tracks = info.tracks;
         
-        let saveResult = await this._conn.request(MessageType.OPEN_FILE_PICKER, {
+        let saveResult = await this.conn.request(MessageType.OPEN_FILE_PICKER, {
             type: 2 /* SAVE_FILE */,
             initialPath: config.savePaths.basePath + `/${PathTemplate.escapePath(info.name)}.m3u8`,
-            fileTypes: [ "M3U Playlist|*.m3u8" ]
+            fileTypes: ["M3U Playlist|*.m3u8"]
         }, null, -1);
         let savePath = saveResult.payload.path;
         if (!saveResult.payload.success) return;
@@ -105,7 +98,7 @@ export default class UI
             tree.add(track.uri, track.vars);
         }
 
-        let data = await this._conn.request(MessageType.DOWNLOAD_STATUS, {
+        let data = await this.conn.request(MessageType.DOWNLOAD_STATUS, {
             searchTree: tree.root,
             basePath: config.savePaths.basePath
         }, null, -1);
@@ -121,12 +114,11 @@ export default class UI
             plData += `${loc.path}\n\n`;
             numExported++;
         }
-        this._conn.send(MessageType.WRITE_FILE, { path: savePath, mode: "replace", text: plData });
+        this.conn.send(MessageType.WRITE_FILE, { path: savePath, mode: "replace", text: plData });
         this.showNotification(Icons.DoneBig, `Exported ${numExported} tracks`);
     }
 
-    private createSettingsDialog()
-    {
+    private createSettingsDialog() {
         //TODO: refactor (+ react port?)
         let onChange = this.updateConfig.bind(this);
 
@@ -177,7 +169,7 @@ export default class UI
 
         let basePathTextInput = UIC.textInput("savePaths.basePath", onChange);
         let browseBasePath = async () => {
-            let resp = await this._conn.request(MessageType.OPEN_FILE_PICKER, {
+            let resp = await this.conn.request(MessageType.OPEN_FILE_PICKER, {
                 type: 3 /* SELECT_FOLDER */,
                 initialPath: config.savePaths.basePath
             }, null, -1);
@@ -236,8 +228,7 @@ export default class UI
         );
     }
 
-    public showNotification(icon: string, text: string)
-    {
+    public showNotification(icon: string, text: string) {
         let anchor = document.querySelector(".Root__now-playing-bar");
 
         let node = UIC.parse(`
@@ -248,8 +239,7 @@ export default class UI
         UIC.notification(node, anchor, "up", false, 3);
     }
 
-    private onContextMenuOpened(menuList: Element)
-    {
+    private onContextMenuOpened(menuList: Element) {
         const HookDescs = [
             (contextUri, trackUris) => ({
                 text: "Export M3U",
@@ -265,7 +255,7 @@ export default class UI
                         for (let uri of uris) {
                             ignored ? delete config.ignorelist[uri] : config.ignorelist[uri] = 1;
                         }
-                        this._conn.send(MessageType.DOWNLOAD_STATUS, {
+                        this.conn.send(MessageType.DOWNLOAD_STATUS, {
                             playbackId: Player.getState().playbackId,
                             ignore: isTrackIgnored(Player.getState().item)
                         });
@@ -303,15 +293,14 @@ export default class UI
         }
     }
 
-    private updateConfig(key: string, newValue?: any)
-    {
+    private updateConfig(key: string, newValue?: any) {
         let finalValue = Utils.accessObjectPath(config, key.split('.'), newValue);
 
         if (newValue !== undefined) {
             let delta = {};
             let field = key.split('.')[0]; //sync only supports topmost field
             delta[field] = config[field];
-            this._conn.send(MessageType.SYNC_CONFIG, delta);
+            this.conn.send(MessageType.SYNC_CONFIG, delta);
         }
         return finalValue;
     }
@@ -321,8 +310,7 @@ export default class UI
  * Extracts the specified CSS selectors from xpui.js.
  * Note: This function is expansive and results should be cached.
  */
-async function extractSelectors(...names: string[])
-{
+async function extractSelectors(...names: string[]) {
     let pattern = `(${names.join('|')}):\\s*"(.+?)"`;
     let regex = new RegExp(pattern, "g");
     let results: any = {};

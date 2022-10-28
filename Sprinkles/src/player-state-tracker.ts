@@ -5,22 +5,20 @@ import config, { isTrackIgnored } from "./config";
 import { PathTemplate, TemplatedSearchTree } from "./path-template";
 import { Connection, MessageType } from "./connection";
 
-export default class PlayerStateTracker
-{
-    private _playbacks = new Map<string, PlayerState>();
-    private _conn: Connection;
+export default class PlayerStateTracker {
+    private playbacks = new Map<string, PlayerState>();
+    private conn: Connection;
 
-    constructor(conn: Connection)
-    {
-        this._conn = conn;
+    constructor(conn: Connection) {
+        this.conn = conn;
 
-        Player.getEvents().addListener("update", ({data}) => {
+        Player.getEvents().addListener("update", ({ data }) => {
             if (!data.playbackId) return;
             
-            if (!this._playbacks.has(data.playbackId)) {
+            if (!this.playbacks.has(data.playbackId)) {
                 conn.send(MessageType.DOWNLOAD_STATUS, { playbackId: data.playbackId, ignore: isTrackIgnored(data.item) });
             }
-            this._playbacks.set(data.playbackId, data);
+            this.playbacks.set(data.playbackId, data);
         });
 
         let queueStatusCache = new Map<string, boolean>();
@@ -38,18 +36,15 @@ export default class PlayerStateTracker
     }
 
     /** Returns limited track metadata for a given playbackId, or null. */
-    getTrackInfo(playbackId: string)
-    {
-        return this._playbacks.get(playbackId)?.item;
+    getTrackInfo(playbackId: string) {
+        return this.playbacks.get(playbackId)?.item;
     }
-    remove(playbackId: string)
-    {
-        return this._playbacks.delete(playbackId);
+    remove(playbackId: string) {
+        return this.playbacks.delete(playbackId);
     }
     /** Returns complete metadata for a given playback id. */
-    async getMetadata(playbackId: string)
-    {
-        let playback = this._playbacks.get(playbackId);
+    async getMetadata(playbackId: string) {
+        let playback = this.playbacks.get(playbackId);
         let track = playback.item;
         let type = Resources.getUriType(track.uri);
 
@@ -83,7 +78,7 @@ export default class PlayerStateTracker
             }
             if (lyrics && config.saveLyrics) {
                 let ext = lyrics.isSynced ? "lrc" : "txt";
-                this._conn.send(MessageType.WRITE_FILE, {
+                this.conn.send(MessageType.WRITE_FILE, {
                     path: PathTemplate.replaceExt(data.trackPath, ext),
                     text: lyrics.text,
                     mode: "keep"
@@ -94,7 +89,7 @@ export default class PlayerStateTracker
         if (config.saveCanvas && canvasUrl) {
             try {
                 let canvasData = await Resources.fetchBytes(canvasUrl);
-                this._conn.send(MessageType.WRITE_FILE, { path: paths.canvas, mode: "keep" }, canvasData);
+                this.conn.send(MessageType.WRITE_FILE, { path: paths.canvas, mode: "keep" }, canvasData);
             } catch (ex) {
                 console.error("Failed to fetch canvas for %s: %s", track.uri, ex);
             }
@@ -102,8 +97,7 @@ export default class PlayerStateTracker
         this.fixMetadata(track, data.metadata, config.outputFormat.ext || "ogg");
         return { info: data, coverData: coverData };
     }
-    private getSavePaths(type: string, meta: any, playback: PlayerState)
-    {
+    private getSavePaths(type: string, meta: any, playback: PlayerState) {
         let template = config.savePaths[type] as string;
         if (!template) throw Error("Unknown track type " + type);
 
@@ -129,8 +123,7 @@ export default class PlayerStateTracker
             canvas: path + PathTemplate.render(config.savePaths.canvas, vars)
         };
     }
-    private fixMetadata(track: TrackInfo, meta: any, format: string): any
-    {
+    private fixMetadata(track: TrackInfo, meta: any, format: string): any {
         //https://wiki.multimedia.cx/index.php?title=FFmpeg_Metadata
         //https://help.mp3tag.de/main_tags.html
         //https://github.com/yarrm80s/orpheusdl/blob/fed108e978083f92d96efcacdf09fe2dc8082bc3/orpheus/tagging.py
@@ -146,8 +139,7 @@ export default class PlayerStateTracker
             meta.album_artist = albumArtist;
         }
     }
-    private async getTrackMetaProps(track: TrackInfo)
-    {
+    private async getTrackMetaProps(track: TrackInfo) {
         let meta = track.metadata;
         let extraMeta = await Resources.getTrackMetadataWG(track.uri);
 
@@ -174,8 +166,7 @@ export default class PlayerStateTracker
             explicit:       meta.is_explicit ? "1" : undefined
         };
     }
-    private async getPodcastMetaProps(track: TrackInfo)
-    {
+    private async getPodcastMetaProps(track: TrackInfo) {
         let meta = await Resources.getEpisodeMetadata(track.uri);
 
         return {
@@ -193,8 +184,7 @@ export default class PlayerStateTracker
             explicit:       meta.explicit ? "1" : undefined
         };
     }
-    private async getLyrics(track: TrackInfo)
-    {
+    private async getLyrics(track: TrackInfo) {
         let lyrics;
 
         try {
@@ -231,8 +221,7 @@ export default class PlayerStateTracker
         return { text: text, rawData: lyrics, isSynced: isSynced };
     }
 
-    private async skipDownloadedTracks(queue: any, statusCache: Map<string, boolean>)
-    {
+    private async skipDownloadedTracks(queue: any, statusCache: Map<string, boolean>) {
         let tree = new TemplatedSearchTree(config.savePaths.track);
         let queuedTracks = new Set<string>();
         
@@ -257,7 +246,7 @@ export default class PlayerStateTracker
             }
         }
         if (!tree.isEmpty) {
-            let data = await this._conn.request(MessageType.DOWNLOAD_STATUS, {
+            let data = await this.conn.request(MessageType.DOWNLOAD_STATUS, {
                 searchTree: tree.root,
                 basePath: config.savePaths.basePath
             });

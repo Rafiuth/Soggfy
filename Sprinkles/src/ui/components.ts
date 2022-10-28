@@ -10,10 +10,8 @@ type SwitchButton = HTMLButtonElement & { index: number };
 
 type AlignDir = "up" | "down" | "left" | "right" | "none";
 
-export default class Components
-{
-    static createSettingOverlay(...elements: Node[])
-    {
+export default class Components {
+    static createSettingOverlay(...elements: Node[]) {
         let node = document.createElement("div");
         node.style.display = "block";
         node.innerHTML = `
@@ -61,8 +59,7 @@ export default class Components
         return node;
     }
 
-    static toggle(key: string, callback: ComponentValueCallback<boolean>)
-    {
+    static toggle(key: string, callback: ComponentValueCallback<boolean>) {
         let node = document.createElement("input");
         node.className = "sgf-toggle-switch";
         node.type = "checkbox";
@@ -71,8 +68,7 @@ export default class Components
 
         return node;
     }
-    static select<T>(key: string, options: Record<string, T> | string[], callback: ComponentValueCallback<T>)
-    {
+    static select<T>(key: string, options: Record<string, T> | string[], callback: ComponentValueCallback<T>) {
         let node = document.createElement("select");
         node.className = "sgf-select";
 
@@ -81,10 +77,10 @@ export default class Components
             : Object.entries(options);
 
         let defaultVal = callback(key);
-        
+
         for (let i = 0; i < entries.length; i++) {
             let [k, v] = entries[i];
-            
+
             let opt = document.createElement("option");
             opt.innerText = k;
             node.appendChild(opt);
@@ -98,8 +94,7 @@ export default class Components
         };
         return node;
     }
-    static textInput(key: string, callback: ComponentValueCallback<string>)
-    {
+    static textInput(key: string, callback: ComponentValueCallback<string>) {
         let node = document.createElement("input");
         node.className = "sgf-text-input";
         node.value = callback(key);
@@ -108,11 +103,10 @@ export default class Components
         return node;
     }
 
-    static slider(key: string, opts: SliderOptions, callback: ComponentValueCallback<number>)
-    {
+    static slider(key: string, opts: SliderOptions, callback: ComponentValueCallback<number>) {
         let initialValue = callback(key);
         let formatter = opts?.formatter ?? (x => x.toString());
-        
+
         let node = document.createElement("div");
         node.className = "sgf-slider-wrapper";
         node.innerHTML = `
@@ -124,47 +118,43 @@ export default class Components
         let slider: HTMLInputElement = node.querySelector(".sgf-slider");
         let label: HTMLInputElement = node.querySelector(".sgf-slider-label");
         label.value = formatter(initialValue);
-        
+
         slider.oninput = () => label.value = formatter(slider.valueAsNumber);
         //remove custom format when editing via the textbox
         label.oninput = () => slider.value = label.value;
         label.onfocus = () => label.value = callback(key).toString();
         label.onblur = () => label.value = formatter(callback(key));
-    
+
         label.onchange = () => callback(key, parseFloat(label.value));
         slider.onchange = () => callback(key, parseFloat(slider.value));
-        
+
         return node;
     }
-    static collapsible(desc: string, ...elements: Node[])
-    {
+    static collapsible(desc: string, ...elements: Node[]) {
         let node = document.createElement("details");
         node.className = "sgf-collapsible";
         node.innerHTML = `<summary>${desc}</summary>`;
         node.append(...elements);
         return node;
     }
-    static tagButton(text: string, callback?: { (): void; })
-    {
+    static tagButton(text: string, callback?: { (): void; }) {
         let node = document.createElement("button");
         node.className = "sgf-tag-button";
         node.innerText = text;
         node.onclick = callback;
         return node;
     }
-    static button(text: string = null, child: string = null, callback: { (): void; })
-    {
+    static button(text: string = null, child: string = null, callback: { (): void; }) {
         let node = document.createElement("button");
         node.className = "sgf-button";
         if (child) node.appendChild(this.parse(child));
         if (text) node.appendChild(new Text(text));
         node.onclick = callback;
-        
+
         return node;
     }
 
-    static switchField(key: string, options: (string | Node | DocumentFragment)[], callback: ComponentValueCallback<number>)
-    {
+    static switchField(key: string, options: (string | Node | DocumentFragment)[], callback: ComponentValueCallback<number>) {
         let node = document.createElement("div");
         node.className = "sgf-switch-field";
 
@@ -199,8 +189,7 @@ export default class Components
 
         return node;
     }
-    static notification(content: (string | Node), anchor: Element, dir: AlignDir, showArrow = true, fadeDelay = 2.5)
-    {
+    static notification(content: (string | Node), anchor: Element, dir: AlignDir, showArrow = true, fadeDelay = 2.5) {
         let node = document.createElement("span");
         node.className = `sgf-notification-bubble sgf-notification-bubble-${showArrow ? dir : "none"}`;
 
@@ -222,10 +211,10 @@ export default class Components
         let cy = (ah - rect.height) / 2;
 
         if (dir === "none") dir = "up";
-        if (dir === "up")    { x += cx;             y -= rect.height + 7; }
-        if (dir === "down")  { x += cx;             y += ah + 7; }
-        if (dir === "left")  { x -= rect.width + 7; y += cy; }
-        if (dir === "right") { x += aw + 7;         y += cy; }
+        if (dir === "up") { x += cx; y -= rect.height + 7; }
+        if (dir === "down") { x += cx; y += ah + 7; }
+        if (dir === "left") { x -= rect.width + 7; y += cy; }
+        if (dir === "right") { x += aw + 7; y += cy; }
 
         node.style.left = x + "px";
         node.style.top = y + "px";
@@ -233,15 +222,13 @@ export default class Components
         return node;
     }
 
-    static title(text: string, tagName: "h1" | "h2" | "h3" = "h2")
-    {
+    static title(text: string, tagName: "h1" | "h2" | "h3" = "h2") {
         let node = document.createElement(tagName);
         node.innerText = text;
         return node;
     }
 
-    static row(desc: string, action: any)
-    {
+    static row(desc: string, action: any) {
         let node = document.createElement("div");
         node.className = "sgf-setting-row";
         node.innerHTML = `
@@ -250,37 +237,32 @@ export default class Components
         node.querySelector(".action").appendChild(action);
         return node;
     }
-    static rows(...elements: (string | Node)[])
-    {
+    static rows(...elements: (string | Node)[]) {
         let node = document.createElement("div");
         node.className = "sgf-setting-rows";
         node.append(...elements);
         return node;
     }
-    static colDesc(text: string)
-    {
+    static colDesc(text: string) {
         let node = document.createElement("label");
         node.className = "col description";
         node.innerText = text;
         return node;
     }
-    static colSection(...elements: Node[])
-    {
+    static colSection(...elements: Node[]) {
         let node = document.createElement("div");
         node.className = "sgf-setting-cols";
         node.append(...elements);
         return node;
     }
-    static section(desc: string, ...elements: Node[])
-    {
+    static section(desc: string, ...elements: Node[]) {
         let node = document.createElement("div");
         node.className = "sgf-setting-section";
         node.innerHTML = `<h2>${desc}</h2>`;
         node.append(...elements);
         return node;
     }
-    static subSection(...elements: Node[])
-    {
+    static subSection(...elements: Node[]) {
         let node = document.createElement("div");
         node.className = "sgf-setting-section";
         node.style.marginLeft = "20px";
@@ -288,8 +270,7 @@ export default class Components
         return node;
     }
 
-    static parse(html: string): DocumentFragment | Node
-    {
+    static parse(html: string): DocumentFragment | Node {
         var template = document.createElement("template");
         template.innerHTML = html.trim(); //trim(): Never return a text node of whitespace as the result
         return template.content.childElementCount > 1 ? template.content : template.content.firstChild;

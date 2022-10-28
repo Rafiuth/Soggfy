@@ -4,8 +4,7 @@ import { Icons, Selectors } from "./ui";
 import Utils from "../utils";
 import { TemplatedSearchTree } from "../path-template";
 
-export const enum DownloadStatus
-{
+export const enum DownloadStatus {
     Error       = "ERROR",
     InProgress  = "IN_PROGRESS",
     Converting  = "CONVERTING",
@@ -13,8 +12,7 @@ export const enum DownloadStatus
     Done        = "DONE",
     Ignored     = "IGNORED",
 }
-export interface TrackStatus
-{
+export interface TrackStatus {
     status: DownloadStatus,
     path?: string; //if status == DONE
     message?: string;
@@ -28,16 +26,14 @@ const StatusIcons = {
     [DownloadStatus.Ignored]: Icons.SyncDisabled
 };
 
-export class StatusIndicator
-{
-    private _conn: Connection;
-    private _obs: MutationObserver;
+export class StatusIndicator {
+    private conn: Connection;
+    private obs: MutationObserver;
 
-    constructor(con: Connection)
-    {
-        this._conn = con;
+    constructor(con: Connection) {
+        this.conn = con;
 
-        this._obs = new MutationObserver((mutations) => {
+        this.obs = new MutationObserver((mutations) => {
             let dirtyRows = [];
             for (let mut of mutations) {
                 for (let node of mut.addedNodes) {
@@ -51,14 +47,13 @@ export class StatusIndicator
             }
         });
         let container = document.querySelector(".main-view-container__scroll-node-child");
-        this._obs.observe(container, {
+        this.obs.observe(container, {
             subtree: true,
             childList: true
         });
     }
 
-    updateRows(map: { [uri: string]: TrackStatus })
-    {
+    updateRows(map: { [uri: string]: TrackStatus }) {
         //TODO: find a better way to extract data from playlist rows
         let listSection = document.querySelector('section[data-testid="playlist-page"],[data-testid="album-page"]');
         if (!listSection) return;
@@ -102,13 +97,12 @@ ${StatusIcons[info.status]}`;
             let browseBtn: HTMLDivElement = node.querySelector(".sgf-status-browse-button");
             if (browseBtn) {
                 browseBtn.onclick = () => {
-                    this._conn.send(MessageType.OPEN_FOLDER, { path: info.path });
+                    this.conn.send(MessageType.OPEN_FOLDER, { path: info.path });
                 };
             }
         }
     }
-    private async sendUpdateRequest(dirtyRows: HTMLDivElement[])
-    {
+    private async sendUpdateRequest(dirtyRows: HTMLDivElement[]) {
         let listSection = document.querySelector('section[data-testid="playlist-page"],[data-testid="album-page"]');
         if (!listSection) return;
 
@@ -120,13 +114,12 @@ ${StatusIcons[info.status]}`;
                 tree.add(trackInfo.uri, trackInfo.vars);
             }
         }
-        this._conn.send(MessageType.DOWNLOAD_STATUS, {
+        this.conn.send(MessageType.DOWNLOAD_STATUS, {
             searchTree: tree.root,
             basePath: config.savePaths.basePath
         });
     }
-    private getRowTrackInfo(row: Element, listSection: Element)
-    {
+    private getRowTrackInfo(row: Element, listSection: Element) {
         let isPlaylist = true;
         let albumName = (row.querySelector('a[href^="/album"]') as HTMLElement)?.innerText;
         let listTitle = listSection.querySelector("h1")?.innerText;

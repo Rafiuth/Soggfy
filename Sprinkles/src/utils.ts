@@ -1,9 +1,7 @@
 type Detour = (stage: "pre" | "post", args: any[], ret?: any) => void;
 
-export default class Utils
-{
-    static createHook(obj: any, funcName: string, detour: Detour)
-    {
+export default class Utils {
+    static createHook(obj: any, funcName: string, detour: Detour) {
         //https://stackoverflow.com/a/62333813
         let originalFunc = obj[funcName];
         obj[funcName] = function (...args: any[]) {
@@ -22,8 +20,7 @@ export default class Utils
             }
         }
     }
-    static padInt(x: number, digits = 2)
-    {
+    static padInt(x: number, digits = 2) {
         return Math.floor(x).toString().padStart(digits, '0');
     }
 
@@ -33,8 +30,7 @@ export default class Utils
      * @param path The current path, should be empty when calling this
      * @returns 
      */
-    static findPath(obj: any, props: Set<string>, path: string[], visitedObjs: Set<any>)
-    {
+    static findPath(obj: any, props: Set<string>, path: string[], visitedObjs: Set<any>) {
         visitedObjs.add(obj);
 
         for (let key in obj) {
@@ -58,8 +54,7 @@ export default class Utils
      * @param path
      * @param newValue Value to set the final field
      */
-    static accessObjectPath(obj: any, path: string[], newValue = undefined)
-    {
+    static accessObjectPath(obj: any, path: string[], newValue = undefined) {
         let lastField = path.at(-1);
         for (let i = 0; i < path.length - 1; i++) {
             obj = obj[path[i]];
@@ -71,8 +66,7 @@ export default class Utils
     }
 
     /** Recursively merges source into target. */
-    static deepMerge(target: any, source: any)
-    {
+    static deepMerge(target: any, source: any) {
         //https://stackoverflow.com/a/34749873
         if (isObject(target) && isObject(source)) {
             for (let key in source) {
@@ -86,18 +80,16 @@ export default class Utils
         }
         return target;
 
-        function isObject(item: any)
-        {
+        function isObject(item: any) {
             return item && typeof item === "object" && !Array.isArray(item);
         }
     }
 
-    static getReactProps(rootElem: Element, targetElem: Element): any
-    {
+    static getReactProps(rootElem: Element, targetElem: Element): any {
         const keyof_ReactProps =
             Object.keys(rootElem)
-                  .find(k => k.startsWith("__reactProps$"));
-        
+                .find(k => k.startsWith("__reactProps$"));
+
         //find the path from elem to target
         let path = [];
         let node = targetElem;
@@ -136,53 +128,47 @@ export class DeferredPromise<T> extends Promise<T>
 {
     onresolve?: (self: this) => void;
 
-    private _resolve: (value?: T) => void;
-    private _reject: (reason?: any) => void;
-    private _timeout: any;
+    private resolveCb: (value?: T) => void;
+    private rejectCb: (reason?: any) => void;
+    private timeout: any;
 
     /**
      * @param timeoutMs Time (in milliseconds, up to INT_MAX) to wait before failing the promise. Will be disabled if `<= 0`.
      */
-    constructor(onresolve?: (self: DeferredPromise<T>) => void, timeoutMs?: number)
-    {
+    constructor(onresolve?: (self: DeferredPromise<T>) => void, timeoutMs?: number) {
         let tmpResolve, tmpReject; //can't access this from inside the callback
         super((resolve, reject) => {
             tmpResolve = resolve;
             tmpReject = reject;
         });
-        this._resolve = tmpResolve;
-        this._reject = tmpReject;
+        this.resolveCb = tmpResolve;
+        this.rejectCb = tmpReject;
         this.onresolve = onresolve;
         if (timeoutMs > 0) {
-            this._timeout = setTimeout(() => this._reject("Timeout"), timeoutMs);
+            this.timeout = setTimeout(() => this.rejectCb("Timeout"), timeoutMs);
         }
     }
 
-    public resolve(result?: T)
-    {
+    public resolve(result?: T) {
         this.cleanup();
-        this._resolve(result);
+        this.resolveCb(result);
     }
-    public reject(reason?: any)
-    {
+    public reject(reason?: any) {
         this.cleanup();
-        this._reject(reason);
+        this.rejectCb(reason);
     }
 
-    private cleanup()
-    {
-        if (this._timeout) {
-            clearTimeout(this._timeout);
+    private cleanup() {
+        if (this.timeout) {
+            clearTimeout(this.timeout);
         }
     }
 
     //https://stackoverflow.com/a/65669070
-    get [Symbol.toStringTag]()
-    {
+    get [Symbol.toStringTag]() {
         return "DeferredPromise";
     }
-    static get [Symbol.species]()
-    {
+    static get [Symbol.species]() {
         return Promise;
     }
 }

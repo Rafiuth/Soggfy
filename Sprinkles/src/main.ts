@@ -11,8 +11,7 @@ let ui = new UI(conn);
 let statusIndicator = new StatusIndicator(conn);
 ui.install();
 
-function onMessage(type: MessageType, payload: any)
-{
+function onMessage(type: MessageType, payload: any) {
     switch (type) {
         case MessageType.SYNC_CONFIG: {
             Utils.deepMerge(config, payload);
@@ -62,8 +61,7 @@ function onMessage(type: MessageType, payload: any)
     }
 }
 
-function setPlaybackStatusInd(playbackId: string, data: TrackStatus)
-{
+function setPlaybackStatusInd(playbackId: string, data: TrackStatus) {
     let info = playbackTracker.getTrackInfo(playbackId);
     if (info) {
         statusIndicator.updateRows({ [info.uri]: data });
