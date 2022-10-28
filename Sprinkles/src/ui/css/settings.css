@@ -21,21 +21,20 @@
     height: 90%;
     display: block;
 }
-.sgf-settings-container, .sgf-quick-settings-popup {
+.sgf-settings-container {
     background-color: #333;
     border-radius: 10px;
     box-shadow: 0px 0px 8px 4px rgb(0, 0, 0, 0.15);
     height: inherit;
+    max-height: 45rem;
     display: flex;
     flex-direction: column;
+    /* v-center taken from https://stackoverflow.com/a/30325113 */
+    position: relative;
+    top: 50%;
+    transform: translateY(-50%);
 }
-.sgf-quick-settings-popup {
-    position: absolute;
-    width: 380px;
-    height: auto;
-    padding: 4px 8px 8px 8px;
-}
-.sgf-quick-settings-popup .sgf-setting-row {
+.sgf-setting-row {
     min-height: 0;
 }
 

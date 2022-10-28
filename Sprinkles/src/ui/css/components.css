@@ -256,13 +256,13 @@
     height: 32px;
     margin-right: 8px;
     border-radius: 32px;
-    background: rgba(0, 0, 0, 0.4);
     overflow: hidden;
-    transition: width 0.15s ease;
+    transition: all 0.15s ease;
 }
 .sgf-topbar-retractor:hover {
     display: flex;
     width: calc(32px * 2 + 4px);
+    background: rgba(0, 0, 0, 0.25);
     gap: 4px;
 }
 .sgf-topbar-retractor button {
