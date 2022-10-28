@@ -50,39 +50,45 @@ export class StatusIndicator {
         this.obs.observe(container, { subtree: true, childList: true });
     }
 
-    public updateRows(map: { [uri: string]: TrackStatus }) {
+    public updateRows(statusMap: Record<string, TrackStatus>) {
         for (let trackInfo of this.getTrackInfoFromRows()) {
-            let info = map[trackInfo.uri];
+            let info = statusMap[trackInfo.uri];
+            let indNode = trackInfo.row["__sgf_status_ind"];
 
-            if (!info && isTrackIgnored(trackInfo.extraProps)) {
-                info = { status: DownloadStatus.Ignored, message: "Ignored" };
+            if (!info) {
+                if (isTrackIgnored(trackInfo.extraProps)) {
+                    info = { status: DownloadStatus.Ignored, message: "Ignored" };
+                } else if (indNode?._status === DownloadStatus.Ignored) {
+                    indNode.remove();
+                    continue;
+                } else {
+                    continue;
+                }
             }
-            if (!info) continue;
-            
-            let node = trackInfo.row["__sgf_status_ind"] ??= document.createElement("div");
-            if (!node.parentElement) {
-                let infoColDiv = trackInfo.row.lastElementChild;
-                infoColDiv.prepend(node);
+            if (!indNode?.parentElement) {
+                indNode = document.createElement("div");
+                indNode.className = "sgf-status-indicator";
+
+                trackInfo.row.lastElementChild.prepend(indNode);
+                trackInfo.row["__sgf_status_ind"] = indNode;
             }
-            
-            node.className = "sgf-status-indicator";
-            node.innerHTML = `
+            indNode.innerHTML = `
 <div class="sgf-status-indicator-card">
 ${info.status == DownloadStatus.Done
-    ? `
+                    ? `
     <div class="sgf-status-browse-button">
         <svg width="24" height="24" viewBox="0 0 24 24" fill="#ddd">
             <path xmlns="http://www.w3.org/2000/svg" d="M20 6h-8l-2-2H4c-1.1 0-1.99.9-1.99 2L2 18c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2zm0 12H4V8h16v10z"></path>
         </svg>
         <span style="padding-left: 4px; font-size: 16px; color: #ddd;">Open Folder</span>
     </div>`
-    : `
-    <span style="font-size: 16px; color: #ddd;">${info.message}</span>
-`}
+                    : `
+    <span style="font-size: 16px; color: #ddd;">${info.message}</span>`}
 </div>
 ${StatusIcons[info.status]}`;
+            indNode._status = info.status;
 
-            let browseBtn = node.querySelector(".sgf-status-browse-button");
+            let browseBtn = indNode.querySelector(".sgf-status-browse-button");
             if (browseBtn) {
                 browseBtn.onclick = () => {
                     this.conn.send(MessageType.OPEN_FOLDER, { path: info.path });
@@ -105,6 +111,8 @@ ${StatusIcons[info.status]}`;
 
     private * getTrackInfoFromRows(rows?: Iterable<Element>) {
         let container = document.querySelector(".main-view-container__scroll-node-child section");
+        if (!container) return;
+
         let listTitle = container.querySelector("h1")?.innerText;
 
         let kind = container.getAttribute("data-testid");

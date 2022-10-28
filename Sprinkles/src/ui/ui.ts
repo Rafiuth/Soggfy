@@ -237,10 +237,15 @@ export default class UI {
                         for (let uri of uris) {
                             ignored ? delete config.ignorelist[uri] : config.ignorelist[uri] = 1;
                         }
-                        this.conn.send(MessageType.DOWNLOAD_STATUS, {
-                            playbackId: Player.getState().playbackId,
-                            ignore: isTrackIgnored(Player.getState().item)
-                        });
+                        if (isTrackIgnored(Player.getState().item)) {
+                            //server will resync status, updateRows() will be called then
+                            this.conn.send(MessageType.DOWNLOAD_STATUS, {
+                                playbackId: Player.getState().playbackId,
+                                ignore: true
+                            });
+                        } else {
+                            this.statusIndicator.updateRows({});
+                        }
                         this.updateConfig("ignorelist", config.ignorelist);
                     }
                 }
