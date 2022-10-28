@@ -55,7 +55,7 @@ export class StatusIndicator {
             let info = statusMap[trackInfo.uri];
             let indNode = trackInfo.row["__sgf_status_ind"];
 
-            if (!info) {
+            if (!info || indNode?._status === DownloadStatus.Done) {
                 if (isTrackIgnored(trackInfo.extraProps)) {
                     info = { status: DownloadStatus.Ignored, message: "Ignored" };
                 } else if (indNode?._status === DownloadStatus.Ignored) {
