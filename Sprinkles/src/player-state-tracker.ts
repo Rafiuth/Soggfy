@@ -23,8 +23,8 @@ export default class PlayerStateTracker {
 
         let queueStatusCache = new Map<string, boolean>();
         Player.getEvents().addListener("queue_update", async ({ data }) => {
-            if (config.skipDownloadedTracks && conn.isConnected) {
-                this.skipDownloadedTracks(data, queueStatusCache);
+            if ((config.skipDownloadedTracks && conn.isConnected) || config.skipIgnoredTracks) {
+                this.skipIgnoredTracks(data, queueStatusCache);
             }
         });
         //Player stops sometimes when speed is too high (>= 30)
@@ -221,40 +221,42 @@ export default class PlayerStateTracker {
         return { text: text, rawData: lyrics, isSynced: isSynced };
     }
 
-    private async skipDownloadedTracks(queue: any, statusCache: Map<string, boolean>) {
-        let tree = new TemplatedSearchTree(config.savePaths.track);
-        let queuedTracks = new Set<string>();
+    private async skipIgnoredTracks(queue: any, statusCache: Map<string, boolean>) {
+        if (config.skipDownloadedTracks) {
+            let tree = new TemplatedSearchTree(config.savePaths.track);
+            let queuedTracks = new Set<string>();
         
-        for (let track of queue.nextUp) {
-            if (!statusCache.has(track.uri)) {
-                statusCache.set(track.uri, false);
+            for (let track of queue.nextUp) {
+                if (!statusCache.has(track.uri)) {
+                    statusCache.set(track.uri, false);
 
-                let vars = {
-                    track_name: track.name,
-                    artist_name: track.artists[0].name,
-                    all_artist_names: track.artists.map(v => v.name).join(", "),
-                    album_name: track.album.name
-                };
-                tree.add(track.uri, vars);
+                    let vars = {
+                        track_name: track.name,
+                        artist_name: track.artists[0].name,
+                        all_artist_names: track.artists.map(v => v.name).join(", "),
+                        album_name: track.album.name
+                    };
+                    tree.add(track.uri, vars);
+                }
+                queuedTracks.add(track.uri);
             }
-            queuedTracks.add(track.uri);
-        }
-        //remove junk from cache
-        for (let track of statusCache.keys()) {
-            if (!queuedTracks.has(track)) {
-                statusCache.delete(track);
+            //remove junk from cache
+            for (let track of statusCache.keys()) {
+                if (!queuedTracks.has(track)) {
+                    statusCache.delete(track);
+                }
+            }
+            if (!tree.isEmpty) {
+                let statusResp = await this.conn.request(MessageType.DOWNLOAD_STATUS, {
+                    searchTree: tree.root,
+                    basePath: config.savePaths.basePath
+                });
+                for (let track in statusResp.results) {
+                    statusCache.set(track, true);
+                }
             }
         }
-        if (!tree.isEmpty) {
-            let statusResp = await this.conn.request(MessageType.DOWNLOAD_STATUS, {
-                searchTree: tree.root,
-                basePath: config.savePaths.basePath
-            });
-            for (let track in statusResp.results) {
-                statusCache.set(track, true);
-            }
-        }
-        let tracksToRemove = queue.nextUp.filter(v => statusCache.get(v.uri) === true);
+        let tracksToRemove = queue.nextUp.filter(v => isTrackIgnored(v) || statusCache.get(v.uri) === true);
         await Player.removeFromQueue(tracksToRemove);
     }
 }

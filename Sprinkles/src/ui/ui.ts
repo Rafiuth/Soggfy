@@ -186,6 +186,7 @@ export default class UI {
                 UIC.row("Output format",            UIC.select("outputFormat", Object.getOwnPropertyNames(defaultFormats), onFormatChange)),
                 customFormatSection,
                 UIC.row("Skip downloaded tracks",   UIC.toggle("skipDownloadedTracks", onChange)),
+                UIC.row("Skip ignored tracks",      UIC.toggle("skipIgnoredTracks", onChange)),
                 UIC.row("Embed cover art",          UIC.toggle("embedCoverArt", onChange)),
                 UIC.row("Save cover art in album folder", UIC.toggle("saveCoverArt", onChange)),
                 UIC.row("Embed lyrics",             UIC.toggle("embedLyrics", onChange)),

@@ -2,6 +2,7 @@ let config = {
     playbackSpeed: 1.0,
     downloaderEnabled: true,
     skipDownloadedTracks: false,
+    skipIgnoredTracks: false,
     embedLyrics: true,
     saveLyrics: true,
     embedCoverArt: true,
