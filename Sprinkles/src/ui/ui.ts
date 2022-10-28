@@ -10,7 +10,10 @@ import SettingsStyle from "./css/settings.css";
 import StatusIndicatorStyle from "./css/status-indicator.css";
 import { PathTemplate, TemplatedSearchTree } from "../path-template";
 
-const MergedStyles = [ComponentsStyle, SettingsStyle, StatusIndicatorStyle].join('\n'); //TODO: find a better way to do this
+const MergedStyles = [
+    ComponentsStyle, SettingsStyle, StatusIndicatorStyle,
+    ".X871RxPwx9V0MqpQdMom { display: none !important; }" //hide ad leaderboard
+].join('\n'); //TODO: find a better way to do this
 
 //From https://fonts.google.com/icons
 export const Icons = {
@@ -34,8 +37,6 @@ export default class UI
 {
     private _conn: Connection;
 
-    private _adblockStyleAdded = false;
-
     constructor(conn: Connection)
     {
         this._conn = conn;
@@ -49,15 +50,20 @@ export default class UI
 
         this.addTopbarButtons();
 
-        let bodyObs = new MutationObserver(this.onDocBodyChanged.bind(this));
+        let bodyObs = new MutationObserver(() => {
+            let menuList = document.querySelector("#context-menu ul");
+            if (menuList !== null && !menuList["_sgf_handled"]) {
+                this.onContextMenuOpened(menuList);
+            }
+        });
         bodyObs.observe(document.body, { childList: true });
     }
 
     private addTopbarButtons()
     {
-        let backButton = document.querySelector(".Root__top-bar").querySelector("button");
-        let topbarContainer = backButton.parentElement;
-        let buttonClass = backButton.classList[0];
+        let fwdButton = document.querySelector("[data-testid='top-bar-forward-button']");
+        let topbarContainer = fwdButton.parentElement;
+        let buttonClass = fwdButton.classList[0];
 
         let div = document.createElement("div");
         div.className = "sgf-topbar-retractor";
@@ -240,22 +246,6 @@ export default class UI
     <span>${text}</span>
 </div>`);
         UIC.notification(node, anchor, "up", false, 3);
-    }
-
-    private onDocBodyChanged()
-    {
-        let menuList = document.querySelector("#context-menu ul");
-        if (menuList !== null && !menuList["_sgf_handled"]) {
-            this.onContextMenuOpened(menuList);
-        }
-        let adLeaderboardDom = Platform.getAdManagers()?.leaderboard?.domTarget;
-        if (adLeaderboardDom && !this._adblockStyleAdded) {
-            this._adblockStyleAdded = true;
-            
-            let style = document.createElement("style");
-            style.innerHTML = `.${adLeaderboardDom.className} { display: none !important; }`;
-            document.body.appendChild(style);
-        }
     }
 
     private onContextMenuOpened(menuList: Element)

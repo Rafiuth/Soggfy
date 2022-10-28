@@ -1,9 +1,8 @@
-$SpotifyInstallerUrl = "https://upgrade.scdn.co/upgrade/client/win32-x86/spotify_installer-1.1.90.859.gf1bb1e36-11.exe"
-$SpotifyVersion = "1.1.90.859"
-$BtsUrl = "https://github.com/mrpond/BlockTheSpot/releases/download/2021.10.29.44/chrome_elf.zip"
+$SpotifyInstallerUrl = "https://upgrade.scdn.co/upgrade/client/win32-x86/spotify_installer-1.1.97.962.g24733a46-543.exe"
+$SpotifyVersion = $SpotifyInstallerUrl -replace 'installer-(.+)\.g', '$1'
+$BtsUrl = "https://github.com/mrpond/BlockTheSpot/releases/download/2022.9.16.55/chrome_elf.zip"
 
-function InstallSpotify
-{
+function InstallSpotify {
     DownloadFile -Url $SpotifyInstallerUrl -DestPath "SpotifyInstaller-$SpotifyVersion.exe"
 
     Write-Host "Extracting..."
@@ -25,8 +24,7 @@ function InstallSpotify
     }
     Remove-Item -Path "Spotify/crash_reporter.cfg"
 }
-function InstallFFmpeg
-{
+function InstallFFmpeg {
     if ([Environment]::Is64BitOperatingSystem) {
         $repoUrl = "https://api.github.com/repos/BtbN/FFmpeg-Builds/releases/latest"
         $platform = "win64"
@@ -66,9 +64,7 @@ function InstallFFmpeg
     Write-Host "Failed to install ffmpeg. Try downloading it from https://ffmpeg.org/download.html and extract the binaries into the 'Soggfy/ffmpeg/' directory."
 }
 
-function DownloadFile {
-    param ( [string] $Url, [string] $DestPath )
-    
+function DownloadFile($Url, $DestPath) {
     $req = [System.Net.WebRequest]::CreateHttp($Url)
     $resp = $req.GetResponse()
     $is = $resp.GetResponseStream()
@@ -99,7 +95,7 @@ function DownloadFile {
     }
 }
 
-if (-not (Test-Path './Spotify/Spotify.exe') -or ((Get-Item ".\Spotify\Spotify.exe").VersionInfo.FileVersion -ne $SpotifyVersion)) {
+if (-not (Test-Path './Spotify/Spotify.exe') -or ((Get-Item "./Spotify/Spotify.exe").VersionInfo.FileVersion -ne $SpotifyVersion)) {
     Write-Host "Installing Spotify..."
     InstallSpotify
 }
