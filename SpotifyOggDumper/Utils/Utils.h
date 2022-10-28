@@ -64,7 +64,7 @@ public:
     void SetExePath(const fs::path& path) { _exePath = path; }
     void SetWorkDir(const fs::path& path) { _workDir = path; }
 
-    void AddArgPath(const fs::path& path) { _args.push_back(path.wstring()); }
+    void AddArgPath(const fs::path& path) { _args.push_back(fs::absolute(path).wstring()); }
     void AddArg(const std::string& str) { _args.push_back(Utils::UtfToWide(str)); }
 
     void AddArgs(const std::string& str);
