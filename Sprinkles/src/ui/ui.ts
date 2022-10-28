@@ -11,6 +11,7 @@ import { StatusIndicator } from "./status-indicator";
 
 export default class UI {
     public readonly statusIndicator: StatusIndicator;
+    private configWatchers = new Array<{ key: string, cb: (newValue: any) => void }>();
 
     constructor(
         private conn: Connection
@@ -29,7 +30,8 @@ export default class UI {
                 this.onContextMenuOpened(menuList);
             }
         });
-        bodyObs.observe(document.body, { childList: true });
+        //playlist context menus are delayed, so we need to observe subtrees too
+        bodyObs.observe(document.body, { childList: true, subtree: true });
     }
 
     private addTopbarButtons() {
@@ -40,21 +42,24 @@ export default class UI {
         let div = document.createElement("div");
         div.className = "sgf-topbar-retractor";
         div.innerHTML = `
-<button class=${buttonClass}>${config.downloaderEnabled ? Icons.FileDownload : Icons.FileDownloadOff}</button>
+<button class=${buttonClass}>${Icons.FileDownload}</button>
 <button class=${buttonClass}>${Icons.Sliders}</button>`;
         
         //@ts-ignore
         div.children[0].onclick = () => {
             this.updateConfig("downloaderEnabled", !config.downloaderEnabled);
-            div.children[0].innerHTML = config.downloaderEnabled ? Icons.FileDownload : Icons.FileDownloadOff;
-            //reset track (when enabling), or speed (when disabling)
-            SpotifyUtils.resetCurrentTrack(!config.downloaderEnabled && config.playbackSpeed === 1.0);
+            //reset track when enabling, or if it's speeded when disabling
+            if (config.downloaderEnabled || config.playbackSpeed !== 1.0) {
+                SpotifyUtils.resetCurrentTrack(!config.downloaderEnabled);
+            }
         };
         //@ts-ignore
         div.children[1].onclick = () => {
             document.body.append(this.createSettingsDialog());
         };
         topbarContainer.append(div);
+
+        this.watchConfig("downloaderEnabled", v => div.children[0].innerHTML = v ? Icons.FileDownload : Icons.FileDownloadOff);
         return div;
     }
 
@@ -274,11 +279,22 @@ export default class UI {
         let finalValue = Utils.accessObjectPath(config, key.split('.'), newValue);
 
         if (newValue !== undefined) {
-            let delta = {};
             let field = key.split('.')[0]; //sync only supports topmost field
-            delta[field] = config[field];
+            let delta = { [field]: config[field] };
+            this.syncConfig(delta);
             this.conn.send(MessageType.SYNC_CONFIG, delta);
         }
         return finalValue;
+    }
+    private watchConfig(key: string, cb: (newValue: any) => void) {
+        this.configWatchers.push({ key, cb });
+    }
+
+    public syncConfig(updatedEntries: Record<string, any>) {
+        for (let watcher of this.configWatchers) {
+            if (Object.hasOwn(updatedEntries, watcher.key)) {
+                watcher.cb(updatedEntries[watcher.key]);
+            }
+        }
     }
 }

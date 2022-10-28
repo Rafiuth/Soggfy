@@ -5,6 +5,9 @@ import UI from "./ui/ui";
 import config from "./config";
 import Utils from "./utils";
 
+//Hack so we can navigate into the source on devtools
+if (!PRODUCTION) console.log(() => { "Go to source" });
+
 let conn = new Connection(onMessage);
 let playbackTracker = new PlayerStateTracker(conn);
 let ui = new UI(conn);
@@ -13,6 +16,7 @@ function onMessage(type: MessageType, payload: any) {
     switch (type) {
         case MessageType.SYNC_CONFIG: {
             Utils.deepMerge(config, payload);
+            ui.syncConfig(payload);
             conn.send(MessageType.SYNC_CONFIG, config);
             break;
         }
