@@ -18,12 +18,12 @@ export interface TrackStatus {
     message?: string;
 }
 const StatusIcons = {
-    [DownloadStatus.Error]: Icons.Error,
+    [DownloadStatus.Error]:      Icons.Error,
     [DownloadStatus.InProgress]: Icons.InProgress,
     [DownloadStatus.Converting]: Icons.Processing,
-    [DownloadStatus.Warn]: Icons.Warning,
-    [DownloadStatus.Done]: Icons.Done,
-    [DownloadStatus.Ignored]: Icons.SyncDisabled
+    [DownloadStatus.Warn]:       Icons.Warning,
+    [DownloadStatus.Done]:       Icons.Done,
+    [DownloadStatus.Ignored]:    Icons.SyncDisabled
 };
 
 export class StatusIndicator {
@@ -47,33 +47,21 @@ export class StatusIndicator {
             }
         });
         let container = document.querySelector(".main-view-container__scroll-node-child");
-        this.obs.observe(container, {
-            subtree: true,
-            childList: true
-        });
+        this.obs.observe(container, { subtree: true, childList: true });
     }
 
-    updateRows(map: { [uri: string]: TrackStatus }) {
-        //TODO: find a better way to extract data from playlist rows
-        let listSection = document.querySelector('section[data-testid="playlist-page"],[data-testid="album-page"]');
-        if (!listSection) return;
+    public updateRows(map: { [uri: string]: TrackStatus }) {
+        for (let trackInfo of this.getTrackInfoFromRows()) {
+            let info = map[trackInfo.uri];
 
-        let listDiv = listSection.querySelector('div[tabindex="0"]');
-        let listDivRows = listDiv.querySelector('div[role="presentation"]:not([class])');
-
-        for (let rowWrapper of listDivRows.children) {
-            let row = rowWrapper.firstElementChild;
-            let trackInfo = this.getRowTrackInfo(row, listSection);
-            let info = map[trackInfo?.uri];
-
-            if (!info && trackInfo && isTrackIgnored(trackInfo.extraProps)) {
+            if (!info && isTrackIgnored(trackInfo.extraProps)) {
                 info = { status: DownloadStatus.Ignored, message: "Ignored" };
             }
             if (!info) continue;
             
-            let node = row["__sgf_status_ind"] ??= document.createElement("div");
+            let node = trackInfo.row["__sgf_status_ind"] ??= document.createElement("div");
             if (!node.parentElement) {
-                let infoColDiv = row.lastElementChild;
+                let infoColDiv = trackInfo.row.lastElementChild;
                 infoColDiv.prepend(node);
             }
             
@@ -94,7 +82,7 @@ ${info.status == DownloadStatus.Done
 </div>
 ${StatusIcons[info.status]}`;
 
-            let browseBtn: HTMLDivElement = node.querySelector(".sgf-status-browse-button");
+            let browseBtn = node.querySelector(".sgf-status-browse-button");
             if (browseBtn) {
                 browseBtn.onclick = () => {
                     this.conn.send(MessageType.OPEN_FOLDER, { path: info.path });
@@ -102,49 +90,48 @@ ${StatusIcons[info.status]}`;
             }
         }
     }
-    private async sendUpdateRequest(dirtyRows: HTMLDivElement[]) {
-        let listSection = document.querySelector('section[data-testid="playlist-page"],[data-testid="album-page"]');
-        if (!listSection) return;
 
+    private async sendUpdateRequest(dirtyRows: HTMLDivElement[]) {
         let tree = new TemplatedSearchTree(config.savePaths.track);
 
-        for (let row of dirtyRows) {
-            let trackInfo = this.getRowTrackInfo(row, listSection);
-            if (trackInfo) {
-                tree.add(trackInfo.uri, trackInfo.vars);
-            }
+        for (let trackInfo of this.getTrackInfoFromRows(dirtyRows)) {
+            tree.add(trackInfo.uri, trackInfo.vars);
         }
         this.conn.send(MessageType.DOWNLOAD_STATUS, {
             searchTree: tree.root,
             basePath: config.savePaths.basePath
         });
     }
-    private getRowTrackInfo(row: Element, listSection: Element) {
-        let isPlaylist = true;
-        let albumName = (row.querySelector('a[href^="/album"]') as HTMLElement)?.innerText;
-        let listTitle = listSection.querySelector("h1")?.innerText;
 
-        if (!albumName) {
-            isPlaylist = false;
-            albumName = listTitle;
+    private * getTrackInfoFromRows(rows?: Iterable<Element>) {
+        let container = document.querySelector(".main-view-container__scroll-node-child section");
+        let listTitle = container.querySelector("h1")?.innerText;
+
+        let kind = container.getAttribute("data-testid");
+        let isPlaylist = ["enhanced-page", "playlist-page"].includes(kind);
+        let isAlbum = kind === "album-page";
+
+        rows ??= container.querySelectorAll('div[data-testid="tracklist-row"]');
+
+        for (let row of rows) {
+            let albumName = isAlbum ? listTitle : row.querySelector<HTMLElement>('a[href^="/album"]')?.innerText;
+            let menuBtn = row.querySelector('[data-testid="more-button"]');
+
+            if (albumName == null || menuBtn == null) continue;
+
+            let extraProps = Utils.getReactProps(row, menuBtn).menu.props;
+
+            yield {
+                row, extraProps, uri: extraProps.uri,
+                vars: {
+                    track_name: row.querySelector(Selectors.rowTitle).innerText,
+                    artist_name: extraProps.artists[0].name,
+                    all_artist_names: extraProps.artists.map(v => v.name).join(", "),
+                    album_name: albumName,
+                    playlist_name: isPlaylist ? listTitle : "unknown",
+                    context_name: listTitle
+                }
+            };
         }
-        let menuBtn = row.querySelector(Selectors.rowMoreButton);
-
-        if (albumName == null || menuBtn == null) return;
-
-        let extraProps = Utils.getReactProps(row, menuBtn).menu.props;
-
-        return {
-            uri: extraProps.uri,
-            extraProps,
-            vars: {
-                track_name: row.querySelector(Selectors.rowTitle).innerText,
-                artist_name: extraProps.artists[0].name,
-                all_artist_names: extraProps.artists.map(v => v.name).join(", "),
-                album_name: albumName,
-                playlist_name: isPlaylist ? listTitle : "unknown",
-                context_name: listTitle
-            }
-        };
     }
 }

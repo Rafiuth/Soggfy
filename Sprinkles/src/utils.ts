@@ -64,40 +64,38 @@ export default class Utils {
         }
     }
 
-    static getReactProps(rootElem: Element, targetElem: Element): any {
-        const keyof_ReactProps =
-            Object.keys(rootElem)
-                .find(k => k.startsWith("__reactProps$"));
+    static getReactProps(parent: Element, target: Element): any {
+        const keyof_ReactProps = Object.keys(parent).find(k => k.startsWith("__reactProps$"));
+        const symof_ReactFragment = Symbol.for("react.fragment");
 
-        //find the path from elem to target
+        //Find the path from target to parent
         let path = [];
-        let node = targetElem;
-        while (node !== rootElem) {
-            let parent = node.parentElement;
+        for (let elem = target; elem !== parent;) {
             let index = 0;
-            for (let child of parent.children) {
-                if (child[keyof_ReactProps]) index++;
-                if (child === node) break;
+            for (let sibling = elem; sibling != null;) {
+                if (sibling[keyof_ReactProps]) index++;
+                sibling = sibling.previousElementSibling;
             }
-            path.push({ next: node, index: index });
-            node = parent;
+            path.push(index);
+            elem = elem.parentElement;
         }
-        //now find the react state
-        let state = node[keyof_ReactProps];
+        //Walk down the path to find the react state props
+        let state = parent[keyof_ReactProps];
         for (let i = path.length - 1; i >= 0 && state != null; i--) {
-            let loc = path[i];
-
-            //find the react state children, ignoring "non element" children
-            let childStateIndex = 0;
-            let childElemIndex = 0;
+            //Find the target child state index
+            let childStateIndex = 0, childElemIndex = 0;
             while (childStateIndex < state.children.length) {
-                let isElem = state.children[childStateIndex] instanceof Object;
-                if (isElem && ++childElemIndex === loc.index) break;
+                let childState = state.children[childStateIndex];
+                if (childState instanceof Object) {
+                    //Fragment children are inlined in the parent DOM element
+                    let isFragment = childState.type === symof_ReactFragment && childState.props.children.length;
+                    childElemIndex += isFragment ? childState.props.children.length : 1;
+                    if (childElemIndex === path[i]) break;
+                }
                 childStateIndex++;
             }
-            let child = state.children[childStateIndex] ?? (childStateIndex === 0 ? state.children : null);
-            state = child?.props;
-            node = loc.next;
+            let childState = state.children[childStateIndex] ?? (childStateIndex === 0 ? state.children : null);
+            state = childState?.props;
         }
         return state;
     }

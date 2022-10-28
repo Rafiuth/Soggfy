@@ -30,3 +30,20 @@
     display: flex;
     cursor: pointer;
 }
+
+/* This style is applied to playlist track rows in enhanced playlists as of 1.1.97. */
+/* The last column width was adjusted for the status indicator (120px -> 150px). */
+.ShMHCGsT93epRGdxJp2w.Ss6hr6HYpN4wjHJ9GHmi[aria-colcount="6"] .wTUruPetkKdWAR1dd6w4 {
+    grid-template-columns:
+        [index] 16px 
+        [first] 6fr 
+        [var1] 4fr 
+        [var2] 3fr 
+        [var3] minmax(120px, 2fr) 
+        [last] minmax(150px, 1fr) !important;
+}
+/* Align status icons to the left (we finally have :has()!) */
+.ShMHCGsT93epRGdxJp2w.Ss6hr6HYpN4wjHJ9GHmi[aria-colcount="6"] .wTUruPetkKdWAR1dd6w4 
+        .sgf-status-indicator:not(:has(+ button + button)) {
+    margin-right: 48px;
+}
