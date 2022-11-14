@@ -19,13 +19,16 @@ A music downloader mod for the Windows Spotify client
 3. Run `Injector.exe`, and wait for Spotify to open.
 4. Play the songs you want to download.
 
+Tracks are saved on the Music folder by default, this can be changed on the settings pane, which can be accessed through the controls button shown after hovering the download toggle button in the navigation bar.  
+Hovering the check mark drawn on each individual track will display a popup offering to open the folder containing them.
+
 You may need to disable or whitelist Soggfy in your anti-virus for it to work.
 
 If the injector crashes because of missing DLLs, you need to install the [MSVC Redistributable package](https://aka.ms/vs/17/release/vc_redist.x86.exe).
 
 # Notes
-- Songs are only downloaded if you play them from start to finish, without seeking (pausing is fine).
-- Quality depends on the account you are using: _160Kb/s_ or _320Kb/s_ for _free_ and _premium_ plans respectively. You may also need to change the streaming quality to "Very high" on Spotify settings to get _320Kb/s_ files.
+- Songs are only downloaded if played from start to finish, without seeking (pausing is fine).
+- Quality depends on the account being used: _160Kb/s_ or _320Kb/s_ for _free_ and _premium_ plans respectively. You may also need to change the streaming quality to "Very high" on Spotify settings to get _320Kb/s_ files.
 - If you are _converting_ to AAC and care about quality, see [High quality AAC](/USAGE.md#high-quality-aac).
 - **This tool breaks [Spotify's Guidelines](https://www.spotify.com/us/legal/user-guidelines/) and using it could get your account banned. Consider using alt accounts or keeping backups (see [Exportify](https://github.com/watsonbox/exportify) and [SpotMyBackup](http://www.spotmybackup.com)).**
 
