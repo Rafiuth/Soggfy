@@ -14,7 +14,7 @@ A music downloader mod for the Windows Spotify client
 - Automatic conversion to MP3 and many other formats
 
 # Installation and Usage
-1. Download and extract the `.zip` package of the [latest release](/releases/latest)
+1. Download and extract the `.zip` package of the [latest release](https://github.com/Rafiuth/Soggfy/releases/latest).
 2. Right click the `Install.ps1` file, then select "Run with PowerShell". If it prompts about execution policy, enter `Y` to allow. Wait for it to finish.
 3. Run `Injector.exe`, and wait for Spotify to open.
 4. Play the songs you want to download.
