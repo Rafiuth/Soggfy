@@ -1,28 +1,32 @@
+$base = $PWD.Path
 $SpotifyInstallerUrl = "https://upgrade.scdn.co/upgrade/client/win32-x86/spotify_installer-1.1.97.962.g24733a46-543.exe"
 $SpotifyVersion = $SpotifyInstallerUrl -replace '.+installer-(.+)\.g.+', '$1'
 $BtsUrl = "https://github.com/mrpond/BlockTheSpot/releases/download/2022.9.16.55/chrome_elf.zip"
 
+Set-Location -Path "$base\"
+
 function InstallSpotify {
-    DownloadFile -Url $SpotifyInstallerUrl -DestPath "SpotifyInstaller-$SpotifyVersion.exe"
+    DownloadFile -Url $SpotifyInstallerUrl -DestPath "$base\SpotifyInstaller-$SpotifyVersion.exe"
 
     Write-Host "Extracting..."
-    Start-Process -FilePath "SpotifyInstaller-$SpotifyVersion.exe" -ArgumentList "/extract" -Wait
-    Remove-Item "SpotifyInstaller-$SpotifyVersion.exe"
+    Start-Process -FilePath "$base\SpotifyInstaller-$SpotifyVersion.exe" -ArgumentList "/extract" -Wait
+    Remove-Item "$base\SpotifyInstaller-$SpotifyVersion.exe"
     
-    if (Test-Path "Spotify/") { 
-        Remove-Item "Spotify" -Force -Recurse
+    if (Test-Path "$base\Spotify/") { 
+        Remove-Item "$base\Spotify" -Force -Recurse
     }
-    $spotifyFolder = Get-ChildItem -Filter "spotify-update-*"
-    Rename-Item -Path $spotifyFolder.FullName -NewName "Spotify"
+	
+    $spotifyFolder = Get-ChildItem -Filter ".\spotify-update-*"
+    Rename-Item -Path $spotifyFolder.FullName -NewName "$base\Spotify"
 
     if ((Read-Host -Prompt "Do you want to install BlockTheSpot to block ads? Y/N") -eq "y") {
-        DownloadFile -Url $BtsUrl -DestPath "bts_patch.zip"
-
-        Rename-Item -Path "Spotify/chrome_elf.dll" -NewName "chrome_elf_bak.dll"
-        Expand-Archive -Path "bts_patch.zip" -DestinationPath "Spotify/" -Force
-        Remove-Item "bts_patch.zip"
+        DownloadFile -Url $BtsUrl -DestPath "$base\bts_patch.zip"
+	
+        Rename-Item -Path "$base\Spotify\chrome_elf.dll" -NewName "$base\Spotify\chrome_elf_bak.dll"
+        Expand-Archive -Path "$base\bts_patch.zip" -DestinationPath "$base\Spotify\" -Force
+        Remove-Item "$base\bts_patch.zip"
     }
-    Remove-Item -Path "Spotify/crash_reporter.cfg"
+    Remove-Item -Path "$base\Spotify\crash_reporter.cfg"
 }
 function InstallFFmpeg {
     if ([Environment]::Is64BitOperatingSystem) {
@@ -36,26 +40,26 @@ function InstallFFmpeg {
 
     foreach ($asset in $release.assets) {
         if ($asset.name -cmatch "ffmpeg-n.+$platform-gpl-shared") {
-            DownloadFile -Url $asset.browser_download_url -DestPath $asset.name
+            DownloadFile -Url $asset.browser_download_url -DestPath "$base\$($asset.name)"
             
             # Remove previous installation
-            if (Test-Path "./ffmpeg/") {
-                Remove-Item -Path "./ffmpeg/" -Recurse -Force
+            if (Test-Path "$base\ffmpeg\") {
+                Remove-Item -Path "$base\ffmpeg\" -Recurse -Force
             }
-            New-Item -ItemType Directory -Path "./ffmpeg/" -Force | Out-Null
+            New-Item -ItemType Directory -Path "$base\ffmpeg\" -Force | Out-Null
             
             # Extract bin/ folder to ffmpeg/
             Add-Type -Assembly System.IO.Compression.FileSystem
-            $zip = [IO.Compression.ZipFile]::OpenRead($asset.name)
+            $zip = [IO.Compression.ZipFile]::OpenRead("$base\$($asset.name)")
 
             foreach ($entry in $zip.Entries) {
                 if ($entry.FullName -notlike "*/bin/*.*") { continue; }
-                [IO.Compression.ZipFileExtensions]::ExtractToFile($entry, "./ffmpeg/" + $entry.Name)
+                [IO.Compression.ZipFileExtensions]::ExtractToFile($entry, "$base\ffmpeg\" + $entry.Name)
             }
             $zip.Dispose()
 
             # Delete zip
-            Remove-Item $asset.name
+            Remove-Item "$base\$($asset.name)"
             
             return
         }
@@ -95,12 +99,12 @@ function DownloadFile($Url, $DestPath) {
     }
 }
 
-if (-not (Test-Path './Spotify/Spotify.exe') -or ((Get-Item "./Spotify/Spotify.exe").VersionInfo.FileVersion -ne $SpotifyVersion)) {
+if (-not (Test-Path '$base\Spotify\Spotify.exe') -or ((Get-Item "$base\Spotify\Spotify.exe").VersionInfo.FileVersion -ne $SpotifyVersion)) {
     Write-Host "Installing Spotify..."
     InstallSpotify
 }
 where.exe /q ffmpeg
-if (-not (Test-Path './ffmpeg/ffmpeg.exe') -and ($LastExitCode -eq 1)) {
+if (-not (Test-Path '$base\ffmpeg\ffmpeg.exe') -and ($LastExitCode -eq 1)) {
     Write-Host "Installing ffmpeg..."
     InstallFFmpeg
 }
