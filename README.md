@@ -15,7 +15,7 @@ A music downloader mod for the Windows Spotify client
 
 # Installation and Usage
 1. Download and extract the `.zip` package of the [latest release](https://github.com/Rafiuth/Soggfy/releases/latest).
-2. Right click the `Install.ps1` file, then select "Run with PowerShell". If it prompts about execution policy, enter `Y` to allow. Wait for it to finish.
+2. Double click the `Install.cmd` file. It will run the Install.ps1 script with Execution Policy Bypass. Wait for it to finish.
 3. Run `Injector.exe`, and wait for Spotify to open.
 4. Play the songs you want to download.
 
