@@ -119,11 +119,11 @@ ${StatusIcons[info.status]}`;
         let isPlaylist = ["enhanced-page", "playlist-page"].includes(kind);
         let isAlbum = kind === "album-page";
 
-        rows ??= container.querySelectorAll('div[data-testid="tracklist-row"]');
+        rows ??= container.querySelectorAll('div[data-testid="tracklist-row"], .main-trackList-trackListRow');
 
         for (let row of rows) {
-            let albumName = isAlbum ? listTitle : row.querySelector<HTMLElement>('a[href^="/album"]')?.innerText;
-            let menuBtn = row.querySelector('[data-testid="more-button"]');
+            let albumName = isAlbum ? listTitle : row.querySelector<HTMLElement>('a[href*="/album"]')?.innerText;
+            let menuBtn = row.querySelector('[data-testid="more-button"], .main-trackList-rowMoreButton');
 
             if (albumName == null || menuBtn == null) continue;
 

@@ -16,7 +16,7 @@ constexpr char* TraversePointers(void* ptr)
     }
     return (char*)ptr;
 }
-std::string ToHex(char* data, int length)
+std::string ToHex(const uint8_t* data, int length)
 {
     std::string str(length * 2, '\0');
 
@@ -28,41 +28,60 @@ std::string ToHex(char* data, int length)
     return str;
 }
 
+struct PlayerState {
+    uint8_t unknown1[0x3E0];
+    uint8_t playback_id[16];
+
+    std::string getPlaybackId() const {
+        return ToHex(playback_id, 16);
+    }
+};
+struct PlayerDriver {
+    uint8_t unknown1[0x18C4];
+    PlayerState* state;
+};
+
 DETOUR_FUNC(__fastcall, int, DecodeAudioData, (
     void* ecx, void* edx, int param_2, void** param_3, void** param_4, int param_5
 ))
 {
-    //All streams are tracked using the playbackId field, which is not directly accessible from DecodeAudioData().
+    //This function is our main target. It takes a buffer containing an audio packet compressed in some particular
+    //format (naturally OGG + Vorbis, but could be AAC or MP3), and calls a virtual function that decodes it into
+    //a raw PCM sample buffer.
+    //
+    //Finding this function is somewhat difficult because it has no distinct search features. It's easier to find the
+    //main OGG parser function (look for "OggS", 4) and then search for this dispatcher in the call stack with x64dbg.
+    //
+    //Associating the data flowing through here with individual songs is the major challange. Soggfy does this by linking
+    //them via the PlaybackId field, which is an unique random 16-byte ID assigned to each playback by the Spotify client.
+    //This ID is easily accessible from every other player control function, but a bit tricker to get from here.
+    //
+    //
     //Assuming that `Player` is a struct containing the PlaybackId field, and `Decoder` is an object accessible by
-    //the caller function, the pointer path from `Decoder` to `Player` can be found using CheatEngine, if it exists:
-    //1. Find the player address by placing a breakpoint in the SeekTrack() function at `mov ecx, [esi+1740]` (copy esi value)
+    //the caller function, the pointer path from `Decoder` to `Player` can be found using CheatEngine, if one exists:
+    //
+    //1. Find the player address by placing a breakpoint in the SeekTrack() function at `mov ecx, [esi+18C4]` (copy esi value)
     //2. Find the decoder address by placing a breakpoint in the caller of DecodeAudioData(), just before `mov ecx, [ecx + 3C]`
     //3. Use the pointer scanner:
     //  1. Search for Addr: <player address>
     //  2. Base addr in specific range: <decoder addr> .. <decoder addr> + 1000
     //4. Restart Spotify and repeat 1 and 2, then use "Rescan Memory" to filter out dead paths
-    //5. Pick one of the results and see if it works with the goto address thing (x32dbg is better for this)
+    //5. Pick one of the results and see if it works with the "goto address" thing (x32dbg is better for this)
+    //     Note: First offset is the addr shown in the first column subtracted by the base decoder addr.
     //
-    //Caller assembly as of 1.1.97:
-    //    mov ecx,dword ptr ss:[ebp-3C]   ; ecx = [decoder instance] - we'll hack this
-    //    ...
-    //    mov ecx,dword ptr ds:[ecx+3C]   ; ecx = ecx->field_3C
-    //    mov dword ptr ss:[ebp-88],eax
-    //    mov eax,dword ptr ss:[ebp-6C]
-    //    mov dword ptr ss:[ebp-48],eax
-    //    lea eax,dword ptr ss:[ebp-70]
-    //    push eax
-    //    lea eax,dword ptr ss:[ebp-88]
-    //    mov dword ptr ss:[ebp-84],edi
-    //    push eax
-    //    lea eax,dword ptr ss:[ebp-60]
-    //    push eax
-    //    call spotify.9D1F96             ; DecodeAudioData(ecx, edx, <stack>)
+    //Caller assembly as of v1.2.25.1011:
+    //    mov ecx,dword ptr ss:[ebp-40]     ; ecx = [decoder ptr]   <-- we need this value
+    //    push eax                      
+    //    lea eax,dword ptr ss:[ebp-64] 
+    //    push eax                      
+    //    mov ecx,dword ptr ds:[ecx+3C]     ; ecx = ecx->field_3C
+    //    call spotify.6550D2               ; DecodeAudioData(ecx, edx, <stack>)
+    //
+    //After DecodeAudioData's prolog (push ebp; mov ebp, esp), [ebp] will contain the value of ebp in the caller function, thus:
+    //  Path found in CE: [[[[ecx+40]+128]+1E8]+150]
+    //  From this function: [[[[[[ebp]-40]+40]+128]+1E8]+150]
     void* _ebp;
     __asm { mov _ebp, ebp }
-    //caller [ebp-3C] is at `ebp-esp-3C = C0` (must be calculated in prolog before `mov ebp, esp`)
-    //path = [[[[ecx+40]+B8]+1E8]+150]+338
-    //     = [[[[[ebp+C0]+40]+B8]+1E8]+150]+338
 
     auto buf = (char*)param_4[0];
     int bufLen = (int)param_4[1];
@@ -72,11 +91,10 @@ DETOUR_FUNC(__fastcall, int, DecodeAudioData, (
     int bytesRead = bufLen - (int)param_4[1];
 
     if (bytesRead != 0) {
-        char* playerPtr = TraversePointers<0xC0, 0x40, 0xB8, 0x1E8, 0x150>(_ebp);
-        std::string playbackId = ToHex(playerPtr + 0x338, 16);
+        auto playerState = (PlayerState*)TraversePointers<0, -0x40, 0x40, 0x128, 0x1E8, 0x150>(_ebp);
+        std::string playbackId = playerState->getPlaybackId();
         _stateMgr->ReceiveAudioData(playbackId, buf, bytesRead);
     }
-    return ret;
 }
 
 DETOUR_FUNC(__fastcall, void*, CreateTrackPlayer, (
@@ -84,43 +102,41 @@ DETOUR_FUNC(__fastcall, void*, CreateTrackPlayer, (
     int param_4, int param_5, int param_6, int param_7, int param_8
 ))
 {
-    std::string playbackId = ToHex((char*)(param_2 + 8), 16);
+    std::string playbackId = ToHex((uint8_t*)(param_2 + 0x58), 16);
     LogTrace("CreateTrack {}", playbackId);
     _stateMgr->OnTrackCreated(playbackId, speed);
 
     return CreateTrackPlayer_Orig(ecx, edx, param_1, param_2, speed, param_4, param_5, param_6, param_7, param_8);
 }
 DETOUR_FUNC(__fastcall, int64_t, SeekTrack, (
-    void* ecx, void* edx, int64_t position
+    PlayerDriver* ecx, void* edx, int64_t position
 ))
 {
-    auto playerPtr = TraversePointers<0x1740>(ecx);
-    if (playerPtr) {
-        std::string playbackId = ToHex(playerPtr + 0x338, 16);
+    if (ecx->state) {
+        std::string playbackId = ecx->state->getPlaybackId();
         LogTrace("SeekTrack {}", playbackId);
         _stateMgr->DiscardTrack(playbackId, "Track was seeked");
     }
     return SeekTrack_Orig(ecx, edx, position);
 }
 DETOUR_FUNC(__fastcall, void, OpenTrack, (
-    void* ecx, void* edx, int param_1, char* param_2, int* param_3,
+    void* ecx, void* edx, int param_1, PlayerState* param_2, int* param_3,
     int64_t position, char param_5, int* param_6
 ))
 {
     if (position != 0) {
-        std::string playbackId = ToHex(param_2 + 0x338, 16);
+        std::string playbackId = param_2->getPlaybackId();
         LogTrace("OpenTrack {}", playbackId);
         _stateMgr->DiscardTrack(playbackId, "Track didn't play from start");
     }
     OpenTrack_Orig(ecx, edx, param_1, param_2, param_3, position, param_5, param_6);
 }
 DETOUR_FUNC(__fastcall, void, CloseTrack, (
-    void* ecx, void* edx, int param_1, void* param_2, char* reason, int param_4, char param_5
+    PlayerDriver* ecx, void* edx, int param_1, void* param_2, char* reason, int param_4, char param_5
 ))
 {
-    auto playerPtr = TraversePointers<0x1740>(ecx);
-    if (playerPtr) {
-        std::string playbackId = ToHex(playerPtr + 0x338, 16);
+    if (ecx->state) {
+        std::string playbackId = ecx->state->getPlaybackId();
         LogTrace("CloseTrack {}, reason={}", playbackId, reason);
 
         if (strcmp(reason, "trackdone") != 0) {
@@ -133,12 +149,12 @@ DETOUR_FUNC(__fastcall, void, CloseTrack, (
 
 void InstallHooks()
 {
-    //Signatures for Spotify v1.1.87+
-    CREATE_HOOK_PATTERN(DecodeAudioData,    "Spotify.exe", "55 8B EC 8B 11 56 8B 75 10 57 8B 7D 0C FF 75 14 8B 47 04 89 45 0C 8B 46 04 89 45 10 8D 45 10 50 FF 36 8D 45 0C 50 FF 37 FF 75 08 FF 52 04 8B 55 0C 8B CA 29 57 04 8B 45 08 C1 E1 02 01 0F 8B 4D 10 01 0E 29 4E 04 5F 5E 5D C2 10 00");
-    CREATE_HOOK_PATTERN(CreateTrackPlayer,  "Spotify.exe", "68 9C 00 00 00 B8 ?? ?? ?? ?? E8 ?? ?? ?? ?? 89 8D 60 FF FF FF 8B 45 18 33 DB 8B 7D 08 8B 75 0C F2 0F 10 45 10 89 85 6C FF FF FF 8B 45 1C 89 85 70 FF FF FF 8B 45 20 89 85 74 FF FF FF 8B 45 24 89 BD 68 FF FF FF 89 85 68 FF FF FF 8B 45 28 89 85 78 FF FF FF 8D 46 08 6A 10 50 8D 45 CC F2 0F 11 85 58 FF FF FF 50 89 9D 64 FF FF FF");
-    CREATE_HOOK_PATTERN(SeekTrack,          "Spotify.exe", "55 8B EC 83 EC 38 A1 ?? ?? ?? ?? 33 C5 89 45 FC 56 8B F1 8B 8E 40 17 00 00 85 C9 75 04 32 C0 EB 5D 8B 01 8D 55 EC 52 8B 80 8C 00 00 00 FF D0 6A 10 50 8D 45 C8 50");
-    CREATE_HOOK_PATTERN(OpenTrack,          "Spotify.exe", "68 ?? ?? 00 00 B8 ?? ?? ?? ?? E8 ?? ?? ?? ?? 8B F1 89 B5 ?? ?? FF FF 8B 45 ?? 33 FF 89 85 ?? ?? FF FF 8B 45 ?? 89 85 ?? ?? FF FF 8A 45 ?? 88 85 ?? ?? FF FF 89 BD ?? ?? FF FF 89 BD ?? ?? FF FF 8B 4D ?? 8D 55 ?? 21 7D ?? FF 86 ?? ?? 00 00 52 8B 01 8B 80 ?? ?? 00 00 FF D0 6A 10 50 8D 45 ?? 50 E8 ?? ?? ?? ?? 8D 45");
-    CREATE_HOOK_PATTERN(CloseTrack,         "Spotify.exe", "6A ?? B8 ?? ?? ?? ?? E8 ?? ?? ?? ?? 8B F9 83 AF ?? 1? 00 00 01 8A 45 ?? 8B 55 ?? 8B 5D ?? 8B 75 ?? 89 55 ?? 88 45 ?? 74 11 6A 01 8B CB E8 ?? ?? ?? ?? 6A 02 58 E9 ?? 0? 00 00 8B 8F ?? 1? 00 00 8D 55 ?? 52 8B 01 FF 90 ?? 00 00 00 6A 10 50 8D 45");
+    //Signatures for Spotify v1.2.25
+    CREATE_HOOK_PATTERN(DecodeAudioData,    "Spotify.exe", "55 8B EC 51 56 8B 75 0C 8D 55 0C 57 FF 75 14 8B 7D 10 8B 46 04 52 8D 55 FC 89 45 FC FF 37 8B 47 04 52 FF 36 89 45 0C 8B 01 FF 75 08 FF 50 04 8B 06 8B 4D FC 29 4E 04 8D 14 88 8B 45 08 89 16 8B 17 8B 4F 04 03 55 0C 2B 4D 0C 89 17 89 4F 04 5F 5E C9 C2 10 00");
+    CREATE_HOOK_PATTERN(CreateTrackPlayer,  "Spotify.exe", "6A 70 B8 ?? ?? ?? ?? E8 ?? ?? ?? ?? 89 4D A0 8B 45 08 8B 4D 0C F2 0F 10 45 10 8B 5D 20 8B 7D 24 8B 75 28 89 45 98 89 45 90 8B 45 18 89 45 98 8B 45 1C 89 45 94 8D 41 58 6A 10 50 8D 45 CC 89 4D 9C 50 F2 0F 11 45 88 E8 ?? ?? ?? ?? 8D 45 CC 50 68 ?? ?? ?? ??");
+    CREATE_HOOK_PATTERN(SeekTrack,          "Spotify.exe", "68 A0 00 00 00 B8 ?? ?? ?? ?? E8 ?? ?? ?? ?? 8B F1 8B 8E C4 18 00 00 85 C9 75 07 32 C0 E9 A0 01 00 00 8B 01 8D 55 C0 52 8B 80 8C 00 00 00 FF D0 6A 10 50 8D 45 9C 50 E8 ?? ?? ?? ?? 8D 45 9C 50 FF 75 0C FF 75 08 68 ?? ?? ?? ??");
+    CREATE_HOOK_PATTERN(OpenTrack,          "Spotify.exe", "68 FC 02 00 00 B8 ?? ?? ?? ?? E8 ?? ?? ?? ?? 8B F1 89 B5 14 FE FF FF 8B 45 10 8B 7D 08 83 A5 08 FE FF FF 00 89 85 00 FE FF FF 8A 45 1C 89 BD FC FD FF FF 88 85 07 FE FF FF 8B 4D 0C 8D 55 DC 83 65 FC 00 FF 86 48 19 00 00 52 8B 01 8B 80 8C 00 00 00 FF D0 6A 10 50 8D 45 B8 50 E8 ?? ?? ?? ?? 8D 45 B8 50 68 ?? ?? ?? ??");
+    CREATE_HOOK_PATTERN(CloseTrack,         "Spotify.exe", "68 D8 00 00 00 B8 ?? ?? ?? ?? E8 ?? ?? ?? ?? 8B D9 83 AB 48 19 00 00 01 8B 45 0C 8B 75 08 8B 7D 10 89 85 64 FF FF FF 8B 45 14 89 85 78 FF FF FF 8A 45 18 89 B5 60 FF FF FF 89 BD 68 FF FF FF 88 45 83 74 27 6A 01 8D 8D 5C FF FF FF E8 3B E4 FF FF 8B 8D 5C FF FF FF 8B 95 60 FF FF FF 89 0E 89 56 04 C6 46 08 00 E9 ?? ?? ?? ?? 8B 8B C4 18 00 00");
     
     auto urlreqHook = CefUtils::InitUrlBlocker([&](auto url) { return _stateMgr && _stateMgr->IsUrlBlocked(url); });
     Hooks::CreateApi(L"libcef.dll", "cef_urlrequest_create", urlreqHook.first, urlreqHook.second);
@@ -244,8 +260,6 @@ DWORD WINAPI Init(LPVOID param)
     return 0;
 }
 
-#if _WINDLL
-
 BOOL APIENTRY DllMain(HMODULE hModule,
                       DWORD  ul_reason_for_call,
                       LPVOID lpReserved
@@ -257,23 +271,3 @@ BOOL APIENTRY DllMain(HMODULE hModule,
     }
     return TRUE;
 }
-#else
-
-#include "ControlServer.h"
-
-#include "Utils/Utils.h"
-
-int main()
-{
-    LogMinLevel = LOG_TRACE;
-    ControlServer sv([](auto con, auto&& msg) {
-        LogInfo("Received message {}: {} (+{} bytes)", (int)msg.Type, msg.Content.dump(), msg.BinaryContent.size());
-    });
-    std::thread(&ControlServer::Run, &sv).detach();
-
-    LogInfo("Press any key to exit");
-    std::cin.get();
-    sv.Stop();
-    return 0;
-}
-#endif

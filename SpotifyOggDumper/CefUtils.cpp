@@ -163,20 +163,19 @@ _CefContext* FindCefContext()
     //55                       | push ebp                       
     //89E5                     | mov ebp,esp                    
     //56                       | push esi                       
-    //8B35 DCF13617            | mov esi,dword ptr ds:[1736F1DC]    //operand offset: 6
+    //8B35 0C792073            | mov esi,dword ptr ds:[7320790C]    ; at +6 bytes
     //85F6                     | test esi,esi                   
-    //74 44                    | je libcef.11D9BBA2             
+    //74 0B                    | je libcef.69175F79             
     //803E 00                  | cmp byte ptr ds:[esi],0        
-    //74 3F                    | je libcef.11D9BBA2             
+    //74 06                    | je libcef.69175F79             
     //807E 01 00               | cmp byte ptr ds:[esi+1],0      
-    //75 39                    | jne libcef.11D9BBA2            
-    //E8 82F0FFFF              | call libcef.11D9ABF0       
-    Hooks::DataPattern pattern("55 89 E5 56 8B 35 ?? ?? ?? ?? 85 F6 74 44 80 3E 00 74 3F 80 7E 01 00 75 39 E8");
-    
+    //74 03                    | je libcef.69175F7C             
+    Hooks::DataPattern pattern("55 89 E5 56 8B 35 ?? ?? ?? ?? 85 F6 74 ?? 80 3E 00 74 ?? 80 7E 01 00 7?");
+
     const uint8_t* codeBase;
     size_t codeLength;
     Hooks::GetModuleCode("libcef.dll", &codeBase, &codeLength);
-    
+
     int32_t offset = pattern.FindNext(codeBase, codeLength);
     if (offset < 0) {
         LogError("Could not find cef_shutdown()");

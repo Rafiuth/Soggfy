@@ -200,7 +200,7 @@ export default class Components {
         }
         node.style.setProperty("--anim-delay", fadeDelay + "s");
         //getBoundingClientRect() won't work before adding to dom
-        anchor.parentElement.appendChild(node);
+        document.body.appendChild(node);
         node.onanimationend = () => node.remove();
 
         let rect = node.getBoundingClientRect();

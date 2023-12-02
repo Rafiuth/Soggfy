@@ -1,5 +1,13 @@
 async function getPlatform(): Promise<any> {
     function tryGet() {
+        //Utils.findPath(document.querySelector("#main"), new Set(["getPlayerAPI"]), [], new Set()).join('?.')
+
+        let mainDiv = document.querySelector("#main");
+        if (!mainDiv) return null;
+
+        let platform = mainDiv[Object.keys(mainDiv).find(k => k.startsWith("__reactContainer$"))]
+            ?.child?.child?.child?.child?.child?.child?.child?.child?.child?.child?.stateNode?.props?.children?.props?.children?.props?.platform;
+        /*
         let reactRoot = (document.querySelector("#main") as any)?._reactRootContainer?._internalRoot;
         if (!reactRoot) return null;
 
@@ -9,6 +17,7 @@ async function getPlatform(): Promise<any> {
 
         //1.1.7x+
         platform ??= reactRoot.current?.child?.child?.stateNode?.props?.children?.props?.children?.props?.children?.props?.platform;
+        */
 
         if (!platform) throw Error("Can't find Spotify platform object");
 

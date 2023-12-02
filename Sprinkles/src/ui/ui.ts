@@ -35,7 +35,7 @@ export default class UI {
     }
 
     private addTopbarButtons() {
-        let fwdButton = document.querySelector("[data-testid='top-bar-forward-button']");
+        let fwdButton = document.querySelector("[data-testid='top-bar-forward-button'], .main-topBar-forward");
         let topbarContainer = fwdButton.parentElement;
         let buttonClass = fwdButton.classList[0];
 
@@ -206,12 +206,13 @@ export default class UI {
             ),
             UIC.section("Misc",
                 UIC.row("Block telemetry",      UIC.toggle("blockAds", onChange)),
+                UIC.row("Move 'Add to Queue' to top", UIC.toggle("liftAddToQueueMenuItem", onChange)),
             )
         );
     }
 
     public showNotification(icon: string, text: string) {
-        let anchor = document.querySelector(".Root__now-playing-bar");
+        let anchor = document.querySelector("[data-testid='now-playing-bar']");
 
         let node = UIC.parse(`
 <div class="sgf-notification-wrapper">
@@ -224,7 +225,8 @@ export default class UI {
     private onContextMenuOpened(menuList: Element) {
         const HookDescs = [
             (contextUri, trackUris) => ({
-                text: "Export M3U",
+                text: "Generate M3U",
+                icon: Icons.SaveAs,
                 onClick: () => this.createM3U(contextUri, trackUris)
             }),
             (contextUri, trackUris) => {
@@ -233,6 +235,7 @@ export default class UI {
                 
                 return {
                     text: `${ignored ? "Unignore" : "Ignore"} ${uris[0].split(':')[1]}${uris.length > 1 ? "s" : ""}`,
+                    icon: Icons.Block,
                     onClick: () => {
                         for (let uri of uris) {
                             ignored ? delete config.ignorelist[uri] : config.ignorelist[uri] = 1;
@@ -252,31 +255,39 @@ export default class UI {
             }
         ];
 
-        for (let menuItem of menuList.children) {
-            let props = Utils.getReactProps(menuList, menuItem);
-            let isTarget = props && (
-                (props.contextUri && (props.highlightedUri || props.uris)) ||   //Track: Show credits
-                (props.uri && props.hasOwnProperty("onRemoveCallback")) ||      //Album: Add/remove to library
-                (props.uri && props.description != null)                        //Playlist: Go to playlist radio
-            );
-            if (isTarget) {
-                let contextUri = props.contextUri ?? props.uri;
-                let trackUris = props.highlightedUri ? [props.highlightedUri] : props.uris;
+        let menuItem = menuList.querySelector("li:has(path[d*='M16 15H2v'])"); // "Add to Queue" button
+        
+        if (!menuItem) return;
 
-                for (let descFactory of HookDescs) {
-                    let desc = descFactory(contextUri, trackUris);
-                    let item = menuList.querySelector("li button:not([aria-disabled='true']) span").parentElement.parentElement.cloneNode(true) as HTMLLIElement;
-                    item.querySelector("span").innerText = desc.text;
-                    item.querySelector("button").classList.remove("QgtQw2NJz7giDZxap2BB"); //separator class
-                    item.querySelector("button").onclick = () => {
-                        desc.onClick();
-                        menuList.parentElement.parentElement["_tippy"]?.props?.onClickOutside();
-                    };
-                    menuItem.insertAdjacentElement("beforebegin", item);
-                }
-                menuList["_sgf_handled"] = true; //add mark to prevent this method from being fired multiple times
-                break;
-            }
+        menuList["_sgf_handled"] = true; //add flag to prevent infinite loop
+        
+        //Move "Add to Queue" to top.
+        if (config["liftAddToQueueMenuItem"]) {
+            menuList.insertBefore(menuItem, menuList.firstChild);
+        }
+        
+        //Add new entries
+        let props = Utils.getReactProps(menuList.parentElement, menuList);
+        let contextUri = props.contextUri ?? props.uri ?? props.reference.uri;
+        let trackUris = props.contextUri && props.uri ? [props.uri] : props.uris;
+
+        for (let descFactory of HookDescs.reverse()) {
+            let desc = descFactory(contextUri, trackUris);
+            let item = menuItem.cloneNode(true) as HTMLLIElement;
+            item.querySelector("span").innerText = desc.text;
+            item.querySelector("button").classList?.remove("QgtQw2NJz7giDZxap2BB"); //separator class
+            item.querySelector("button").onclick = () => {
+                desc.onClick();
+                menuList.parentElement.parentElement["_tippy"]?.props?.onClickOutside();
+            };
+
+            //Replace icon
+            let icon = item.querySelector("svg");
+            let newIcon = UIC.parse(desc.icon) as SVGSVGElement;
+            icon.innerHTML = newIcon.innerHTML;
+            icon.setAttribute("viewBox", newIcon.getAttribute("viewBox"));
+
+            menuItem.insertAdjacentElement("afterend", item);
         }
     }
 

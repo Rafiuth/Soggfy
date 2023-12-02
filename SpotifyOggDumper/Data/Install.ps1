@@ -1,7 +1,6 @@
 $base = $PWD.Path
-$SpotifyInstallerUrl = "https://upgrade.scdn.co/upgrade/client/win32-x86/spotify_installer-1.1.97.962.g24733a46-543.exe"
+$SpotifyInstallerUrl = "https://upgrade.scdn.co/upgrade/client/win32-x86/spotify_installer-1.2.25.1011.g0348b2ea-701.exe"
 $SpotifyVersion = $SpotifyInstallerUrl -replace '.+installer-(.+)\.g.+', '$1'
-$BtsUrl = "https://github.com/mrpond/BlockTheSpot/releases/download/2022.9.16.55/chrome_elf.zip"
 
 Set-Location -Path "$base\"
 
@@ -19,15 +18,24 @@ function InstallSpotify {
     $spotifyFolder = Get-ChildItem -Filter ".\spotify-update-*"
     Rename-Item -Path $spotifyFolder.FullName -NewName "$base\Spotify"
 
-    if ((Read-Host -Prompt "Do you want to install BlockTheSpot to block ads? Y/N") -eq "y") {
-        DownloadFile -Url $BtsUrl -DestPath "$base\bts_patch.zip"
-	
-        Rename-Item -Path "$base\Spotify\chrome_elf.dll" -NewName "$base\Spotify\chrome_elf_bak.dll"
-        Expand-Archive -Path "$base\bts_patch.zip" -DestinationPath "$base\Spotify\" -Force
-        Remove-Item "$base\bts_patch.zip"
+    if ((Read-Host -Prompt "Do you want to install SpotX to block ads and enable extra client features? Y/N") -eq "y") {
+        InstallSpotX
     }
     Remove-Item -Path "$base\Spotify\crash_reporter.cfg"
 }
+function InstallSpotX {
+    $baseUrl = "https://raw.githubusercontent.com/SpotX-Official/SpotX/5f85bf124a1f459b4016d775e4219b8ebdf135fa"
+    $src = (Invoke-WebRequest "$baseUrl/run.ps1" -UseBasicParsing).Content
+
+    # Patch the script so it runs on our install dir, and at a fixed commit so that it hopefully won't break easily
+    $src = $src.Replace('Join-Path $env:APPDATA ''Spotify', "Join-Path '$base\Spotify' '");
+    $src = $src.Replace('https://spotx-official.github.io/SpotX', $baseUrl);
+    $src = $src.Replace('[System.Text.Encoding]::UTF8.GetString($response)', '$response');
+
+    # Set-Content -Path "spotx_patched.ps1" -Value $src
+    Invoke-Expression "&{ $src } -new_theme -block_update_on"
+}
+
 function InstallFFmpeg {
     if ([Environment]::Is64BitOperatingSystem) {
         $repoUrl = "https://api.github.com/repos/BtbN/FFmpeg-Builds/releases/latest"

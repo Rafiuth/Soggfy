@@ -12,7 +12,7 @@ class Resources {
             url: `https://spclient.wg.spotify.com/color-lyrics/v2/track/${this.getUriId(trackUri)}/image/${encodeURIComponent(coverUri)}`,
             params: {
                 format: "json",
-                vocalRemoval: true
+                vocalRemoval: false
             }
         });
     }

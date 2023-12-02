@@ -82,6 +82,9 @@ export default class Utils {
         //Walk down the path to find the react state props
         let state = parent[keyof_ReactProps];
         for (let i = path.length - 1; i >= 0 && state != null; i--) {
+            if (state.children.type == symof_ReactFragment) {
+                state = state.children.props;
+            }
             //Find the target child state index
             let childStateIndex = 0, childElemIndex = 0;
             while (childStateIndex < state.children.length) {

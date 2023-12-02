@@ -295,7 +295,8 @@ struct StateManagerImpl : public StateManager
             //https://github.com/abba23/spotify-adblock/blob/main/config.toml#L73
             return url.starts_with(L"https://spclient.wg.spotify.com/ads/") ||
                    url.starts_with(L"https://spclient.wg.spotify.com/ad-logic/") ||
-                   url.starts_with(L"https://spclient.wg.spotify.com/gabo-receiver-service/");
+                   url.starts_with(L"https://spclient.wg.spotify.com/gabo-receiver-service/") ||
+                   url.starts_with(L"https://spclient.wg.spotify.com/dodo-receiver-service/");
         }
         return false;
     }
@@ -513,8 +514,9 @@ struct StateManagerImpl : public StateManager
         std::wstring envPath;
         DWORD envPathLen = SearchPath(NULL, L"ffmpeg.exe", NULL, 0, envPath.data(), NULL);
         if (envPathLen != 0) {
-            envPath.resize(envPathLen - 1);
-            SearchPath(NULL, L"ffmpeg.exe", NULL, envPath.capacity(), envPath.data(), NULL);
+            envPath.reserve(envPathLen);
+            envPath.resize(envPathLen - 1); //remove null terminator
+            SearchPath(NULL, L"ffmpeg.exe", NULL, envPathLen, envPath.data(), NULL);
 
             return fs::path(envPath);
         }

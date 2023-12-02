@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 16
-VisualStudioVersion = 16.0.31515.178
+# Visual Studio Version 17
+VisualStudioVersion = 17.8.34309.116
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "SpotifyOggDumper", "SpotifyOggDumper\SpotifyOggDumper.vcxproj", "{90E473EF-B87A-4CD1-9C9C-34F50FE9CE25}"
 EndProject
@@ -10,20 +10,15 @@ EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x86 = Debug|x86
-		DebugCon|x86 = DebugCon|x86
 		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{90E473EF-B87A-4CD1-9C9C-34F50FE9CE25}.Debug|x86.ActiveCfg = Debug|Win32
 		{90E473EF-B87A-4CD1-9C9C-34F50FE9CE25}.Debug|x86.Build.0 = Debug|Win32
-		{90E473EF-B87A-4CD1-9C9C-34F50FE9CE25}.DebugCon|x86.ActiveCfg = DebugCon|Win32
-		{90E473EF-B87A-4CD1-9C9C-34F50FE9CE25}.DebugCon|x86.Build.0 = DebugCon|Win32
 		{90E473EF-B87A-4CD1-9C9C-34F50FE9CE25}.Release|x86.ActiveCfg = Release|Win32
 		{90E473EF-B87A-4CD1-9C9C-34F50FE9CE25}.Release|x86.Build.0 = Release|Win32
 		{7C9A3D73-7031-4BD3-85A8-892B623B456B}.Debug|x86.ActiveCfg = Debug|Win32
 		{7C9A3D73-7031-4BD3-85A8-892B623B456B}.Debug|x86.Build.0 = Debug|Win32
-		{7C9A3D73-7031-4BD3-85A8-892B623B456B}.DebugCon|x86.ActiveCfg = DebugCon|Win32
-		{7C9A3D73-7031-4BD3-85A8-892B623B456B}.DebugCon|x86.Build.0 = DebugCon|Win32
 		{7C9A3D73-7031-4BD3-85A8-892B623B456B}.Release|x86.ActiveCfg = Release|Win32
 		{7C9A3D73-7031-4BD3-85A8-892B623B456B}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
