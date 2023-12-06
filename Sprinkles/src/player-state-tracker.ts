@@ -12,12 +12,19 @@ export default class PlayerStateTracker {
     constructor(conn: Connection) {
         this.conn = conn;
 
+        let lastPlaybackId = null as string;
         Player.getEvents().addListener("update", ({ data }) => {
             if (!data.playbackId) return;
             
             if (!this.playbacks.has(data.playbackId)) {
                 conn.send(MessageType.DOWNLOAD_STATUS, { playbackId: data.playbackId, ignore: isTrackIgnored(data.item) });
+                conn.send(MessageType.PLAYER_STATE, { event: "trackstart", playbackId: data.playbackId });
             }
+            if (data.playbackId !== lastPlaybackId && lastPlaybackId != null) {
+                conn.send(MessageType.PLAYER_STATE, { event: "trackend", playbackId: lastPlaybackId });
+            }
+            lastPlaybackId = data.playbackId;
+
             this.playbacks.set(data.playbackId, data);
         });
 
@@ -45,6 +52,14 @@ export default class PlayerStateTracker {
     /** Returns complete metadata for a given playback id. */
     async getMetadata(playbackId: string) {
         let playback = this.playbacks.get(playbackId);
+
+        // Server may request metadata for a playback before we even know
+        // about it when playspeed is too high. Keep retrying for up to 10 secs.
+        for (let i = 0; playback == null && i < 10; i++) {
+            await new Promise(r => setTimeout(r, 1000));
+            playback = this.playbacks.get(playbackId);
+        }
+
         let track = playback.item;
         let type = Resources.getUriType(track.uri);
 

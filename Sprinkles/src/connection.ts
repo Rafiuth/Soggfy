@@ -34,6 +34,12 @@ export const enum MessageType {
      */
     WRITE_FILE = 6,
 
+    /**
+     * [C->S] To notify server of player state changes.
+     * Format: { event: "trackstart" | "trackend", playbackId: string }
+     */
+    PLAYER_STATE = 7,  //C -> S
+
     READY = -1, //Internal
     CLOSED = -2, //Internal
 }

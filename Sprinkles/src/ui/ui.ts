@@ -103,16 +103,6 @@ export default class UI {
         //TODO: refactor (+ react port?)
         let onChange = this.updateConfig.bind(this);
 
-        let speedSlider = UIC.slider(
-            "playbackSpeed",
-            { min: 1, max: 20, step: 1, formatter: val => val + "x" },
-            (key, newValue) => {
-                if (newValue) {
-                    SpotifyUtils.resetCurrentTrack(false);
-                }
-                return onChange(key, newValue);
-            }
-        );
         let defaultFormats = {
             "Original OGG":     { ext: "",    args: "-c copy" },
             "MP3 320K":         { ext: "mp3", args: "-c:a libmp3lame -b:a 320k -id3v2_version 3 -c:v copy" },
@@ -181,7 +171,7 @@ export default class UI {
 
         return UIC.createSettingOverlay(
             UIC.section("General",
-                UIC.row("Playback speed",           speedSlider),
+                UIC.row("Playback speed",           UIC.slider("playbackSpeed", { min: 1, max: 50, step: 1, formatter: val => val + "x" }, onChange)),
                 UIC.row("Output format",            UIC.select("outputFormat", Object.getOwnPropertyNames(defaultFormats), onFormatChange)),
                 customFormatSection,
                 UIC.row("Skip downloaded tracks",   UIC.toggle("skipDownloadedTracks", onChange)),

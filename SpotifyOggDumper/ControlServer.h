@@ -15,7 +15,8 @@ enum class MessageType
     DOWNLOAD_STATUS     = 3,  //C <> S
     OPEN_FOLDER         = 4,  //C -> S
     OPEN_FILE_PICKER    = 5,  //C <> S
-    WRITE_FILE          = 6,  //c -> S
+    WRITE_FILE          = 6,  //C -> S
+    PLAYER_STATE        = 7,  //C -> S
 
     //Internal
     HELLO               = -1,   //Client connected

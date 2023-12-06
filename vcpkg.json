@@ -10,6 +10,7 @@
       "default-features": false,
       "features": [ "network" ]
     },
-    "uwebsockets"
+    "uwebsockets",
+    "libogg"
   ]
 }
