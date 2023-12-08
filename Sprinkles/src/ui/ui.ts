@@ -104,14 +104,16 @@ export default class UI {
         let onChange = this.updateConfig.bind(this);
 
         let defaultFormats = {
-            "Original OGG":     { ext: "",    args: "-c copy" },
-            "MP3 320K":         { ext: "mp3", args: "-c:a libmp3lame -b:a 320k -id3v2_version 3 -c:v copy" },
-            "MP3 256K":         { ext: "mp3", args: "-c:a libmp3lame -b:a 256k -id3v2_version 3 -c:v copy" },
-            "MP3 192K":         { ext: "mp3", args: "-c:a libmp3lame -b:a 192k -id3v2_version 3 -c:v copy" },
-            "M4A 256K (AAC)":   { ext: "m4a", args: "-c:a aac -b:a 256k -disposition:v attached_pic -c:v copy" }, //TODO: aac quality disclaimer / libfdk
-            "M4A 192K (AAC)":   { ext: "m4a", args: "-c:a aac -b:a 192k -disposition:v attached_pic -c:v copy" },
-            "Opus 160K":        { ext: "opus",args: "-c:a libopus -b:a 160k" },
-            "Custom":           { ext: "mp3", args: "-c:a libmp3lame -b:a 320k -id3v2_version 3 -c:v copy" },
+            "Original OGG":         { ext: "",    args: "-c copy" },
+            "MP3 320K":             { ext: "mp3", args: "-c:a libmp3lame -b:a 320k -id3v2_version 3 -c:v copy" },
+            "MP3 256K":             { ext: "mp3", args: "-c:a libmp3lame -b:a 256k -id3v2_version 3 -c:v copy" },
+            "MP3 192K":             { ext: "mp3", args: "-c:a libmp3lame -b:a 192k -id3v2_version 3 -c:v copy" },
+            // https://trac.ffmpeg.org/wiki/Encode/AAC
+            "M4A 256K (FDK AAC)":   { ext: "m4a", args: "-c:a libfdk_aac -b:a 256k -cutoff 20k -disposition:v attached_pic -c:v copy" },
+            "M4A 224K VBR (FDK AAC)":{ext: "m4a", args: "-c:a libfdk_aac -vbr 5 -disposition:v attached_pic -c:v copy" },
+            "M4A 160K (FDK AAC)":   { ext: "m4a", args: "-c:a libfdk_aac -b:a 160k -cutoff 18k -disposition:v attached_pic -c:v copy" },
+            "Opus 160K":            { ext: "opus",args: "-c:a libopus -b:a 160k" },
+            "Custom":               { ext: "mp3", args: "-c:a libmp3lame -b:a 320k -id3v2_version 3 -c:v copy" },
         };
         let extensions = {
             "MP3": "mp3", "M4A": "m4a", "MP4": "mp4",
@@ -202,7 +204,7 @@ export default class UI {
     }
 
     public showNotification(icon: string, text: string) {
-        let anchor = document.querySelector("[data-testid='now-playing-bar']");
+        let anchor = document.querySelector(".Root__now-playing-bar, [data-testid='now-playing-bar']");
 
         let node = UIC.parse(`
 <div class="sgf-notification-wrapper">

@@ -6,14 +6,6 @@
 
 #include <type_traits>
 
-//Compat stuff (these got removed in C++20)
-namespace std
-{
-    template <class> struct result_of;
-    template <class F, class... ArgTypes>
-    struct result_of<F(ArgTypes...)> : std::invoke_result<void, F, ArgTypes...> {};
-}
-
 //hack to prevent linking to cef library
 #ifndef NDEBUG
 #define NDEBUG
@@ -41,9 +33,7 @@ namespace std
 
 //Because of the API incompat: trying to free CefString returned by an API will result in a crash.
 //This workaround will obviously leak memory, but it's small and rare enough that it isn't a big deal.
-#define CEF_STRING_ABANDON(str) \
-    str.clear();                \
-    *(bool*)((void**)&str + 2) = false;      //url.owner_ = false
+#define CEF_STRING_ABANDON(str)     url.Detach()
 
 struct _CefBrowserInfo;
 typedef void* _CefLock;  //ABI: pthreads=size_t(4/8) vs msvc=CRITICAL_SECTION(24/40)
@@ -199,21 +189,16 @@ namespace CefUtils
         }
     }
 
-    typedef cef_urlrequest_t* (*cef_urlrequest_create_proc)(
+    std::function<bool(std::wstring_view)> _isUrlBlocked;
+
+    DETOUR_FUNC(__cdecl, cef_urlrequest_t*, UrlRequestCreate, (
         _cef_request_t* request,
         _cef_urlrequest_client_t* client,
         _cef_request_context_t* request_context
-    );
-    cef_urlrequest_create_proc UrlRequestCreate_Orig;
-    std::function<bool(std::wstring_view)> _isUrlBlocked;
-
-    cef_urlrequest_t* UrlRequestCreate_Detour(
-        _cef_request_t* request,
-        _cef_urlrequest_client_t* client,
-        _cef_request_context_t* request_context)
+    ))
     {
         auto url = request->get_url(request);
-        auto urlsv = std::wstring_view(url->str, url->length);
+        auto urlsv = std::wstring_view((wchar_t*)url->str, url->length);
         bool blocked = _isUrlBlocked(urlsv);
 
         if (LogMinLevel <= LOG_TRACE) {
@@ -222,12 +207,10 @@ namespace CefUtils
         cef_string_userfree_free(url);
         return blocked ? nullptr : UrlRequestCreate_Orig(request, client, request_context);
     }
-    std::pair<OpaqueFn, OpaqueFn*> InitUrlBlocker(std::function<bool(std::wstring_view)> isUrlBlocked)
+
+    void InitUrlBlocker(std::function<bool(std::wstring_view)> isUrlBlocked)
     {
         _isUrlBlocked = isUrlBlocked;
-        return std::make_pair(
-            (OpaqueFn)&UrlRequestCreate_Detour,
-            (OpaqueFn*)&UrlRequestCreate_Orig
-        );
+        Hooks::CreateApi(L"libcef.dll", "cef_urlrequest_create", &UrlRequestCreate_Detour, (Hooks::FuncAddr*)&UrlRequestCreate_Orig);
     }
 }

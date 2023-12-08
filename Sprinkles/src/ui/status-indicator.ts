@@ -3,6 +3,7 @@ import { Connection, MessageType } from "../connection";
 import { Icons, Selectors } from "./ui-assets";
 import Utils from "../utils";
 import { TemplatedSearchTree } from "../path-template";
+import { Player } from "../spotify-apis";
 
 export const enum DownloadStatus {
     Error       = "ERROR",
@@ -99,14 +100,24 @@ ${StatusIcons[info.status]}`;
 
     private async sendUpdateRequest(dirtyRows: HTMLDivElement[]) {
         let tree = new TemplatedSearchTree(config.savePaths.track);
+        let currentPlayingTrackUri = Player.getState().item?.uri;
+        let requestStatusForCurrentPlayback = false;
 
         for (let trackInfo of this.getTrackInfoFromRows(dirtyRows)) {
             tree.add(trackInfo.uri, trackInfo.vars);
+
+            if (trackInfo.uri === currentPlayingTrackUri) {
+                requestStatusForCurrentPlayback = true;
+            }
         }
         this.conn.send(MessageType.DOWNLOAD_STATUS, {
             searchTree: tree.root,
             basePath: config.savePaths.basePath
         });
+
+        if (requestStatusForCurrentPlayback) {
+            this.conn.send(MessageType.DOWNLOAD_STATUS, { playbackId: Player.getState().playbackId });
+        }
     }
 
     private * getTrackInfoFromRows(rows?: Iterable<Element>) {

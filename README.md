@@ -16,32 +16,34 @@ A music downloader mod for the Windows Spotify client
 # Installation and Usage
 1. Download and extract the `.zip` package of the [latest release](https://github.com/Rafiuth/Soggfy/releases/latest).
 2. Double click the `Install.cmd` file. It will run the Install.ps1 script with Execution Policy Bypass. Wait for it to finish.
-3. Run `Injector.exe`, and wait for Spotify to open.
-4. Play the songs you want to download.
+3. Open Spotify and play the songs you want to download.
 
-Tracks are saved on the Music folder by default, this can be changed on the settings pane, which can be accessed through the controls button shown after hovering the download toggle button in the navigation bar.  
+Tracks are saved in the Music folder by default. The settings panel can be accessed by hovering next to the download button in the navigation bar.  
 Hovering the check mark drawn on each individual track will display a popup offering to open the folder containing them.
 
 You may need to disable or whitelist Soggfy in your anti-virus for it to work.
 
-If the injector crashes because of missing DLLs, you need to install the [MSVC Redistributable package](https://aka.ms/vs/17/release/vc_redist.x86.exe).
+If the Spotify client crashes because of missing DLLs, you may need to install the [MSVC Redistributable package](https://aka.ms/vs/17/release/vc_redist.x86.exe).
 
 # Notes
 - Songs are only downloaded if played from start to finish, without seeking (pausing is fine).
 - Quality depends on the account being used: _160Kb/s_ or _320Kb/s_ for _free_ and _premium_ plans respectively. You may also need to change the streaming quality to "Very high" on Spotify settings to get _320Kb/s_ files.
-- If you are _converting_ to AAC and care about quality, see [High quality AAC](/USAGE.md#high-quality-aac).
-- **This tool breaks [Spotify's Guidelines](https://www.spotify.com/us/legal/user-guidelines/) and using it could get your account banned. Consider using alt accounts or keeping backups (see [Exportify](https://github.com/watsonbox/exportify) and [SpotMyBackup](http://www.spotmybackup.com)).**
+- Podcast support is very hit or miss and will only work with audio-only OGG podcasts (usually the exclusive ones).
+- **This mod breaks [Spotify's Guidelines](https://www.spotify.com/us/legal/user-guidelines/) and using it could get your account banned. Consider using alt accounts or keeping backups (see [Exportify](https://github.com/watsonbox/exportify) and [SpotMyBackup](http://www.spotmybackup.com)).**
 
 # How it works
-Soggfy works by intercepting Spotify's OGG parser and capturing the unencr​ypted data during playback. This process is similar to recording, but it results in an exact copy of the original file served by Spotify, without ever extracting k​eys or actually re-downloading it.  
+Soggfy works by intercepting Spotify's OGG parser and capturing the unencrypted data during playback. This process is similar to recording, but it results in an exact copy of the original files served by Spotify, without ever extracting keys or actually re-downloading them.  
 Conversion and metadata is then applied according to user settings.
 
-# Manual Install
+# Manual Installation
 If you are having issues with the install script, try following the steps below for a manual installation:
-1. Download and install the _correct_ Spotify client version using the link inside the install script.
-2. Go to `%appdata%` and copy the `Spotify` folder to the `Soggfy` folder (such that the final structure looks like `Soggfy/Spotify/Spotify.exe`).  
-_Note that you can also install other mods such as Spicetify or SpotX before this step._
-3. [Download and install FFmpeg](/USAGE.md#high-quality-aac).
+
+1. Download and install the _correct_ Spotify client version using the link inside the Install.ps1 script.
+2. Copy and rename `SpotifyOggDumper.dll` to `%appdata%/Spotify/dpapi.dll`
+3. Copy `SoggfyUIC.js` to `%appdata%/Spotify/SoggfyUIC.js`
+4. Download and extract [FFmpeg binaries](https://github.com/AnimMouse/ffmpeg-autobuild/releases) to `%localappdata%/Soggfy/ffmpeg/ffmpeg.exe` (or add them to `%PATH%`).
+
+Alternatively, Soggfy can be injected into a running Spotify process by running `Injector.exe`.
 
 # Credits
 - [XSpotify](https://web.archive.org/web/20200303145624/https://github.com/meik97/XSpotify) and spotifykeydumper - Inspiration for this project

@@ -7,7 +7,6 @@ namespace CefUtils
 {
     void InjectJS(const std::string& code);
 
-    typedef void* OpaqueFn;
-    //Initializes the URL blocker and returns a pair of <Detour, OrigFunc> for cef_urlrequest_create() hook.
-    std::pair<OpaqueFn, OpaqueFn*> InitUrlBlocker(std::function<bool(std::wstring_view)> isUrlBlocked);
+    //Initializes the URL blocker hook.
+    void InitUrlBlocker(std::function<bool(std::wstring_view)> isUrlBlocked);
 }

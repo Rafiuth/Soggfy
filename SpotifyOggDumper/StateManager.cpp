@@ -33,19 +33,18 @@ struct StateManagerImpl : public StateManager
 
     json _config;
 
-    fs::path _dataDir;
-    fs::path _configPath;
+    fs::path _dataDir, _uicScriptPath;
     fs::path _ffmpegPath;
 
     ControlServer _ctrlSv;
 
-    StateManagerImpl(const fs::path& dataDir) :
-        _dataDir(dataDir),
+    StateManagerImpl(const fs::path& dataDir, const fs::path& moduleDir) :
         _ctrlSv(std::bind(&StateManagerImpl::HandleMessage, this, std::placeholders::_1, std::placeholders::_2))
     {
-        _configPath = _dataDir / "config.json";
+        _dataDir = dataDir;
+        _uicScriptPath = moduleDir / "SoggfyUIC.js";
 
-        std::ifstream configFile(_configPath);
+        std::ifstream configFile(_dataDir / "config.json");
         if (configFile.good()) {
             _config = json::parse(configFile, nullptr, true, true);
         } else {
@@ -60,7 +59,7 @@ struct StateManagerImpl : public StateManager
         }
         //delete old temp files
         std::error_code deleteError;
-        fs::remove_all(dataDir / "temp", deleteError);
+        fs::remove_all(_dataDir / "temp", deleteError);
 
         _ffmpegPath = FindFFmpegPath();
         if (_ffmpegPath.empty()) {
@@ -78,19 +77,25 @@ struct StateManagerImpl : public StateManager
     {
         auto& content = msg.Content;
 
-        LogTrace("ControlMessage: {} {} + {} bytes", (int)msg.Type, msg.Content.dump(), msg.BinaryContent.size());
+        if (msg.Type != MessageType::IDLE) {
+            LogTrace("ControlMessage: {} {} + {} bytes", (int)msg.Type, msg.Content.dump(), msg.BinaryContent.size());
+        }
 
         switch (msg.Type) {
-            case MessageType::SERVER_OPEN: {
-                std::ifstream srcJsFile(_dataDir / "Soggfy.js", std::ios::binary);
+            case MessageType::IDLE: {
+                std::ifstream srcJsFile(_uicScriptPath, std::ios::binary);
 
                 if (srcJsFile.good()) {
-                    LogInfo("Injecting JS...");
+                    LogInfo("Attempting to inject client JS bundle...");
                     std::string srcJs(std::istreambuf_iterator<char>(srcJsFile), {});
-                    Utils::Replace(srcJs, "ws://127.0.0.1:28653/sgf_ctrl", msg.Content["addr"]);
+
+                    srcJs.insert(0, "if (!window.__sgf_nonce) { window.__sgf_nonce=1;\n\n");
+                    srcJs.append("\n}");
+
+                    std::string addr = "ws://127.0.0.1:" + std::to_string(_ctrlSv.GetListenPort()) + "/sgf_ctrl";
+                    Utils::Replace(srcJs, "ws://127.0.0.1:28653/sgf_ctrl", addr);
                     CefUtils::InjectJS(srcJs);
                 }
-                LogInfo("Ready");
                 break;
             }
             case MessageType::HELLO: {
@@ -104,7 +109,7 @@ struct StateManagerImpl : public StateManager
                 for (auto& [key, val] : content.items()) {
                     _config[key] = val;
                 }
-                std::ofstream(_configPath) << _config.dump(4);
+                std::ofstream(_dataDir / "config.json") << _config.dump(4);
 
                 if (!_config.value("downloaderEnabled", true)) {
                     std::lock_guard lock(_mutex);
@@ -569,6 +574,12 @@ struct StateManagerImpl : public StateManager
         return outPath;
     }
 
+    fs::path MakeTempPath(const std::string& filename)
+    {
+        fs::create_directories(_dataDir / "temp");
+        return _dataDir / "temp" / filename;
+    }
+
     fs::path FindFFmpegPath()
     {
         //Try Soggfy/ffmpeg/ffmpeg.exe
@@ -588,15 +599,9 @@ struct StateManagerImpl : public StateManager
         }
         return {};
     }
-
-    fs::path MakeTempPath(const std::string& filename)
-    {
-        fs::create_directories(_dataDir / "temp");
-        return _dataDir / "temp" / filename;
-    }
 };
 
-std::unique_ptr<StateManager> StateManager::New(const fs::path& dataDir)
+std::unique_ptr<StateManager> StateManager::New(const fs::path& dataDir, const fs::path& moduleDir)
 {
-    return std::make_unique<StateManagerImpl>(dataDir);
+    return std::make_unique<StateManagerImpl>(dataDir, moduleDir);
 }

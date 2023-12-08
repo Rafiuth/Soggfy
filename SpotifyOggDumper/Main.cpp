@@ -3,37 +3,18 @@
 #include "StateManager.h"
 #include "Utils/Log.h"
 #include "Utils/Hooks.h"
+#include "Utils/Utils.h"
 #include "CefUtils.h"
 
 HMODULE _selfModule;
 std::shared_ptr<StateManager> _stateMgr;
-
-template <int... Offsets>
-constexpr char* TraversePointers(void* ptr)
-{
-    for (int offset : { Offsets... }) {
-        ptr = *(char**)((char*)ptr + offset);
-    }
-    return (char*)ptr;
-}
-std::string ToHex(const uint8_t* data, int length)
-{
-    std::string str(length * 2, '\0');
-
-    for (int i = 0; i < length; i++) {
-        const char ALPHA[] = "0123456789abcdef";
-        str[i * 2 + 0] = ALPHA[(data[i] >> 4) & 15];
-        str[i * 2 + 1] = ALPHA[(data[i] >> 0) & 15];
-    }
-    return str;
-}
 
 struct PlayerState {
     uint8_t unknown1[0x3E0];
     uint8_t playback_id[16];
 
     std::string getPlaybackId() const {
-        return ToHex(playback_id, 16);
+        return Utils::ToHex(playback_id, 16);
     }
 };
 
@@ -94,7 +75,7 @@ DETOUR_FUNC(__fastcall, int, DecodeAudioData, (
     int samplesDecoded = sampleBuffer.size - param_3->size;
 
     if (bytesRead > 0) {
-        auto playerState = (PlayerState*)TraversePointers<0, -0x40, 0x40, 0x128, 0x1E8, 0x150>(_ebp);
+        auto playerState = (PlayerState*)Utils::TraversePointers<0, -0x40, 0x40, 0x128, 0x1E8, 0x150>(_ebp);
         std::string playbackId = playerState->getPlaybackId();
         _stateMgr->ReceiveAudioData(playbackId, encodedBuffer.data, bytesRead);
     }
@@ -115,12 +96,11 @@ void InstallHooks()
     //Signatures for Spotify v1.2.25+
     CREATE_HOOK_PATTERN(DecodeAudioData,    "Spotify.exe", "55 8B EC 51 56 8B 75 0C 8D 55 0C 57 FF 75 14 8B 7D 10 8B 46 04 52 8D 55 FC 89 45 FC FF 37 8B 47 04 52 FF 36 89 45 0C 8B 01 FF 75 08 FF 50 04 8B 06 8B 4D FC 29 4E 04 8D 14 88 8B 45 08 89 16 8B 17 8B 4F 04 03 55 0C 2B 4D 0C 89 17 89 4F 04 5F 5E C9 C2 10 00");
 
-    auto urlreqHook = CefUtils::InitUrlBlocker([&](auto url) { return _stateMgr && _stateMgr->IsUrlBlocked(url); });
-    Hooks::CreateApi(L"libcef.dll", "cef_urlrequest_create", urlreqHook.first, urlreqHook.second);
+    CefUtils::InitUrlBlocker([&](auto url) { return _stateMgr && _stateMgr->IsUrlBlocked(url); });
     Hooks::EnableAll();
 }
 
-std::filesystem::path GetModuleFileNameEx(HMODULE module)
+std::filesystem::path GetModulePath(HMODULE module)
 {
     //https://stackoverflow.com/a/33613252
     std::vector<wchar_t> pathBuf;
@@ -168,7 +148,12 @@ void Exit()
 
 DWORD WINAPI Init(LPVOID param)
 {
-    auto dataDir = GetModuleFileNameEx(_selfModule).parent_path();
+    auto dataDir = Utils::GetLocalAppDataFolder() / "Soggfy";
+    auto moduleDir = GetModulePath(_selfModule).parent_path();
+    
+    if (!fs::exists(dataDir)) {
+        fs::create_directories(dataDir);
+    }
     
     bool logToCon = true;
     fs::path logFile = dataDir / "log.txt";
@@ -182,7 +167,7 @@ DWORD WINAPI Init(LPVOID param)
     try {
         InitLogger(logToCon, logFile);
         
-        _stateMgr = StateManager::New(dataDir);
+        _stateMgr = StateManager::New(dataDir, moduleDir);
     
         spotifyVersion = GetFileVersion(L"Spotify.exe");
         LogInfo("Spotify version: {}", spotifyVersion);
@@ -194,8 +179,7 @@ DWORD WINAPI Init(LPVOID param)
         auto msg = std::format(
             "Failed to initialize Soggfy: {}\n\n"
             "This likely means that the Spotify version you are using ({}) is not supported.\n"
-            "Try updating Soggfy, or downgrading Spotify to the latest supported "
-            "version linked in the readme.",
+            "Try updating Soggfy, or downgrading Spotify to the supported version.",
             ex.what(), spotifyVersion
         );
         LogError("{}", msg);

@@ -10,6 +10,7 @@ void ControlServer::Run()
 {
     _loop = uWS::Loop::get();
     _app = std::make_unique<uWS::App>();
+    CreateIdleTimer();
 
     _app->ws<Connection>("/sgf_ctrl", {
         .compression = uWS::CompressOptions::DISABLED,
@@ -54,20 +55,12 @@ void ControlServer::Run()
             ws->getUserData()->Socket = nullptr;
         }
     });
-#if _DEBUG
-    _app->get("/", [](auto res, auto req) {
-        res->end("Soggfy it's working ;)");
-    });
-#endif
 
     int attemptNum = 0;
     std::function<void(us_listen_socket_t*)> listenHandler = [&](auto socket) {
         if (socket) {
             _socket = socket;
             LogInfo("Control server listening on port {}", _port);
-
-            std::string addr = "ws://127.0.0.1:" + std::to_string(_port) + "/sgf_ctrl";
-            _msgHandler(nullptr, { MessageType::SERVER_OPEN, { { "addr", addr } } });
         } else {
             if (attemptNum > 64) {
                 throw std::exception("Failed to open control server.");
@@ -94,12 +87,26 @@ void ControlServer::Stop()
             for (auto ws : clients) {
                 ws->end(1001, "Server is shutting down");
             }
+            us_timer_close(_idleTimer);
             us_listen_socket_close(0, _socket);
             _socket = nullptr;
         });
         std::unique_lock lock(_doneMutex);
         _doneCond.wait(lock);
     }
+}
+
+void ControlServer::CreateIdleTimer()
+{
+    _idleTimer = us_create_timer((us_loop_t*)_loop, 1, sizeof(ControlServer*));
+    *(ControlServer**)us_timer_ext(_idleTimer) = this;
+
+    us_timer_set(_idleTimer, [](us_timer_t* timer) {
+        auto sv = *(ControlServer**)us_timer_ext(timer);
+        if (sv->_clients.size() == 0) {
+            sv->_msgHandler(nullptr, { MessageType::IDLE });
+        }
+    }, 1000, 1000);
 }
 
 void SendData(WebSocket* socket, const std::string& data, uWS::OpCode opcode = uWS::BINARY)

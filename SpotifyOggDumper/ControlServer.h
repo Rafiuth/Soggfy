@@ -21,7 +21,7 @@ enum class MessageType
     //Internal
     HELLO               = -1,   //Client connected
     BYE                 = -2,   //Client disconnected
-    SERVER_OPEN         = -128  //Server listen success, message: { addr: string }
+    IDLE                = -3,   //Sent periodicaly when there are no clients connected
 };
 
 struct Message
@@ -87,11 +87,14 @@ public:
     //Sends the specified message to all connected clients. Can be called from any thread.
     void Broadcast(const Message& msg);
     void Broadcast(MessageType type, const json& content) { Broadcast({ type, content }); }
-    
+
+    int GetListenPort() const { return _port; }
+
 private:
     std::unique_ptr<uWS::App> _app;
     uWS::Loop* _loop = nullptr;
     us_listen_socket_t* _socket = nullptr;
+    us_timer_t* _idleTimer = nullptr;
     std::unordered_set<WebSocket*> _clients;
 
     std::condition_variable _doneCond;
@@ -99,6 +102,8 @@ private:
 
     int _port = 28653;
     MessageHandler _msgHandler;
+
+    void CreateIdleTimer();
 };
 
 struct Connection

@@ -1,86 +1,81 @@
 $base = $PWD.Path
-$SpotifyInstallerUrl = "https://upgrade.scdn.co/upgrade/client/win32-x86/spotify_installer-1.2.25.1011.g0348b2ea-701.exe"
+$temp = "$base\temp";
+$SpotifyDir = "$env:APPDATA\Spotify"
+
+$SpotifyInstallerUrl = "https://upgrade.scdn.co/upgrade/client/win32-x86/spotify_installer-1.2.26.1187.g36b715a1-269.exe"
 $SpotifyVersion = $SpotifyInstallerUrl -replace '.+installer-(.+)\.g.+', '$1'
+$SpotifyVersionWithCommit = $SpotifyInstallerUrl -replace '.+installer-(.+\.g.+)\.exe', '$1'
 
 Set-Location -Path "$base\"
 
-function InstallSpotify {
-    DownloadFile -Url $SpotifyInstallerUrl -DestPath "$base\SpotifyInstaller-$SpotifyVersion.exe"
+function CheckOrInstallSpotify {
+    if (Test-Path "$SpotifyDir\Spotify.exe") {
+        $installedVersion = (Get-Item "$SpotifyDir\Spotify.exe").VersionInfo.FileVersion;
 
-    Write-Host "Extracting..."
-    Start-Process -FilePath "$base\SpotifyInstaller-$SpotifyVersion.exe" -ArgumentList "/extract" -Wait
-    Remove-Item "$base\SpotifyInstaller-$SpotifyVersion.exe"
-    
-    if (Test-Path "$base\Spotify/") { 
-        Remove-Item "$base\Spotify" -Force -Recurse
-    }
-	
-    $spotifyFolder = Get-ChildItem -Filter ".\spotify-update-*"
-    Rename-Item -Path $spotifyFolder.FullName -NewName "$base\Spotify"
+        if ($installedVersion -ne $SpotifyVersion) {
+            Write-Host "The currently installed Spotify version $installedVersion may not work with this version of Soggfy."
 
-    if ((Read-Host -Prompt "Do you want to install SpotX to block ads and enable extra client features? Y/N") -eq "y") {
-        InstallSpotX
-    }
-    Remove-Item -Path "$base\Spotify\crash_reporter.cfg"
-}
-function InstallSpotX {
-    $baseUrl = "https://raw.githubusercontent.com/SpotX-Official/SpotX/5f85bf124a1f459b4016d775e4219b8ebdf135fa"
-    $src = (Invoke-WebRequest "$baseUrl/run.ps1" -UseBasicParsing).Content
-
-    # Patch the script so it runs on our install dir, and at a fixed commit so that it hopefully won't break easily
-    $src = $src.Replace('Join-Path $env:APPDATA ''Spotify', "Join-Path '$base\Spotify' '");
-    $src = $src.Replace('https://spotx-official.github.io/SpotX', $baseUrl);
-    $src = $src.Replace('[System.Text.Encoding]::UTF8.GetString($response)', '$response');
-
-    # Set-Content -Path "spotx_patched.ps1" -Value $src
-    Invoke-Expression "&{ $src } -new_theme -block_update_on"
-}
-
-function InstallFFmpeg {
-    if ([Environment]::Is64BitOperatingSystem) {
-        $repoUrl = "https://api.github.com/repos/BtbN/FFmpeg-Builds/releases/latest"
-        $platform = "win64"
-    } else {
-        $repoUrl = "https://api.github.com/repos/sudo-nautilus/FFmpeg-Builds-Win32/releases/latest"
-        $platform = "win32"
-    }
-    $release = Invoke-WebRequest $repoUrl -UseBasicParsing | ConvertFrom-Json
-
-    foreach ($asset in $release.assets) {
-        if ($asset.name -cmatch "ffmpeg-n.+$platform-gpl-shared") {
-            DownloadFile -Url $asset.browser_download_url -DestPath "$base\$($asset.name)"
-            
-            # Remove previous installation
-            if (Test-Path "$base\ffmpeg\") {
-                Remove-Item -Path "$base\ffmpeg\" -Recurse -Force
-            }
-            New-Item -ItemType Directory -Path "$base\ffmpeg\" -Force | Out-Null
-            
-            # Extract bin/ folder to ffmpeg/
-            Add-Type -Assembly System.IO.Compression.FileSystem
-            $zip = [IO.Compression.ZipFile]::OpenRead("$base\$($asset.name)")
-
-            foreach ($entry in $zip.Entries) {
-                if ($entry.FullName -notlike "*/bin/*.*") { continue; }
-                [IO.Compression.ZipFileExtensions]::ExtractToFile($entry, "$base\ffmpeg\" + $entry.Name)
-            }
-            $zip.Dispose()
-
-            # Delete zip
-            Remove-Item "$base\$($asset.name)"
-            
-            return
+            if ((Read-Host -Prompt "Do you want to reinstall to the recommended version ($SpotifyVersion)? Y/N") -ne "y") { return; }
         }
+        else {
+            return;
+        }
+        
+        Stop-Process -Name "Spotify" -ErrorAction SilentlyContinue
     }
+    DownloadFile -Url $SpotifyInstallerUrl -DestPath "$temp\SpotifyInstaller-$SpotifyVersion.exe"
 
-    Write-Host "Failed to install ffmpeg. Try downloading it from https://ffmpeg.org/download.html and extract the binaries into the 'Soggfy/ffmpeg/' directory."
+    Write-Host "Installing..."
+
+    # Remove everything but user folders, to avoid conflicts with Spicetify extracted files
+    Remove-Item -Path $SpotifyDir -Recurse -Exclude ("Users\", "prefs") -ErrorAction SilentlyContinue
+
+    # Other undocumented switches: /extract /log-file
+    Start-Process -FilePath "$temp\SpotifyInstaller-$SpotifyVersion.exe" -ArgumentList "/silent /skip-app-launch" -Wait
+    Remove-Item -Path "$SpotifyDir\crash_reporter.cfg" -ErrorAction SilentlyContinue
+
+    if ((Read-Host -Prompt "Do you want to install SpotX to block ads, updates, and enable extra client features? Y/N") -eq "y") {
+        $src = (Invoke-WebRequest "https://spotx-official.github.io/run.ps1" -UseBasicParsing).Content
+        $src = [System.Text.Encoding]::UTF8.GetString($src);
+        Invoke-Expression "& { $src } -new_theme -block_update_on -version $SpotifyVersionWithCommit"
+    }
+}
+function InstallFFmpeg {
+    where.exe /q ffmpeg
+    if ($LastExitCode -eq 0) {
+        Write-Host "Will use FFmpeg binaries found in %PATH% at '$(where.exe ffmpeg)'."
+        return;
+    }
+    if ((Test-Path "$env:LOCALAPPDATA\Soggfy\ffmpeg\ffmpeg.exe")) {
+        if ((Read-Host -Prompt "Do you want to re-install or update FFmpeg? Y/N") -ne "y") { return; }
+
+        Remove-Item -Path "$env:LOCALAPPDATA\Soggfy\ffmpeg\" -Recurse -Force
+    }
+    $arch = $(if ([Environment]::Is64BitOperatingSystem) { "win64" } else { "win32" })
+    $release = Invoke-WebRequest "https://api.github.com/repos/AnimMouse/ffmpeg-autobuild/releases/latest" -UseBasicParsing | ConvertFrom-Json
+    $asset = $release.assets | Where-Object { $_.name.Contains($arch) } | Select-Object -First 1
+
+    DownloadFile -Url $asset.browser_download_url -DestPath "$temp/$($asset.name)"
+    DownloadFile -Url "https://7-zip.org/a/7zr.exe" -DestPath "$temp/7zr.exe"
+
+    & "$temp\7zr.exe" e "$temp\$($asset.name)" -y -o"$env:LOCALAPPDATA\Soggfy\ffmpeg\" ffmpeg.exe
+}
+function InstallSoggfy {
+    Write-Host "Copying Soggfy files..."
+    Copy-Item -Path "$base\SpotifyOggDumper.dll" -Destination "$SpotifyDir\dpapi.dll"
+    Copy-Item -Path "$base\SoggfyUIC.js" -Destination "$SpotifyDir\SoggfyUIC.js"
+    Write-Host "Done."
 }
 
 function DownloadFile($Url, $DestPath) {
     $req = [System.Net.WebRequest]::CreateHttp($Url)
     $resp = $req.GetResponse()
     $is = $resp.GetResponseStream()
+
+    $name = [System.IO.Path]::GetFileName($DestPath)
+    [System.IO.Directory]::CreateDirectory([System.IO.Path]::GetDirectoryName($DestPath))
     $os = [System.IO.File]::Create($DestPath)
+
     try {
         $buffer = New-Object byte[] (1024 * 512)
         $lastProgUpdate = 0
@@ -88,33 +83,28 @@ function DownloadFile($Url, $DestPath) {
             $bytesRead = $is.Read($buffer, 0, $buffer.Length);
             if ($bytesRead -le 0) { break; }
             $os.Write($buffer, 0, $bytesRead);
-            
-            # Delay progress updates because they are awfully slow
+
+            # Throttle progress updates because they slowdown download too much
             if ([Environment]::TickCount - $lastProgUpdate -lt 100) { continue; }
             $lastProgUpdate = [Environment]::TickCount;
 
             $totalReceived = $os.Position / 1048576
             $totalLength = $resp.ContentLength / 1048576
             Write-Progress `
-                -Activity "Downloading $DestPath" `
+                -Activity "Downloading $name" `
                 -Status ('{0:0.00}MB of {1:0.00}MB' -f $totalReceived, $totalLength) `
                 -PercentComplete ($totalReceived * 100 / $totalLength)
         }
-        Write-Progress -Activity "Downloading $DestPath" -Completed
+        Write-Progress -Activity "Downloading $name" -Completed
     } finally {
         $os.Dispose()
         $resp.Dispose()
     }
 }
 
-if (-not (Test-Path '$base\Spotify\Spotify.exe') -or ((Get-Item "$base\Spotify\Spotify.exe").VersionInfo.FileVersion -ne $SpotifyVersion)) {
-    Write-Host "Installing Spotify..."
-    InstallSpotify
-}
-where.exe /q ffmpeg
-if (-not (Test-Path '$base\ffmpeg\ffmpeg.exe') -and ($LastExitCode -eq 1)) {
-    Write-Host "Installing ffmpeg..."
-    InstallFFmpeg
-}
-Write-Host "Everything done. You can now run Injector.exe"
+CheckOrInstallSpotify
+InstallSoggfy
+InstallFFmpeg
+
+Write-Host "Everything done. Soggfy will be enabled on the next Spotify launch.";
 Pause

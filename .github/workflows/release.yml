@@ -35,8 +35,7 @@ jobs:
 
         npm install
         npm run build
-        Copy-Item dist/bundle.js ../build/Release/Soggfy.js
-        Copy-Item dist/bundle.js.map ../build/Release/Soggfy.js.map
+        Copy-Item dist/*.* ../build/Release/
         cd ../
         
     - name: Create Zip

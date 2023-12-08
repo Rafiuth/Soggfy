@@ -181,20 +181,7 @@ void DeleteSpotifyUpdate()
     }
     CoTaskMemFree(localAppData);
 }
-bool IsFFmpegInstalled()
-{
-    //Try Soggfy/ffmpeg/ffmpeg.exe
-    if (fs::exists("ffmpeg/ffmpeg.exe")) {
-        return true;
-    }
-    //Try %PATH%
-    std::wstring envPath;
-    DWORD envPathLen = SearchPath(NULL, L"ffmpeg.exe", NULL, 0, envPath.data(), NULL);
-    if (envPathLen != 0) {
-        return true;
-    }
-    return false;
-}
+
 void EnableAnsiColoring()
 {
     HANDLE handle = GetStdHandle(STD_OUTPUT_HANDLE);
@@ -205,10 +192,10 @@ void EnableAnsiColoring()
 
 int main(int argc, char* argv[])
 {
-    bool attach = false;
+    bool launch = false;
     bool enableRemoteDebug = false;
     for (int i = 0; i < argc; i++) {
-        attach |= strcmp(argv[i], "-a") == 0;
+        launch |= strcmp(argv[i], "-l") == 0;
         enableRemoteDebug |= strcmp(argv[i], "-d") == 0;
     }
     
@@ -216,7 +203,7 @@ int main(int argc, char* argv[])
 
     try {
         HANDLE targetProc;
-        if (attach) {
+        if (!launch) {
             targetProc = FindSpotifyProcess();
         } else {
             KillSpotifyProcesses();
@@ -229,11 +216,6 @@ int main(int argc, char* argv[])
         CloseHandle(targetProc);
         
         std::cout << COL_GREEN "Injection succeeded!\n" COL_RESET;
-
-        if (!IsFFmpegInstalled()) {
-            std::cout << COL_YELLOW "Note: FFmpeg binaries were not found, songs won't be tagged nor converted.\n";
-            std::cout << COL_YELLOW "Run Install.ps1 or add ffmpeg to the PATH environment variable.\n" COL_RESET;
-        }
     } catch (std::exception& ex) {
         std::cout << COL_RED "Error: " << ex.what() << "\n" COL_RESET;
     }

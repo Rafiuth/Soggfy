@@ -172,6 +172,10 @@ namespace Utils
     {
         return GetKnownPath(FOLDERID_RoamingAppData);
     }
+    fs::path GetLocalAppDataFolder()
+    {
+        return GetKnownPath(FOLDERID_LocalAppData);
+    }
     fs::path GetMusicFolder()
     {
         return GetKnownPath(FOLDERID_Music);

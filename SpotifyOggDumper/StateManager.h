@@ -14,5 +14,5 @@ public:
     //Closes any open files and the control server.
     virtual void Shutdown() = 0;
 
-    static std::unique_ptr<StateManager> New(const std::filesystem::path& dataDir);
+    static std::unique_ptr<StateManager> New(const fs::path& dataDir, const fs::path& moduleDir);
 };

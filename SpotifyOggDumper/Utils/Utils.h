@@ -36,6 +36,7 @@ namespace Utils
     std::string ExpandEnvVars(const std::string& str);
 
     fs::path GetAppDataFolder();
+    fs::path GetLocalAppDataFolder();
     fs::path GetMusicFolder();
     void RevealInFileExplorer(const fs::path& path);
 
@@ -51,7 +52,25 @@ namespace Utils
      */
     fs::path NormalizeToLongPath(const fs::path& path, bool force = false);
 
-    int64_t CurrentMillis();
+    template <int... Offsets>
+    constexpr char* TraversePointers(void* ptr)
+    {
+        for (int offset : { Offsets... }) {
+            ptr = *(char**)((char*)ptr + offset);
+        }
+        return (char*)ptr;
+    }
+    inline std::string ToHex(const uint8_t* data, int length)
+    {
+        std::string str(length * 2, '\0');
+
+        for (int i = 0; i < length; i++) {
+            const char ALPHA[] = "0123456789abcdef";
+            str[i * 2 + 0] = ALPHA[(data[i] >> 4) & 15];
+            str[i * 2 + 1] = ALPHA[(data[i] >> 0) & 15];
+        }
+        return str;
+    }
 }
 
 class ProcessBuilder
