@@ -8,6 +8,32 @@ $SpotifyVersionWithCommit = $SpotifyInstallerUrl -replace '.+installer-(.+\.g.+)
 
 Set-Location -Path "$base\"
 
+function New-Hyperlink {
+  <#
+        .SYNOPSIS
+            Creates a VT Hyperlink in a supported terminal such as Windows Terminal 1.4+
+        .NOTES
+            There's a more powerful version of this, with color support and more, in PANSIES
+        .EXAMPLE
+            New-Hyperlink https://github.com/Jaykul/PANSIES PANSIES
+            Creates a hyperlink with the text PANSIES which links to the github project
+    #>
+  [Alias("Url")]
+  [CmdletBinding()]
+  param(
+    # The Uri the hyperlink should point to
+    [Parameter(Mandatory, ValueFromPipeline, ValueFromPipelineByPropertyName)]
+    [string]$Uri,
+
+    # The text of the hyperlink (if not specified, defaults to the URI)
+    [ValidateNotNullOrEmpty()]
+    [Parameter(ValueFromRemainingArguments)]
+    [String]$InputObject = $Uri
+  )
+  $8 = [char]27 + "]8;;"
+  "$8{0}`a{1}$8`a" -f $Uri, $InputObject
+}
+
 function CheckOrInstallSpotify {
     if (Test-Path "$SpotifyDir\Spotify.exe") {
         $installedVersion = (Get-Item "$SpotifyDir\Spotify.exe").VersionInfo.FileVersion;
@@ -35,7 +61,7 @@ function CheckOrInstallSpotify {
     Remove-Item -Path "$SpotifyDir\crash_reporter.cfg" -ErrorAction SilentlyContinue
 
     if ((Read-Host -Prompt "Do you want to install SpotX to block ads, updates, and enable extra client features? Y/N") -eq "y") {
-        $flags = Read-Host -Prompt "Input any desired SpotX flags (forced flags: -new_theme -block_update_on)"
+        $flags = Read-Host -Prompt "Input any desired $(New-Hyperlink 'https://github.com/SpotX-Official/SpotX/discussions/60' 'SpotX parameters') (forced flags: -new_theme -block_update_on)"
         $src = (Invoke-WebRequest "https://spotx-official.github.io/run.ps1" -UseBasicParsing).Content
         $src = [System.Text.Encoding]::UTF8.GetString($src);
         Invoke-Expression "& { $src } $flags -new_theme -block_update_on -version $SpotifyVersionWithCommit"
