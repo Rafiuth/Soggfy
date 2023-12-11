@@ -53,7 +53,7 @@ function CheckOrInstallSpotify {
 
     Write-Host "Installing..."
 
-    # Remove everything but user folders, to avoid conflicts with Spicetify extracted files
+    # Remove everything but user folders, to prevent conflicts with Spicetify extracted files
     Remove-Item -Path $SpotifyDir -Recurse -Exclude ("Users\", "prefs") -ErrorAction SilentlyContinue
 
     # Other undocumented switches: /extract /log-file
@@ -65,6 +65,12 @@ function CheckOrInstallSpotify {
         $src = (Invoke-WebRequest "https://spotx-official.github.io/run.ps1" -UseBasicParsing).Content
         $src = [System.Text.Encoding]::UTF8.GetString($src);
         Invoke-Expression "& { $src } $flags -new_theme -block_update_on -version $SpotifyVersionWithCommit"
+    }
+    
+    where.exe /q spicetify
+    if ($LastExitCode -eq 0) {
+        Write-Host "Re-applying Spicetify..."
+        spicetify.exe backup apply --no-restart
     }
 }
 function InstallFFmpeg {
@@ -79,7 +85,7 @@ function InstallFFmpeg {
         Remove-Item -Path "$env:LOCALAPPDATA\Soggfy\ffmpeg\" -Recurse -Force
     }
     $arch = $(if ([Environment]::Is64BitOperatingSystem) { "win64" } else { "win32" })
-    $release = Invoke-WebRequest "https://api.github.com/repos/AnimMouse/ffmpeg-autobuild/releases/latest" -UseBasicParsing | ConvertFrom-Json
+    $release = Invoke-WebRequest "https://api.github.com/repos/AnimMouse/ffmpeg-stable-autobuild/releases/latest" -UseBasicParsing | ConvertFrom-Json
     $asset = $release.assets | Where-Object { $_.name.Contains($arch) } | Select-Object -First 1
 
     DownloadFile -Url $asset.browser_download_url -DestPath "$temp/$($asset.name)"
