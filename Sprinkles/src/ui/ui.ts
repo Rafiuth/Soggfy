@@ -260,8 +260,8 @@ export default class UI {
         
         //Add new entries
         let props = Utils.getReactProps(menuList.parentElement, menuList);
-        let contextUri = props.contextUri ?? props.uri ?? props.reference.uri;
-        let trackUris = props.contextUri && props.uri ? [props.uri] : props.uris;
+        let contextUri = props.contextUri ?? props.uri ?? props.reference?.uri ?? props.context?.uri;
+        let trackUris = props.contextUri && props.uri ? [props.uri] : (props.uris ?? (props.item ? [props.item?.uri] : []));
 
         for (let descFactory of HookDescs.reverse()) {
             let desc = descFactory(contextUri, trackUris);
