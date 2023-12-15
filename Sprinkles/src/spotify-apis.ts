@@ -19,8 +19,6 @@ async function getPlatform(): Promise<any> {
         platform ??= reactRoot.current?.child?.child?.stateNode?.props?.children?.props?.children?.props?.children?.props?.platform;
         */
 
-        if (!platform) throw Error("Can't find Spotify platform object");
-
         return platform;
     }
     function callback(resolve) {
