@@ -1,4 +1,4 @@
-$base = $PWD.Path
+$base = $PSScriptRoot
 $temp = "$base\temp";
 $SpotifyDir = "$env:APPDATA\Spotify"
 
@@ -8,50 +8,31 @@ $SpotifyVersionWithCommit = $SpotifyInstallerUrl -replace '.+installer-(.+\.g.+)
 
 Set-Location -Path "$base\"
 
-function New-Hyperlink {
-  <#
-        .SYNOPSIS
-            Creates a VT Hyperlink in a supported terminal such as Windows Terminal 1.4+
-        .NOTES
-            There's a more powerful version of this, with color support and more, in PANSIES
-        .EXAMPLE
-            New-Hyperlink https://github.com/Jaykul/PANSIES PANSIES
-            Creates a hyperlink with the text PANSIES which links to the github project
-    #>
-  [Alias("Url")]
-  [CmdletBinding()]
-  param(
-    # The Uri the hyperlink should point to
-    [Parameter(Mandatory, ValueFromPipeline, ValueFromPipelineByPropertyName)]
-    [string]$Uri,
-
-    # The text of the hyperlink (if not specified, defaults to the URI)
-    [ValidateNotNullOrEmpty()]
-    [Parameter(ValueFromRemainingArguments)]
-    [String]$InputObject = $Uri
-  )
-  $8 = [char]27 + "]8;;"
-  "$8{0}`a{1}$8`a" -f $Uri, $InputObject
-}
-
 function CheckOrInstallSpotify {
     if (Test-Path "$SpotifyDir\Spotify.exe") {
         $installedVersion = (Get-Item "$SpotifyDir\Spotify.exe").VersionInfo.FileVersion;
+        $arch = GetExeTargetMachine -Path "$SpotifyDir\Spotify.exe";
 
-        if ($installedVersion -ne $SpotifyVersion) {
-            Write-Host "The currently installed Spotify version $installedVersion may not work with this version of Soggfy."
+        if (($installedVersion -ne $SpotifyVersion) -or ($arch -ne "x86_32")) {
+            Write-Host "The currently installed Spotify version $installedVersion-$arch may not be compatible with this version of Soggfy." -ForegroundColor Yellow
 
-            if ((Read-Host -Prompt "Do you want to reinstall to the recommended version ($SpotifyVersion)? Y/N") -ne "y") { return; }
+            if ((Read-Host -Prompt "Replace with the recommended version ($SpotifyVersion-x86_32)? Y/N") -ne "y") { return; }
         }
         else {
             return;
         }
+    }
+    elseif (Get-AppxPackage -Name SpotifyAB.SpotifyMusic) {
+        Write-Host "Spotify install from Microsoft Store is not supported." -ForegroundColor Yellow
+        if ((Read-Host -Prompt "Replace with classic version? Y/N") -ne "y") { return; }
 
-        Stop-Process -Name "Spotify" -ErrorAction SilentlyContinue
+        Get-AppxPackage -Name SpotifyAB.SpotifyMusic | Remove-AppxPackage
     }
     DownloadFile -Url $SpotifyInstallerUrl -DestPath "$temp\SpotifyInstaller-$SpotifyVersion.exe"
 
     Write-Host "Installing..."
+
+    Stop-Process -Name "Spotify" -ErrorAction SilentlyContinue
 
     # Remove everything but user folders, to prevent conflicts with Spicetify extracted files
     Remove-Item -Path $SpotifyDir -Recurse -Exclude ("Users\", "prefs") -ErrorAction SilentlyContinue
@@ -95,11 +76,65 @@ function InstallFFmpeg {
 }
 function InstallSoggfy {
     Write-Host "Copying Soggfy files..."
-    Copy-Item -Path "$base\SpotifyOggDumper.dll" -Destination "$SpotifyDir\dpapi.dll"
-    Copy-Item -Path "$base\SoggfyUIC.js" -Destination "$SpotifyDir\SoggfyUIC.js"
+    Copy-Item -Path "$base\Release\SpotifyOggDumper.dll" -Destination "$SpotifyDir\dpapi.dll"
+    Copy-Item -Path "$base\Release\SoggfyUIC.js" -Destination "$SpotifyDir\SoggfyUIC.js"
     Write-Host "Done."
 }
 
+# Helper functions
+
+function New-Hyperlink {
+    <#
+        .SYNOPSIS
+            Creates a VT Hyperlink in a supported terminal such as Windows Terminal 1.4+
+        .NOTES
+            There's a more powerful version of this, with color support and more, in PANSIES
+        .EXAMPLE
+            New-Hyperlink https://github.com/Jaykul/PANSIES PANSIES
+            Creates a hyperlink with the text PANSIES which links to the github project
+    #>
+    [Alias("Url")]
+    [CmdletBinding()]
+    param(
+        # The Uri the hyperlink should point to
+        [Parameter(Mandatory, ValueFromPipeline, ValueFromPipelineByPropertyName)]
+        [string]$Uri,
+
+        # The text of the hyperlink (if not specified, defaults to the URI)
+        [ValidateNotNullOrEmpty()]
+        [Parameter(ValueFromRemainingArguments)]
+        [String]$InputObject = $Uri
+    )
+    $8 = [char]27 + "]8;;"
+    "$8{0}`a{1}$8`a" -f $Uri, $InputObject
+}
+
+function GetExeTargetMachine($Path) {
+    $fs = [System.IO.File]::OpenRead($Path);
+    $rd = New-Object -TypeName IO.BinaryReader -ArgumentList $fs;
+
+    try {
+        if ($rd.ReadUInt16() -ne 0x5A4D) { return "(bad dos sig)"; } # DOS header signature: "MZ"
+
+        $fs.Position = 0x3C;
+        $fs.Position = $rd.ReadUInt32();
+        if ($rd.ReadUInt32() -ne 0x00004550) { return "(bad coff sig)"; } # COFF header signature: "PE\0\0"
+        
+        $mach = $rd.ReadUInt16();
+        if ($mach -eq 0x014c) { return "x86_32"; } # IMAGE_FILE_MACHINE_I386
+        if ($mach -eq 0x8664) { return "x86_64"; } # IMAGE_FILE_MACHINE_AMD64
+        if ($mach -eq 0xaa64) { return "arm64"; }  # IMAGE_FILE_MACHINE_ARM64
+        return $mach.ToString("X4");
+    }
+    catch {
+        return "(bad pe file)";
+    }
+    finally {
+        $fs.Dispose();
+    }
+}
+
+# Faster file download function, alternative to Invoke-WebRequest and the dozen other alternatives.
 function DownloadFile($Url, $DestPath) {
     $req = [System.Net.WebRequest]::CreateHttp($Url)
     $resp = $req.GetResponse()
@@ -135,9 +170,11 @@ function DownloadFile($Url, $DestPath) {
     }
 }
 
+# Entry point
+
 CheckOrInstallSpotify
 InstallSoggfy
 InstallFFmpeg
 
-Write-Host "Everything done. Soggfy will be enabled on the next Spotify launch.";
+Write-Host "Everything done. Soggfy will be enabled on the next Spotify launch." -ForegroundColor Green
 Pause

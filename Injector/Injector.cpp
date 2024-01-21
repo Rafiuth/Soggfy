@@ -115,7 +115,7 @@ HANDLE FindSpotifyProcess()
         }
     });
     if (procId == 0) {
-        throw std::exception("Couldn't find target process");
+        return INVALID_HANDLE_VALUE;
     }
     return OpenProcess(
         PROCESS_QUERY_INFORMATION | PROCESS_CREATE_THREAD |
@@ -202,10 +202,8 @@ int main(int argc, char* argv[])
     EnableAnsiColoring();
 
     try {
-        HANDLE targetProc;
-        if (!launch) {
-            targetProc = FindSpotifyProcess();
-        } else {
+        HANDLE targetProc = FindSpotifyProcess();
+        if (launch || targetProc == INVALID_HANDLE_VALUE) {
             KillSpotifyProcesses();
             DeleteSpotifyUpdate();
             targetProc = LaunchSpotifyProcess(enableRemoteDebug);
