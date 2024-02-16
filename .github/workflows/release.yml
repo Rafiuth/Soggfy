@@ -10,11 +10,11 @@ jobs:
     runs-on: windows-latest
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - uses: microsoft/setup-msbuild@v1.1
-    - uses: actions/setup-node@v3
+    - uses: actions/setup-node@v4
       with:
-        node-version: 16
+        node-version: 18
         cache: 'npm'
         cache-dependency-path: Sprinkles/package-lock.json
 
@@ -35,7 +35,6 @@ jobs:
 
         npm install
         npm run build
-        Copy-Item dist/*.* ../build/Release/
         cd ../
         
     - name: Create Zip
@@ -46,8 +45,9 @@ jobs:
         } else {
           $ver = $Env:GITHUB_SHA.Substring(0, 8) + "-pre";
         }
-        (Get-Content "./Scripts/Install.ps1").Replace("__BUILD_VERSION__", $ver) | Set-Content "./Scripts/Install.ps1" 
-        7z a "-xr!*.lib" "-xr!*.exp" "-xr!*.pdb" build/Soggfy-$ver.zip ./build/Release ./Scripts/*
+        
+        Copy-Item ./Sprinkles/dist/*.* ./build/Release/
+        7z a "-xr!*.lib" "-xr!*.exp" "-xr!*.pdb" build/Soggfy-$ver.zip ./build/Release/ ./Scripts/*
 
     - name: Upload Binaries
       uses: softprops/action-gh-release@v1
@@ -58,7 +58,7 @@ jobs:
         files: 'build/*.zip'
         
     - name: Upload Artifacts
-      uses: actions/upload-artifact@v2
+      uses: actions/upload-artifact@v4
       if: ${{ github.ref_type != 'tag' }}
       with:
         path: build/*.zip

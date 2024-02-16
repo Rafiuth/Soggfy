@@ -43,7 +43,7 @@ If you are having issues with the install script, try following the steps below 
 3. Copy `SoggfyUIC.js` to `%appdata%/Spotify/SoggfyUIC.js`
 4. Download and extract [FFmpeg binaries](https://github.com/AnimMouse/ffmpeg-autobuild/releases) to `%localappdata%/Soggfy/ffmpeg/ffmpeg.exe` (or add them to `%PATH%`).
 
-Alternatively, Soggfy can be injected into a running Spotify process by running `Injector.exe`.
+Alternatively, `Injector.exe` can be used to launch _or_ inject Soggfy into an already running Spotify instance. A portable and self-contained install can be made by copying Spotify binaries from `%appdata%/Spotify/` to `Soggfy/Spotify/`.
 
 # Credits
 - [XSpotify](https://web.archive.org/web/20200303145624/https://github.com/meik97/XSpotify) and spotifykeydumper - Inspiration for this project

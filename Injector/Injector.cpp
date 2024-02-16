@@ -126,10 +126,15 @@ HANDLE FindSpotifyProcess()
 HANDLE LaunchSpotifyProcess(bool enableRemoteDebug)
 {
     fs::path exePath = fs::absolute("Spotify/Spotify.exe");
-    fs::path workDir = exePath.parent_path();
     if (!fs::exists(exePath)) {
-        throw std::exception("Spotify installation not found. Run Install.ps1 and try again.");
+        PWSTR appData;
+        SHGetKnownFolderPath(FOLDERID_RoamingAppData, 0, NULL, &appData);
+        exePath = fs::path(appData) / "Spotify/Spotify.exe";
     }
+    if (!fs::exists(exePath)) {
+        throw std::exception("Spotify installation not found.");
+    }
+    fs::path workDir = exePath.parent_path();
     std::cout << "Launching Spotify...\n";
 
     PROCESS_INFORMATION proc = {};

@@ -22,12 +22,18 @@ export default class UI {
         style.innerHTML = MergedStyles;
         document.head.appendChild(style);
 
-        this.addTopbarButtons();
+        let topbarDiv = this.addTopbarButtons();
 
         let bodyObs = new MutationObserver(() => {
             let menuList = document.querySelector("#context-menu ul");
             if (menuList !== null && !menuList["_sgf_handled"]) {
                 this.onContextMenuOpened(menuList);
+            }
+            // Lyrics page will delete topbar header 
+            if (!topbarDiv.isConnected) {
+                let fwdButton = document.querySelector("[data-testid='top-bar-forward-button'], .main-topBar-forward");
+                let topbarContainer = fwdButton.parentElement;
+                topbarContainer.append(topbarDiv);
             }
         });
         //playlist context menus are delayed, so we need to observe subtrees too

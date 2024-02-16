@@ -10,7 +10,7 @@ HMODULE _selfModule;
 std::shared_ptr<StateManager> _stateMgr;
 
 struct PlayerState {
-    uint8_t unknown1[0x3E0];
+    uint8_t unknown1[0x3E8];
     uint8_t playback_id[16];
 
     std::string getPlaybackId() const {
@@ -148,10 +148,14 @@ void Exit()
 
 DWORD WINAPI Init(LPVOID param)
 {
-    auto dataDir = Utils::GetLocalAppDataFolder() / "Soggfy";
-    auto moduleDir = GetModulePath(_selfModule).parent_path();
-    
-    if (!fs::exists(dataDir)) {
+    fs::path moduleDir = GetModulePath(_selfModule).parent_path();
+    fs::path dataDir = Utils::GetLocalAppDataFolder() / "Soggfy";
+
+    // Portable config heuristic: config.json placed next to DLL or injected launch with no persistent config 
+    if (fs::exists(moduleDir / "config.json") || (!fs::exists(moduleDir / "Spotify.exe") && !fs::exists(dataDir / "config.json"))) {
+        dataDir = moduleDir;
+    }
+    else if (!fs::exists(dataDir)) {
         fs::create_directories(dataDir);
     }
     
