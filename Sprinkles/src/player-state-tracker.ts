@@ -1,5 +1,5 @@
 import Utils from "./utils";
-import { Player, PlayerState, TrackInfo, SpotifyUtils } from "./spotify-apis";
+import { Player, PlayerState, TrackInfo, SpotifyUtils, Platform } from "./spotify-apis";
 import Resources from "./resources";
 import config, { isTrackIgnored } from "./config";
 import { PathTemplate, TemplatedSearchTree } from "./path-template";
@@ -40,6 +40,11 @@ export default class PlayerStateTracker {
                 SpotifyUtils.resetCurrentTrack(false);
             }
         });
+
+        // Force highest audio quality (4=very high, automatically clamped to 3 for free users)
+        let settings = Platform.getSettingsAPI();
+        settings.quality.streamingQuality.setValue(4);
+        settings.quality.autoAdjustQuality.setValue(false);
     }
 
     /** Returns limited track metadata for a given playbackId, or null. */
