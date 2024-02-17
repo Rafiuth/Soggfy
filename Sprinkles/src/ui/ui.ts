@@ -31,19 +31,22 @@ export default class UI {
             }
             // Lyrics page will delete topbar header 
             if (!topbarDiv.isConnected) {
-                let fwdButton = document.querySelector("[data-testid='top-bar-forward-button'], .main-topBar-forward");
-                let topbarContainer = fwdButton.parentElement;
-                topbarContainer.append(topbarDiv);
+                this.addTopbarButtons(topbarDiv);
             }
         });
         //playlist context menus are delayed, so we need to observe subtrees too
         bodyObs.observe(document.body, { childList: true, subtree: true });
     }
 
-    private addTopbarButtons() {
-        let fwdButton = document.querySelector("[data-testid='top-bar-forward-button'], .main-topBar-forward");
+    private addTopbarButtons(existingDiv = undefined) {
+        let fwdButton = document.querySelector("[data-testid='top-bar-forward-button'], .main-topBar-forward, .main-topBar-responsiveForward");
         let topbarContainer = fwdButton.parentElement;
         let buttonClass = fwdButton.classList[0];
+
+        if (existingDiv) {
+            topbarContainer.append(existingDiv);
+            return;
+        }
 
         let div = document.createElement("div");
         div.className = "sgf-topbar-retractor";
